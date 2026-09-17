@@ -12,7 +12,7 @@ categories = ["command-line-utilities"]
 include = ["src/**", "assets/**", "Cargo.toml", "README.md", "LICENSE"]
 
 [dependencies]
-quvyta-framework = { version = "0.1.1", path = "../framework/crates/quvyta-framework" }
+quvyta-framework = "0.1.1"
 
 [lints.rust]
 unsafe_code = "forbid"
