@@ -1,0 +1,47 @@
+# English: the final fallback language. Every other locale is checked against this file.
+
+[meta]
+name = "English"
+code = "en"
+
+[header]
+tagline = "Terminal applications, made with care"
+
+[status]
+ready = "Ready"
+coming = "In the works"
+
+[detail]
+package = "Package"
+command = "Command"
+source = "Source"
+add = "Add to a project"
+coming = "Not released yet. Once it is, quvyta will install it for you."
+
+[hints]
+switch = "switch"
+
+[family.framework]
+tab = "Framework"
+title = "Quvyta Framework"
+summary = "The Rust framework every Quvyta application is built on: the runtime, the widgets, and theme, icon and language files. Anyone can use it to build terminal applications of their own."
+
+[family.code]
+tab = "qcode"
+title = "Quvyta Code"
+summary = "A home for coding agent harnesses. It runs on Podman or Docker and switches between harnesses in a moment."
+
+[family.focus]
+tab = "qfocus"
+title = "Quvyta Focus"
+summary = "Focus tracking in the terminal. Set yourself tasks and follow, with charts, how long you worked on each."
+
+[family.tools]
+tab = "qtools"
+title = "Quvyta Tools"
+summary = "A Linux tool, Arch Linux first, for the jobs usually done by hand in the terminal: setting up ufw, installing paru, GTK and Qt appearance."
+
+[family.packages]
+tab = "qpackages"
+title = "Quvyta Packages"
+summary = "One simple place for pacman, AUR, Flatpak and Snap packages. You choose which sources are on; a missing one can be installed from inside."

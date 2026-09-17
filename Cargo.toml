@@ -1,0 +1,30 @@
+[package]
+name = "quvyta"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+description = "Installs and introduces the Quvyta family of terminal applications"
+repository = "https://github.com/quvyta/quvyta"
+readme = "README.md"
+keywords = ["tui", "terminal", "quvyta"]
+categories = ["command-line-utilities"]
+include = ["src/**", "assets/**", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+quvyta-framework = { version = "0.1.1", path = "../framework/crates/quvyta-framework" }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+cast_lossless = "deny"
+needless_pass_by_value = "deny"
+redundant_closure_for_method_calls = "deny"
+semicolon_if_nothing_returned = "deny"
+uninlined_format_args = "deny"

@@ -1,0 +1,46 @@
+[meta]
+name = "Türkçe"
+code = "tr"
+fallback = "en"
+
+[header]
+tagline = "Özenle yapılmış terminal uygulamaları"
+
+[status]
+ready = "Hazır"
+coming = "Hazırlanıyor"
+
+[detail]
+package = "Paket"
+command = "Komut"
+source = "Kaynak"
+add = "Projeye ekle"
+coming = "Henüz yayınlanmadı. Yayınlanınca quvyta senin için kuracak."
+
+[hints]
+switch = "geçiş"
+
+[family.framework]
+tab = "Framework"
+title = "Quvyta Framework"
+summary = "Bütün Quvyta uygulamalarının üzerinde durduğu Rust framework'ü: çalışma zamanı, bileşenler, tema, ikon ve dil dosyaları. Herkes kendi terminal uygulamasını onunla yazabilir."
+
+[family.code]
+tab = "qcode"
+title = "Quvyta Code"
+summary = "Kodlama ajanı harness'ları için bir yuva. Podman ya da Docker üzerinde çalışır, harness'lar arasında bir anda geçiş yapar."
+
+[family.focus]
+tab = "qfocus"
+title = "Quvyta Focus"
+summary = "Terminalde odak takibi. Kendine işler ayırırsın, hangisine ne kadar çalıştığını grafiklerle izlersin."
+
+[family.tools]
+tab = "qtools"
+title = "Quvyta Tools"
+summary = "Önce Arch Linux için, terminalde genelde elle yapılan işleri hızlandıran bir Linux aracı: ufw kurulumu, paru kurulumu, GTK ve Qt görünümü."
+
+[family.packages]
+tab = "qpackages"
+title = "Quvyta Packages"
+summary = "pacman, AUR, Flatpak ve Snap paketleri için tek ve sade bir yer. Hangi kaynakların açık olacağını sen seçersin; eksik olanı içeriden kurabilirsin."
