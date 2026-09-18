@@ -65,7 +65,7 @@ pub const FAMILY: [Member; 5] = [
     Member {
         key: "packages",
         package: "quvyta-packages",
-        command: Some("qpackages"),
+        command: Some("qpac"),
         repository: "https://github.com/quvyta/packages",
         install: "cargo install quvyta-packages",
         status: Status::Beta,
