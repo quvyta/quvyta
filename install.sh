@@ -383,9 +383,12 @@ rc_has_path() {
 }
 
 # rustup keeps fish's line in a file of its own, which fish reads at start-up.
+fish_rustup_file() {
+    echo "${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/rustup.fish"
+}
+
 fish_has_rustup_path() {
-    [ "$bin_dir" = "$HOME/.cargo/bin" ] &&
-        [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/rustup.fish" ]
+    [ "$bin_dir" = "$HOME/.cargo/bin" ] && [ -f "$(fish_rustup_file)" ]
 }
 
 # Sets path_state: on-path (nothing to do), next-terminal (a start-up file adds the folder, so a
@@ -405,8 +408,13 @@ ensure_path() {
         say "  $path_line"
         return 0
     fi
-    if rc_has_path "$rc_file" "$path_line" || { [ "$shell" = fish ] && fish_has_rustup_path; }; then
+    if rc_has_path "$rc_file" "$path_line"; then
         say "$rc_file already adds it; a new terminal will pick it up."
+        path_state=next-terminal
+        return 0
+    fi
+    if [ "$shell" = fish ] && fish_has_rustup_path; then
+        say "$(fish_rustup_file) already adds it; a new terminal will pick it up."
         path_state=next-terminal
         return 0
     fi

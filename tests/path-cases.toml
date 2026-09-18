@@ -1,0 +1,508 @@
+# The PATH rules of quvyta and install.sh, one case per table. Both are held to this file:
+# `src/shell_path.rs` reads it in its unit tests and `tests/install/run.sh` runs install.sh
+# against every case.
+#
+# Each case runs in an empty temporary folder: {root} is that folder and {home} is {root}/home,
+# the HOME of the case. Paths and file contents are written with these two placeholders.
+#
+# The format is kept small enough for the shell reader in run.sh:
+# - `key = 'text'` (literal strings only, on one line) and `key = true` or `false`;
+# - a file's content as a multi-line literal string, opened by `'''` alone at the end of the
+#   key's line and closed by `'''` at the end of a line (a closing `'''` right after the last
+#   character means the file does not end with a newline);
+# - no comments after a value.
+#
+# Keys:
+# - name: what the case is about.
+# - shell: the value of SHELL; left out when SHELL is not set at all.
+# - cargo_home, xdg_config_home, zdotdir: the value of CARGO_HOME, XDG_CONFIG_HOME, ZDOTDIR;
+#   left out when the variable is not set.
+# - on_path: whether cargo's bin folder is already on PATH.
+# - file: the start-up file the rules look at for this shell.
+# - before: the file's content before the run; left out when the file does not exist.
+# - link_to: when set, `file` is a symbolic link to this path, and `before` is the content of
+#   the link's target.
+# - extra_file: an empty file that exists before the run (rustup's own fish file).
+# - outcome: on-path (nothing to do), already (a start-up file already adds the folder; a new
+#   terminal finds the programs), add (the line would be added to `file`), unknown (a shell the
+#   rules do not know: the line is only shown).
+# - line: the line that is added (add) or shown (unknown).
+# - configured_by: for already, the file that adds the folder.
+# - shown_file: `file` as it is shown to the user, with ~ for the home folder.
+# - after: for add, the content of `file` after adding.
+
+# --- Already on PATH: nothing is looked at or written
+
+[[case]]
+name = 'on-path-bash'
+shell = '/bin/bash'
+on_path = true
+file = '{home}/.bashrc'
+outcome = 'on-path'
+
+[[case]]
+name = 'on-path-unknown-shell'
+shell = '/bin/tcsh'
+on_path = true
+outcome = 'on-path'
+
+[[case]]
+name = 'on-path-cargo-home-elsewhere'
+shell = '/bin/bash'
+cargo_home = '{root}/elsewhere'
+on_path = true
+file = '{home}/.bashrc'
+outcome = 'on-path'
+
+# --- bash
+
+[[case]]
+name = 'bash-no-file'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'bash-empty-file'
+shell = '/usr/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+before = ''
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'bash-keeps-what-is-there'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+alias ll='ls -l'
+'''
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+alias ll='ls -l'
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'bash-file-without-last-newline'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+alias ll='ls -l''''
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+alias ll='ls -l'
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'bash-our-line-present'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+alias ll='ls -l'
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+outcome = 'already'
+configured_by = '{home}/.bashrc'
+
+[[case]]
+name = 'bash-our-line-commented-out'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+# export PATH="$HOME/.cargo/bin:$PATH"
+'''
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+# export PATH="$HOME/.cargo/bin:$PATH"
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'bash-rustup-env-line'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+. "$HOME/.cargo/env"
+'''
+outcome = 'already'
+configured_by = '{home}/.bashrc'
+
+[[case]]
+name = 'bash-shell-without-folder'
+shell = 'bash'
+on_path = false
+file = '{home}/.bashrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+# --- Where cargo lives
+
+[[case]]
+name = 'cargo-home-set-to-the-default'
+shell = '/bin/bash'
+cargo_home = '{home}/.cargo'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+. "$HOME/.cargo/env"
+'''
+outcome = 'already'
+configured_by = '{home}/.bashrc'
+
+[[case]]
+name = 'cargo-home-empty-means-default'
+shell = '/bin/bash'
+cargo_home = ''
+on_path = false
+file = '{home}/.bashrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'cargo-home-elsewhere-in-home'
+shell = '/bin/bash'
+cargo_home = '{home}/cargo'
+on_path = false
+file = '{home}/.bashrc'
+outcome = 'add'
+line = 'export PATH="$HOME/cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'cargo-home-elsewhere-ignores-rustup-env'
+shell = '/bin/bash'
+cargo_home = '{home}/cargo'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+. "$HOME/.cargo/env"
+'''
+outcome = 'add'
+line = 'export PATH="$HOME/cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+. "$HOME/.cargo/env"
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'cargo-home-outside-home'
+shell = '/bin/bash'
+cargo_home = '{root}/elsewhere'
+on_path = false
+file = '{home}/.bashrc'
+outcome = 'add'
+line = 'export PATH="{root}/elsewhere/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="{root}/elsewhere/bin:$PATH"
+'''
+
+[[case]]
+name = 'cargo-home-outside-home-our-line-present'
+shell = '/bin/bash'
+cargo_home = '{root}/elsewhere'
+on_path = false
+file = '{home}/.bashrc'
+before = '''
+export PATH="{root}/elsewhere/bin:$PATH"
+'''
+outcome = 'already'
+configured_by = '{home}/.bashrc'
+
+# --- zsh
+
+[[case]]
+name = 'zsh-no-file'
+shell = '/usr/bin/zsh'
+on_path = false
+file = '{home}/.zshrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.zshrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'zsh-zdotdir'
+shell = '/bin/zsh'
+zdotdir = '{home}/zdot'
+on_path = false
+file = '{home}/zdot/.zshrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/zdot/.zshrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'zsh-zdotdir-empty-means-home'
+shell = '/bin/zsh'
+zdotdir = ''
+on_path = false
+file = '{home}/.zshrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.zshrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'zsh-rustup-env-line'
+shell = '/usr/bin/zsh'
+on_path = false
+file = '{home}/.zshrc'
+before = '''
+. "$HOME/.cargo/env"
+'''
+outcome = 'already'
+configured_by = '{home}/.zshrc'
+
+# --- fish
+
+[[case]]
+name = 'fish-no-file-no-folder'
+shell = '/usr/bin/fish'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+outcome = 'add'
+line = 'fish_add_path $HOME/.cargo/bin'
+shown_file = '~/.config/fish/config.fish'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+fish_add_path $HOME/.cargo/bin
+'''
+
+[[case]]
+name = 'fish-xdg-config-home'
+shell = '/usr/bin/fish'
+xdg_config_home = '{home}/xdg'
+on_path = false
+file = '{home}/xdg/fish/config.fish'
+outcome = 'add'
+line = 'fish_add_path $HOME/.cargo/bin'
+shown_file = '~/xdg/fish/config.fish'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+fish_add_path $HOME/.cargo/bin
+'''
+
+[[case]]
+name = 'fish-xdg-config-home-empty-means-default'
+shell = '/usr/bin/fish'
+xdg_config_home = ''
+on_path = false
+file = '{home}/.config/fish/config.fish'
+outcome = 'add'
+line = 'fish_add_path $HOME/.cargo/bin'
+shown_file = '~/.config/fish/config.fish'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+fish_add_path $HOME/.cargo/bin
+'''
+
+[[case]]
+name = 'fish-our-line-present'
+shell = '/usr/bin/fish'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+before = '''
+set -g fish_greeting
+
+# cargo programs, added by the Quvyta installer
+fish_add_path $HOME/.cargo/bin
+'''
+outcome = 'already'
+configured_by = '{home}/.config/fish/config.fish'
+
+[[case]]
+name = 'fish-rustup-conf-d'
+shell = '/usr/bin/fish'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+extra_file = '{home}/.config/fish/conf.d/rustup.fish'
+outcome = 'already'
+configured_by = '{home}/.config/fish/conf.d/rustup.fish'
+
+[[case]]
+name = 'fish-rustup-conf-d-under-xdg'
+shell = '/usr/bin/fish'
+xdg_config_home = '{home}/xdg'
+on_path = false
+file = '{home}/xdg/fish/config.fish'
+extra_file = '{home}/xdg/fish/conf.d/rustup.fish'
+outcome = 'already'
+configured_by = '{home}/xdg/fish/conf.d/rustup.fish'
+
+[[case]]
+name = 'fish-rustup-conf-d-cargo-home-elsewhere'
+shell = '/usr/bin/fish'
+cargo_home = '{root}/elsewhere'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+extra_file = '{home}/.config/fish/conf.d/rustup.fish'
+outcome = 'add'
+line = 'fish_add_path {root}/elsewhere/bin'
+shown_file = '~/.config/fish/config.fish'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+fish_add_path {root}/elsewhere/bin
+'''
+
+[[case]]
+name = 'fish-config-sources-rustup-env'
+shell = '/usr/bin/fish'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+before = '''
+source "$HOME/.cargo/env.fish"
+'''
+outcome = 'already'
+configured_by = '{home}/.config/fish/config.fish'
+
+# --- Shells the rules do not know: the line is shown, nothing is written
+
+[[case]]
+name = 'unknown-shell'
+shell = '/bin/tcsh'
+on_path = false
+outcome = 'unknown'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+
+[[case]]
+name = 'shell-not-set'
+on_path = false
+outcome = 'unknown'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+
+[[case]]
+name = 'shell-empty'
+shell = ''
+on_path = false
+outcome = 'unknown'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+
+[[case]]
+name = 'unknown-shell-cargo-home-outside-home'
+shell = '/usr/bin/nu'
+cargo_home = '{root}/elsewhere'
+on_path = false
+outcome = 'unknown'
+line = 'export PATH="{root}/elsewhere/bin:$PATH"'
+
+# --- A start-up file that is a symbolic link: the link stays, its target gets the lines
+
+[[case]]
+name = 'symlinked-file'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+link_to = '{home}/dotfiles/bashrc'
+before = '''
+alias ll='ls -l'
+'''
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+alias ll='ls -l'
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+
+[[case]]
+name = 'symlinked-file-with-our-line'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+link_to = '{home}/dotfiles/bashrc'
+before = '''
+export PATH="$HOME/.cargo/bin:$PATH"
+'''
+outcome = 'already'
+configured_by = '{home}/.bashrc'
+
+[[case]]
+name = 'symlink-to-a-missing-file'
+shell = '/bin/bash'
+on_path = false
+file = '{home}/.bashrc'
+link_to = '{home}/dotfiles/bashrc'
+outcome = 'add'
+line = 'export PATH="$HOME/.cargo/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="$HOME/.cargo/bin:$PATH"
+'''

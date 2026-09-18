@@ -11,38 +11,192 @@ tagline = "Terminal applications, made with care"
 released = "Released"
 beta = "Beta"
 
+[row]
+missing = "not installed"
+unknown = "unknown version"
+this = "{version}  this application"
+this-short = "this application"
+installing = "installing"
+installing-share = "installing {percent}%"
+queued = "queued"
+failed = "failed"
+update = "{version}  new {latest}"
+removing = "removing"
+not-removed = "not removed"
+
 [detail]
+open = "Open"
 package = "Package"
 command = "Command"
 source = "Source"
 add = "Add to a project"
 install = "Install"
+update = "Update"
+remove = "Remove"
+new = "new {version}"
+installed = "Installed"
+running = "Running"
+where = "{version}, {path}"
+unknown = "unknown version"
+elsewhere = "Installed without cargo, so whatever installed it keeps it up to date."
 beta = "A beta: it works, but its interface and files may still change between releases."
 
-[hints]
-switch = "switch"
+[nav]
+back = "Back"
 
-[family.framework]
-tab = "Framework"
-title = "Quvyta Framework"
-summary = "The Rust framework every Quvyta application is built on: the runtime, the widgets, and theme, icon and language files. Anyone can use it to build terminal applications of their own."
+[hints]
+open = "open"
+choose = "choose"
+details = "details"
+back = "back"
+install = "install"
+update = "update"
+refresh = "check for updates"
 
 [family.code]
-tab = "qcode"
 title = "Quvyta Code"
 summary = "Runs coding agent harnesses inside Podman or Docker containers. Set up a profile once, open it in any of your projects and move between harnesses and shells like tabs."
 
 [family.focus]
-tab = "qfocus"
 title = "Quvyta Focus"
 summary = "Focus tracking in the terminal. Start a counter on what you work on and see where your time went in day, week, month and year charts."
 
 [family.tools]
-tab = "qtools"
 title = "Quvyta Tools"
 summary = "Applies the settings Arch Linux users usually set up by hand, from one list: mirrors, pacman, an AUR helper, a firewall, SSH and more. Every item shows what it will touch, keeps a backup and can be undone."
 
 [family.packages]
-tab = "qpackages"
 title = "Quvyta Packages"
 summary = "A package manager for Arch Linux that shows exactly what will change before anything does. This first release manages pacman's packages; the AUR, Flatpak and Snap are recognised but not managed yet."
+
+[family.framework]
+title = "Quvyta Framework"
+summary = "The showcase of the framework: every widget, theme, icon set and language of the family, to try out live."
+library = "The framework itself is a Rust library: the runtime, the widgets, and theme, icon and language files every Quvyta application is built on. Anyone can use it to build terminal applications of their own."
+
+[family.quvyta]
+title = "Quvyta"
+summary = "This application: it lists the family, installs its members, opens them, keeps them up to date and removes them."
+
+[open]
+notice = "Opening {command}…"
+exited = "{command} closed with code {code}"
+signal = "{command} was stopped by a signal"
+failed = "{command} could not be opened"
+
+[launcher]
+problems = "Part of launcher.conf was ignored"
+
+[confirm]
+title = "Install {command}?"
+source = "Source"
+version = "Version"
+target = "Target"
+command = "Command"
+crates-io = "crates.io, {package}"
+latest = "the latest version on crates.io"
+built-here = "It is built on this machine, which may take a few minutes."
+no-sudo = "No sudo needed; it writes only under {folder}."
+cancel = "Cancel"
+install = "Install"
+update-title = "Update {command} from {from} to {to}?"
+update = "Update"
+
+[checks]
+no-cargo = "cargo, Rust's package tool, is not installed, and the family is built with it."
+install-script = "The install script sets up Rust and quvyta together"
+rustup-site = "Or install Rust with rustup, the official installer"
+old-rust = "Rust {version} is installed; the family needs {needed} or later."
+rustup-update = "rustup can bring it up to date with rustup update stable."
+update-rust = "Update Rust"
+update-rust-yourself = "Update Rust with the tool you installed it with, then check again."
+updating-rust = "Updating Rust with rustup…"
+rustup-failed = "rustup could not update Rust"
+no-linker = "Rust needs a C linker to build programs, and none was found: cc, gcc or clang."
+linker-on = "To install one on {distro}"
+no-sudo = "quvyta never runs sudo; run the command yourself, then check again."
+again = "Check again"
+
+[install]
+installing = "{command} installing"
+stop = "Stop"
+details = "Details"
+queued-title = "{command} queued"
+queued-after = "It starts when {command} is done."
+queued = "It starts in a moment."
+waiting-other-window = "Waiting for another quvyta window to finish installing."
+dequeue = "Take out of the queue"
+other-window = "Another quvyta window is installing; this one waits until it is done."
+stopped = "Stopped, nothing was installed."
+failed = "{command} could not be installed"
+not-started = "cargo could not be started: {reason}"
+nothing-changed = "Nothing was installed; nothing on the machine changed."
+last-lines = "Last lines"
+log-file = "The whole log is in {path}"
+copy-log = "Copy log"
+close = "Close"
+retry = "Retry"
+done = "{command} {version} installed"
+next-time = "The new version runs next time."
+done-unknown = "{command} installed"
+
+[install.phase]
+starting = "Starting"
+downloading = "Downloading"
+compiling = "Compiling"
+placing = "Installing"
+
+[install.failure]
+linker = "There is no C linker on this machine, and Rust programs cannot be built without one."
+rust = "It needs a newer Rust than the one installed."
+network = "crates.io could not be reached. Check the connection and try again."
+disk = "The disk is full. A build needs a few gigabytes free; make some room and try again."
+not-found = "crates.io has no such version of {package}."
+build = "The build failed."
+
+[stop]
+title = "Stop installing {command}?"
+message = "Nothing is installed and nothing on the machine changes; it can be installed again later."
+queued = "Stop the queued ones too"
+keep = "Keep installing"
+confirm = "Stop"
+
+[quit]
+title = "An install is running"
+message = "Quitting stops it; nothing is installed and nothing on the machine changes."
+confirm = "Quit"
+
+[remove]
+title = "Remove {command}?"
+message = "The program {program} is deleted, along with cargo's record of it."
+settings-kept = "Its settings in {folder} stay, so installing it again brings them back."
+settings-kept-anywhere = "Its settings stay, so installing it again brings them back."
+confirm = "Remove"
+removing = "{command} removing"
+done = "{command} removed"
+failed = "{command} could not be removed"
+failed-reason = "cargo could not remove it; its last lines say why."
+
+[updates]
+count = { one = "{n} update", other = "{n} updates" }
+install-all = "Install updates"
+checking = "Checking for updates…"
+failed = "Could not check for updates"
+
+[path]
+title = "{folder} is not on PATH"
+why = "For {command} to open when you type its name in a terminal, this line has to be added to your shell's start-up file. Opening from quvyta is not affected."
+why-any = "For the programs cargo installs to open when you type their names in a terminal, this line has to be added to your shell's start-up file. Opening from quvyta is not affected."
+unknown = "For {command} to open when you type its name in a terminal, add this line to your shell's start-up file. Opening from quvyta is not affected."
+unknown-any = "For the programs cargo installs to open when you type their names in a terminal, add this line to your shell's start-up file. Opening from quvyta is not affected."
+file = "File"
+line = "Line"
+not-now = "Not now"
+add = "Add"
+added = "Added. Terminals you open from now on can start {command} by name."
+added-any = "Added. Terminals you open from now on can start the programs cargo installs by name."
+open-terminals = "Terminals that are already open are not affected."
+ready = "Terminals you open from now on can start {command} by name."
+ready-any = "Terminals you open from now on can start the programs cargo installs by name."
+failed = "The line could not be added. You can add it yourself: click the line to copy it."
+not-remembered = "launcher.conf could not remember the answer"

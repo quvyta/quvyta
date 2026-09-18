@@ -1,0 +1,85 @@
+#!/bin/sh
+# A stand-in for cargo, so tests never build, install or remove anything.
+#
+# Tests copy this file into a temporary folder and write the scenario next to it. Each call is
+# named after what it asks for:
+#
+#   cargo install --list     list
+#   cargo install <pkg>      install, or install-<pkg> when files of that name exist
+#   cargo uninstall <pkg>    uninstall, or uninstall-<pkg> when files of that name exist
+#   cargo search ...         search
+#   cargo <anything else>    its first word
+#
+# and answers from the files of that name, all optional:
+#
+#   <name>.out    printed on standard output, as it is: `\r` progress lines included
+#   <name>.err    printed on standard error
+#   <name>.code   the exit code; 0 without it
+#   <name>.sleep  seconds to wait after printing, for a test that stops it
+#
+# An install makes CARGO_TARGET_DIR, as cargo's build does. One that exits with 0 also does what
+# cargo would: it reads the line of its package in `packages` ("<package> <command> <version>"),
+# puts an executable <command> in $CARGO_HOME/bin and records the package in list.out, in place
+# of the version it had, so the list read afterwards shows it. The version is the one after
+# `--version` when the call gives one, else the one in `packages`.
+#
+# An uninstall that exits with 0 removes the package's command from $CARGO_HOME/bin and its
+# entry from list.out.
+#
+# Every call is appended to calls.log as one line of tab-separated fields: CARGO_HOME,
+# CARGO_TARGET_DIR, the folder it runs in, then the arguments.
+set -u
+here=$(dirname "$0")
+
+name=${1:-none}
+package=
+version=
+if [ "$name" = install ] && [ "${2:-}" = --list ]; then
+    name=list
+elif [ "$name" = install ] || [ "$name" = uninstall ]; then
+    previous=
+    for arg in "$@"; do
+        case $previous in --version) version=$arg ;; esac
+        case $arg in
+            install | uninstall | -*) ;;
+            *) [ -z "$package" ] && [ "$previous" != --version ] && package=$arg ;;
+        esac
+        previous=$arg
+    done
+    [ -n "$package" ] && [ -f "$here/$name-$package.out" -o -f "$here/$name-$package.code" ] &&
+        name=$name-$package
+fi
+
+printf '%s\t%s\t%s\t%s\n' "${CARGO_HOME:-}" "${CARGO_TARGET_DIR:-}" "$(pwd)" "$*" >> "$here/calls.log"
+case $name in install*) [ -n "$package" ] && [ -n "${CARGO_TARGET_DIR:-}" ] && mkdir -p "$CARGO_TARGET_DIR/release" ;; esac
+[ -f "$here/$name.out" ] && cat "$here/$name.out"
+[ -f "$here/$name.err" ] && cat "$here/$name.err" >&2
+[ -f "$here/$name.sleep" ] && sleep "$(cat "$here/$name.sleep")"
+code=0
+[ -f "$here/$name.code" ] && code=$(cat "$here/$name.code")
+
+# Takes the entry of package $1, its line and the command lines under it, out of list.out.
+forget() {
+    [ -f "$here/list.out" ] || return 0
+    awk -v pkg="$1" '
+        /^[^ \t]/ { skip = ($1 == pkg) }
+        !skip { print }
+    ' "$here/list.out" > "$here/list.out.new" && mv "$here/list.out.new" "$here/list.out"
+}
+
+if [ -n "$package" ] && [ "$code" = 0 ] && [ -f "$here/packages" ]; then
+    while read -r pkg command known; do
+        [ "$pkg" = "$package" ] || continue
+        forget "$pkg"
+        case $name in
+            install*)
+                mkdir -p "$CARGO_HOME/bin"
+                printf '#!/bin/sh\nexit 0\n' > "$CARGO_HOME/bin/$command"
+                chmod +x "$CARGO_HOME/bin/$command"
+                printf '%s v%s:\n    %s\n' "$pkg" "${version:-$known}" "$command" >> "$here/list.out"
+                ;;
+            uninstall*) rm -f "$CARGO_HOME/bin/$command" ;;
+        esac
+    done < "$here/packages"
+fi
+exit "$code"

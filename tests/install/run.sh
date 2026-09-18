@@ -39,15 +39,11 @@ case_name=
 # The lines as they should appear in the start-up files, with $HOME left unexpanded.
 # shellcheck disable=SC2016
 bash_line='export PATH="$HOME/.cargo/bin:$PATH"'
-# shellcheck disable=SC2016
-fish_line='fish_add_path $HOME/.cargo/bin'
-# shellcheck disable=SC2016
-env_line='. "$HOME/.cargo/env"'
 
-# Sets up a fresh home. stub_dir holds the stand-ins; a case removes the ones it wants missing.
+# Sets up a fresh home, in the given folder or one named after the case. stub_dir holds the stand-ins; a case removes the ones it wants missing.
 fresh() {
     case_name=$1
-    home="$work/home-$case_name"
+    home=${2:-"$work/home-$case_name"}
     stubs="$work/stubs-$case_name"
     mkdir -p "$home" "$stubs"
     log="$home/.stub.log"
@@ -67,8 +63,8 @@ case $1 in
             quvyta-tools) bin=qtools ;;
             *) bin=$crate ;;
         esac
-        mkdir -p "$CARGO_HOME/bin"
-        : >"$CARGO_HOME/bin/$bin"
+        mkdir -p "${CARGO_HOME:-$HOME/.cargo}/bin"
+        : >"${CARGO_HOME:-$HOME/.cargo}/bin/$bin"
         ;;
 esac
 EOF
@@ -252,68 +248,164 @@ expect_output "C linker"
 expect_not_logged "cargo install"
 
 # --- PATH and the shell's start-up file
+#
+# These cases come from tests/path-cases.toml, the table quvyta's own PATH rules are tested
+# against too, so the two cannot drift apart.
 
-fresh already-on-path
-path="$home/.cargo/bin:$path"
-run --yes code
-expect_status 0
-expect_output "Run a command above by its name"
-[ ! -e "$home/.bashrc" ] || fail ".bashrc written although the folder is on PATH"
+cases="$here/../path-cases.toml"
 
-fresh bash-twice
-run --yes code
-run --yes focus
-expect_count "$home/.bashrc" "$bash_line" 1
-expect_output "already adds it"
+# Prints one value of case number $case_number exactly as the table holds it, with {root} and
+# {home} filled in, and without a newline of its own; fails when the case has no such key.
+# It reads only the part of TOML the table is written in: see the comment at its top.
+value() {
+    awk -v want="$case_number" -v key="$1" -v root="$case_root" -v home="$case_root/home" '
+        function fill(text,    out, at) {
+            out = ""
+            while ((at = index(text, "{")) > 0) {
+                if (substr(text, at, 6) == "{home}") {
+                    out = out substr(text, 1, at - 1) home
+                    text = substr(text, at + 6)
+                } else if (substr(text, at, 6) == "{root}") {
+                    out = out substr(text, 1, at - 1) root
+                    text = substr(text, at + 6)
+                } else {
+                    out = out substr(text, 1, at)
+                    text = substr(text, at + 1)
+                }
+            }
+            return out text
+        }
+        multiline {
+            if (length($0) >= 3 && substr($0, length($0) - 2) == "'"'''"'") {
+                text = text substr($0, 1, length($0) - 3)
+                multiline = 0
+                if (wanted) { printf "%s", fill(text); found = 1; exit }
+            } else {
+                text = text $0 "\n"
+            }
+            next
+        }
+        $0 == "[[case]]" { number++; next }
+        /^[ \t]*(#|$)/ { next }
+        {
+            at = index($0, " = ")
+            wanted = number == want && substr($0, 1, at - 1) == key
+            text = substr($0, at + 3)
+            if (text == "'"'''"'") { multiline = 1; text = ""; next }
+            if (wanted) {
+                if (substr(text, 1, 1) == "'"'"'") text = substr(text, 2, length(text) - 2)
+                printf "%s", fill(text); found = 1; exit
+            }
+        }
+        END { exit !found }
+    ' "$cases"
+}
 
-fresh zsh
-user_shell=/usr/bin/zsh
-run --yes code
-expect_count "$home/.zshrc" "$bash_line" 1
-[ ! -e "$home/.bashrc" ] || fail "bash file written for zsh"
+# The home folder as a list of names, with a checksum for every file, leaving out cargo's own
+# folders and the files of the harness. Equal lists mean nothing was written.
+snapshot() {
+    (cd "$home" && find . \( -path ./.cargo -o -path ./cargo \) -prune -o \
+        ! -name .out ! -name .stub.log ! -name .answers -print | sort | while read -r entry; do
+        if [ -L "$entry" ]; then
+            echo "$entry link"
+        elif [ -f "$entry" ]; then
+            echo "$entry $(cksum <"$entry")"
+        else
+            echo "$entry"
+        fi
+    done)
+}
 
-fresh zsh-zdotdir
-user_shell=/bin/zsh
-extra_env="ZDOTDIR=$home/zdot"
-mkdir -p "$home/zdot"
-run --yes code
-expect_count "$home/zdot/.zshrc" "$bash_line" 1
+# Whether a file holds exactly the text, trailing newlines included.
+same_content() {
+    [ "$(cat "$1"; echo .)" = "$(value "$2"; echo .)" ]
+}
 
-fresh fish
-user_shell=/usr/bin/fish
-run --yes code
-run --yes focus
-expect_count "$home/.config/fish/config.fish" "$fish_line" 1
-
-fresh fish-rustup-conf
-user_shell=/usr/bin/fish
-mkdir -p "$home/.config/fish/conf.d"
-: >"$home/.config/fish/conf.d/rustup.fish"
-run --yes code
-[ ! -e "$home/.config/fish/config.fish" ] || fail "config.fish written although rustup's file adds the folder"
-
-fresh rustup-env-line
-printf '%s\n' "$env_line" >"$home/.bashrc"
-run --yes code
-expect_count "$home/.bashrc" "$bash_line" 0
-
-fresh unknown-shell
-user_shell=/bin/tcsh
-run --yes code
-expect_status 0
-expect_output "$bash_line"
-[ ! -e "$home/.bashrc" ] && [ ! -e "$home/.profile" ] || fail "a start-up file was written for an unknown shell"
-
-fresh cargo-home-elsewhere
-elsewhere="$work/cargo-elsewhere"
-env_home=$home
-run_elsewhere() {
-    env -i HOME="$env_home" CARGO_HOME="$elsewhere" PATH="$path" SHELL=/bin/bash \
-        "$shell_path" "$script" "$@" >"$home/.out" 2>&1 </dev/null
+# Runs install.sh with only the variables the case sets. case_env holds VAR=value words and is
+# split on purpose.
+# shellcheck disable=SC2086
+run_path_case() {
+    env -i HOME="$home" PATH="$path" $case_env "$shell_path" "$script" --yes code >"$home/.out" 2>&1 </dev/null
     status=$?
 }
-run_elsewhere --yes code
-expect_count "$home/.bashrc" "export PATH=\"$elsewhere/bin:\$PATH\"" 1
+
+# bash fills in SHELL from the password file when it is not set, so under bash install.sh never
+# sees it unset.
+runner_sets_shell=0
+# shellcheck disable=SC2016 # the inner shell expands it
+[ "$(env -i "$shell_path" -c 'echo "${SHELL-unset}"')" = unset ] || runner_sets_shell=1
+
+case_count=$(awk '$0 == "[[case]]" { n++ } END { print n + 0 }' "$cases")
+[ "$case_count" -gt 0 ] || { echo "no cases in $cases"; failures=$((failures + 1)); }
+case_number=1
+while [ "$case_number" -le "$case_count" ]; do
+    case_root="$work/path-$case_number"
+    fresh "path-$(value name)" "$case_root/home"
+
+    if ! value shell >/dev/null && [ "$runner_sets_shell" = 1 ]; then
+        echo "skipped path case $(value name): $shell sets SHELL itself when it is not set"
+        case_number=$((case_number + 1))
+        continue
+    fi
+    case_env=
+    for variable in SHELL=shell CARGO_HOME=cargo_home XDG_CONFIG_HOME=xdg_config_home ZDOTDIR=zdotdir; do
+        if value "${variable#*=}" >/dev/null; then
+            case_env="$case_env ${variable%%=*}=$(value "${variable#*=}")"
+        fi
+    done
+    cargo_home=$(value cargo_home) && [ -n "$cargo_home" ] || cargo_home="$home/.cargo"
+    [ "$(value on_path)" = true ] && path="$cargo_home/bin:$path"
+
+    file=$(value file) || file=
+    if link_to=$(value link_to); then
+        mkdir -p "$(dirname "$file")" "$(dirname "$link_to")"
+        ln -s "$link_to" "$file"
+        value before >/dev/null && value before >"$link_to"
+    elif value before >/dev/null; then
+        mkdir -p "$(dirname "$file")"
+        value before >"$file"
+    fi
+    if extra_file=$(value extra_file); then
+        mkdir -p "$(dirname "$extra_file")"
+        : >"$extra_file"
+    fi
+    before=$(snapshot)
+
+    run_path_case
+    expect_status 0
+    outcome=$(value outcome)
+    case $outcome in
+        on-path)
+            expect_output "Run a command above by its name"
+            [ "$(snapshot)" = "$before" ] || fail "the home folder changed"
+            ;;
+        already)
+            expect_output "$(value configured_by) already adds it"
+            expect_output "Open a new terminal"
+            [ "$(snapshot)" = "$before" ] || fail "the home folder changed"
+            ;;
+        unknown)
+            expect_output "is not one this script knows"
+            expect_output "  $(value line)"
+            [ "$(snapshot)" = "$before" ] || fail "the home folder changed"
+            ;;
+        add)
+            expect_output "This line would be added to $file"
+            expect_output "  $(value line)"
+            expect_output "Added to $file"
+            same_content "$file" after || fail "$file does not hold what the table expects"
+            if [ -n "$link_to" ]; then
+                [ -L "$file" ] || fail "$file is no longer a link"
+            fi
+            # A second run finds the line it added and leaves the file alone.
+            run_path_case
+            expect_output "$file already adds it"
+            same_content "$file" after || fail "$file changed on the second run"
+            ;;
+        *) fail "unknown outcome in the table: $outcome" ;;
+    esac
+    case_number=$((case_number + 1))
+done
 
 # --- On a terminal
 

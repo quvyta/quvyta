@@ -1,0 +1,22 @@
+[1m[92m    Updating[0m crates.io index
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m quvyta-tools v0.1.2
+[1m[92m  Installing[0m quvyta-tools v0.1.2
+[1m[92m    Updating[0m crates.io index
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m ratatui v0.29.0
+[1m[92m  Downloaded[0m serde v1.0.219
+[1m[92m  Downloaded[0m unicode-width v0.2.0
+[1m[92m  Downloaded[0m rustix v1.0.5
+[1m[92m  Downloaded[0m 231 crates (18.4 MB) in 2.31s
+[1m[92m   Compiling[0m proc-macro2 v1.0.95
+[1m[96m    Building[0m [                            ] 0/231: proc-macro2                         [K[1m[92m   Compiling[0m unicode-ident v1.0.18
+[1m[96m    Building[0m [                            ] 1/231: unicode-ident                         [K[1m[92m   Compiling[0m libc v0.2.172
+[1m[96m    Building[0m [                            ] 2/231: libc                         [K[1m[92m   Compiling[0m serde v1.0.219
+[1m[96m    Building[0m [===============>            ] 140/231: serde                         [K[1m[92m   Compiling[0m rustix v1.0.5
+[1m[96m    Building[0m [================>           ] 141/231: rustix                         [K[1m[92m   Compiling[0m ratatui v0.29.0
+[1m[96m    Building[0m [================>           ] 142/231: ratatui, serde                         [K[1m[92m   Compiling[0m quvyta-framework v0.1.4
+[1m[96m    Building[0m [==========================> ] 229/231: quvyta-framework                         [K[1m[92m   Compiling[0m quvyta-tools v0.1.2
+[1m[96m    Building[0m [==========================> ] 230/231: quvyta-tools                         [K[1m[92m    Finished[0m `release` profile [optimized] target(s) in 1m 32s
+[1m[92m  Installing[0m /home/ayse/.cargo/bin/qtools
+[1m[92m   Installed[0m package `quvyta-tools v0.1.2` (executable `qtools`)

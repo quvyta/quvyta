@@ -10,38 +10,192 @@ tagline = "Özenle yapılmış terminal uygulamaları"
 released = "Yayında"
 beta = "Beta"
 
+[row]
+missing = "kurulu değil"
+unknown = "sürümü bilinmiyor"
+this = "{version}  bu uygulama"
+this-short = "bu uygulama"
+installing = "kuruluyor"
+installing-share = "kuruluyor %{percent}"
+queued = "sırada"
+failed = "kurulamadı"
+update = "{version}  yeni {latest}"
+removing = "kaldırılıyor"
+not-removed = "kaldırılamadı"
+
 [detail]
+open = "Aç"
 package = "Paket"
 command = "Komut"
 source = "Kaynak"
 add = "Projeye ekle"
 install = "Kur"
+update = "Güncelle"
+remove = "Kaldır"
+new = "yeni {version}"
+installed = "Kurulu"
+running = "Çalışan"
+where = "{version}, {path}"
+unknown = "sürümü bilinmiyor"
+elsewhere = "cargo dışında bir yoldan kurulmuş; güncel tutmak onu kuranın işi."
 beta = "Beta sürümü: çalışıyor, ama arayüzü ve dosyaları sürümler arasında hâlâ değişebilir."
 
-[hints]
-switch = "geçiş"
+[nav]
+back = "Geri"
 
-[family.framework]
-tab = "Framework"
-title = "Quvyta Framework"
-summary = "Bütün Quvyta uygulamalarının üzerinde durduğu Rust framework'ü: çalışma zamanı, bileşenler, tema, ikon ve dil dosyaları. Herkes kendi terminal uygulamasını onunla yazabilir."
+[hints]
+open = "aç"
+choose = "seç"
+details = "ayrıntı"
+back = "geri"
+install = "kur"
+update = "güncelle"
+refresh = "güncellemeleri denetle"
 
 [family.code]
-tab = "qcode"
 title = "Quvyta Code"
 summary = "Kodlama ajanı harness'larını Podman ya da Docker kapsayıcılarında çalıştırır. Bir profili bir kez kurarsın, sonra onu istediğin projede açar, harness'lar ve kabuklar arasında sekme gibi geçersin."
 
 [family.focus]
-tab = "qfocus"
 title = "Quvyta Focus"
 summary = "Terminalde odak takibi. Üzerinde çalıştığın şeye bir sayaç başlatırsın, zamanının nereye gittiğini gün, hafta, ay ve yıl grafikleriyle görürsün."
 
 [family.tools]
-tab = "qtools"
 title = "Quvyta Tools"
 summary = "Arch Linux kullanıcılarının genelde elle yaptığı ayarları tek bir listeden uygular: yansılar, pacman, bir AUR yardımcısı, güvenlik duvarı, SSH ve fazlası. Her madde neye dokunacağını gösterir, yedek alır ve geri alınabilir."
 
 [family.packages]
-tab = "qpackages"
 title = "Quvyta Packages"
 summary = "Arch Linux için, bir şey değişmeden önce neyin değişeceğini tam olarak gösteren bir paket yöneticisi. Bu ilk sürüm pacman paketlerini yönetir; AUR, Flatpak ve Snap tanınır ama henüz yönetilmez."
+
+[family.framework]
+title = "Quvyta Framework"
+summary = "Framework'ün vitrini: ailenin bütün bileşenleri, temaları, ikon setleri ve dilleri, canlı olarak denemek için."
+library = "Framework'ün kendisi bir Rust kütüphanesi: bütün Quvyta uygulamalarının üzerinde durduğu çalışma zamanı, bileşenler, tema, ikon ve dil dosyaları. Herkes kendi terminal uygulamasını onunla yazabilir."
+
+[family.quvyta]
+title = "Quvyta"
+summary = "Bu uygulama: aileyi listeler, üyelerini kurar, açar, güncel tutar ve kaldırır."
+
+[open]
+notice = "{command} açılıyor…"
+exited = "{command} {code} koduyla kapandı"
+signal = "{command} bir sinyalle durduruldu"
+failed = "{command} açılamadı"
+
+[launcher]
+problems = "launcher.conf'un bir kısmı yok sayıldı"
+
+[confirm]
+title = "{command} kurulsun mu?"
+source = "Kaynak"
+version = "Sürüm"
+target = "Hedef"
+command = "Komut"
+crates-io = "crates.io, {package}"
+latest = "crates.io'daki en son sürüm"
+built-here = "Program bu makinede derlenir; birkaç dakika sürebilir."
+no-sudo = "sudo gerekmez, yalnızca {folder} altına yazılır."
+cancel = "Vazgeç"
+install = "Kur"
+update-title = "{command} {from} sürümünden {to} sürümüne güncellensin mi?"
+update = "Güncelle"
+
+[checks]
+no-cargo = "Rust'ın paket aracı cargo kurulu değil; aile onunla derleniyor."
+install-script = "Kurulum betiği Rust'ı ve quvyta'yı birlikte kurar"
+rustup-site = "Ya da Rust'ı resmî kurucusu rustup ile kur"
+old-rust = "Kurulu Rust {version}; aile {needed} ya da daha yenisini istiyor."
+rustup-update = "rustup onu rustup update stable ile güncelleyebilir."
+update-rust = "Rust'ı güncelle"
+update-rust-yourself = "Rust'ı hangi araçla kurduysan onunla güncelle, sonra yeniden denetle."
+updating-rust = "Rust rustup ile güncelleniyor…"
+rustup-failed = "rustup Rust'ı güncelleyemedi"
+no-linker = "Rust programları derlemek için bir C bağlayıcısı gerekiyor, ama hiçbiri bulunamadı: cc, gcc ya da clang."
+linker-on = "{distro} üzerinde kurmak için"
+no-sudo = "quvyta sudo çalıştırmaz; komutu kendin çalıştır, sonra yeniden denetle."
+again = "Yeniden denetle"
+
+[install]
+installing = "{command} kuruluyor"
+stop = "Durdur"
+details = "Ayrıntılar"
+queued-title = "{command} sırada"
+queued-after = "{command} bitince başlayacak."
+queued = "Birazdan başlayacak."
+waiting-other-window = "Başka bir quvyta penceresinin kurulumu bitirmesi bekleniyor."
+dequeue = "Sıradan çıkar"
+other-window = "Başka bir quvyta penceresi kuruyor; bu pencere o bitene kadar bekler."
+stopped = "Durduruldu, hiçbir şey kurulmadı."
+failed = "{command} kurulamadı"
+not-started = "cargo başlatılamadı: {reason}"
+nothing-changed = "Hiçbir şey kurulmadı, makinede bir şey değişmedi."
+last-lines = "Son satırlar"
+log-file = "Günlüğün tamamı {path} dosyasında"
+copy-log = "Günlüğü kopyala"
+close = "Kapat"
+retry = "Yeniden dene"
+done = "{command} {version} kuruldu"
+next-time = "Yeni sürüm bir sonraki açılışta çalışır."
+done-unknown = "{command} kuruldu"
+
+[install.phase]
+starting = "Başlıyor"
+downloading = "İndiriliyor"
+compiling = "Derleniyor"
+placing = "Yerleştiriliyor"
+
+[install.failure]
+linker = "Bu makinede C bağlayıcısı yok; Rust programları onsuz derlenemez."
+rust = "Bu sürüm, kurulu olandan daha yeni bir Rust istiyor."
+network = "crates.io'ya ulaşılamadı. Bağlantıyı denetleyip yeniden dene."
+disk = "Disk dolu. Derleme birkaç gigabayt boş yer istiyor; yer açıp yeniden dene."
+not-found = "crates.io'da {package} paketinin böyle bir sürümü yok."
+build = "Derleme hata verdi."
+
+[stop]
+title = "{command} kurulumu durdurulsun mu?"
+message = "Hiçbir şey kurulmaz, makinede bir şey değişmez; sonra yeniden kurulabilir."
+queued = "Sıradakileri de durdur"
+keep = "Kurmaya devam et"
+confirm = "Durdur"
+
+[quit]
+title = "Kurulum sürüyor"
+message = "Çıkarsan durdurulur; hiçbir şey kurulmaz, makinede bir şey değişmez."
+confirm = "Çık"
+
+[remove]
+title = "{command} kaldırılsın mı?"
+message = "{program} programı ve cargo'nun ona dair kaydı silinir."
+settings-kept = "Ayarları {folder} içinde kalır; yeniden kurarsan kaldığı yerden devam eder."
+settings-kept-anywhere = "Ayarları kalır; yeniden kurarsan kaldığı yerden devam eder."
+confirm = "Kaldır"
+removing = "{command} kaldırılıyor"
+done = "{command} kaldırıldı"
+failed = "{command} kaldırılamadı"
+failed-reason = "cargo kaldıramadı; nedeni son satırlarda."
+
+[updates]
+count = { one = "{n} güncelleme", other = "{n} güncelleme" }
+install-all = "Güncellemeleri kur"
+checking = "Güncellemeler denetleniyor…"
+failed = "Güncellemeler denetlenemedi"
+
+[path]
+title = "{folder} PATH'te değil"
+why = "Terminalde {command} yazınca açılması için bu satırın kabuğunun başlangıç dosyasına eklenmesi gerekiyor. quvyta'dan açmak bundan etkilenmez."
+why-any = "cargo'nun kurduğu programların terminalde adları yazılınca açılması için bu satırın kabuğunun başlangıç dosyasına eklenmesi gerekiyor. quvyta'dan açmak bundan etkilenmez."
+unknown = "Terminalde {command} yazınca açılması için bu satırı kabuğunun başlangıç dosyasına ekle. quvyta'dan açmak bundan etkilenmez."
+unknown-any = "cargo'nun kurduğu programların terminalde adları yazılınca açılması için bu satırı kabuğunun başlangıç dosyasına ekle. quvyta'dan açmak bundan etkilenmez."
+file = "Dosya"
+line = "Satır"
+not-now = "Şimdi değil"
+add = "Ekle"
+added = "Eklendi. Yeni açtığın terminallerde {command} yazarak açabilirsin."
+added-any = "Eklendi. Yeni açtığın terminallerde cargo'nun kurduğu programları adlarını yazarak açabilirsin."
+open-terminals = "Şu an açık olan terminaller bundan etkilenmez."
+ready = "Yeni açtığın terminallerde {command} yazarak açabilirsin."
+ready-any = "Yeni açtığın terminallerde cargo'nun kurduğu programları adlarını yazarak açabilirsin."
+failed = "Satır eklenemedi. Kendin ekleyebilirsin: satıra tıklayınca kopyalanır."
+not-remembered = "Cevap launcher.conf'a yazılamadı"
