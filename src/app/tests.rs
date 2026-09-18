@@ -29,10 +29,19 @@ fn the_language_files_load_without_problems_and_turkish_is_complete() {
 fn starts_on_the_framework_with_how_to_add_it() {
     let h = harness(100, 24);
     let screen = h.screen();
-    for text in ["quvyta", "Quvyta Framework", "Ready", "quvyta-framework", "cargo add quvyta-framework", "quit"] {
+    for text in [
+        "quvyta",
+        "Quvyta Framework",
+        "Released",
+        "quvyta-framework",
+        "Add to a project",
+        "cargo add quvyta-framework",
+        "quit",
+    ] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
     assert!(!screen.contains("Command"), "a library has no command:\n{screen}");
+    assert!(!screen.contains("beta"), "the library is not marked as a beta:\n{screen}");
 }
 
 #[test]
@@ -40,10 +49,28 @@ fn a_click_on_a_tab_shows_that_application() {
     let mut h = harness(100, 24);
     h.click_text("qcode");
     let screen = h.screen();
-    for text in ["Quvyta Code", "In the works", "Command", "github.com/quvyta/code", "Not released yet"] {
+    for text in [
+        "Quvyta Code",
+        "Beta",
+        "Command",
+        "qcode",
+        "https://github.com/quvyta/code",
+        "Install",
+        "cargo install quvyta-code",
+        "A beta",
+    ] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    assert!(!screen.contains("cargo add"), "nothing to install before release:\n{screen}");
+    assert!(!screen.contains("cargo add"), "an application is installed, not added:\n{screen}");
+}
+
+#[test]
+fn every_application_installs_under_its_package_name() {
+    for member in FAMILY.iter().filter(|member| member.command.is_some()) {
+        assert_eq!(member.install, format!("cargo install {}", member.package));
+        assert_eq!(member.status, Status::Beta, "{}", member.package);
+        assert!(member.repository.starts_with("https://github.com/quvyta/"), "{}", member.repository);
+    }
 }
 
 #[test]
@@ -87,7 +114,7 @@ fn turkish_uses_its_own_words() {
     let mut h = harness(100, 24);
     h.set_locale("tr");
     let screen = h.screen();
-    for text in ["Özenle yapılmış terminal uygulamaları", "Hazır", "Projeye ekle", "Kaynak"] {
+    for text in ["Özenle yapılmış terminal uygulamaları", "Yayında", "Projeye ekle", "Kaynak"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
 }

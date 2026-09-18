@@ -79,8 +79,8 @@ fn details(member: &Member, ui: &mut View<'_, Msg>) {
     ui.row(|ui| {
         ui.add(Text::new(text("title")).role("title").no_wrap());
         match member.status {
-            Status::Ready => ui.add(Badge::new(t!("status.ready")).variant("success")),
-            Status::Coming => ui.add(Badge::new(t!("status.coming"))),
+            Status::Released => ui.add(Badge::new(t!("status.released")).variant("success")),
+            Status::Beta => ui.add(Badge::new(t!("status.beta")).variant("info")),
         };
     })
     .gap(2);
@@ -96,11 +96,11 @@ fn details(member: &Member, ui: &mut View<'_, Msg>) {
 
     // Copyable values go under their label so a narrow screen never cuts them short.
     copyable(ui, t!("detail.source"), member.repository, "source");
-    match (member.status, member.install) {
-        (Status::Ready, Some(install)) => copyable(ui, t!("detail.add"), install, "install"),
-        _ => {
-            ui.add(Text::new(t!("detail.coming")).role("secondary")).fill_width();
-        }
+    // A library is added to a project; an application, which has a command, is installed.
+    let install = if member.command.is_some() { t!("detail.install") } else { t!("detail.add") };
+    copyable(ui, install, member.install, "install");
+    if member.status == Status::Beta {
+        ui.add(Text::new(t!("detail.beta")).role("secondary")).fill_width();
     }
 }
 

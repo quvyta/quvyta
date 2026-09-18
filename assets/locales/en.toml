@@ -8,15 +8,16 @@ code = "en"
 tagline = "Terminal applications, made with care"
 
 [status]
-ready = "Ready"
-coming = "In the works"
+released = "Released"
+beta = "Beta"
 
 [detail]
 package = "Package"
 command = "Command"
 source = "Source"
 add = "Add to a project"
-coming = "Not released yet. Once it is, quvyta will install it for you."
+install = "Install"
+beta = "A beta: it works, but its interface and files may still change between releases."
 
 [hints]
 switch = "switch"
@@ -29,19 +30,19 @@ summary = "The Rust framework every Quvyta application is built on: the runtime,
 [family.code]
 tab = "qcode"
 title = "Quvyta Code"
-summary = "A home for coding agent harnesses. It runs on Podman or Docker and switches between harnesses in a moment."
+summary = "Runs coding agent harnesses inside Podman or Docker containers. Set up a profile once, open it in any of your projects and move between harnesses and shells like tabs."
 
 [family.focus]
 tab = "qfocus"
 title = "Quvyta Focus"
-summary = "Focus tracking in the terminal. Set yourself tasks and follow, with charts, how long you worked on each."
+summary = "Focus tracking in the terminal. Start a counter on what you work on and see where your time went in day, week, month and year charts."
 
 [family.tools]
 tab = "qtools"
 title = "Quvyta Tools"
-summary = "A Linux tool, Arch Linux first, for the jobs usually done by hand in the terminal: setting up ufw, installing paru, GTK and Qt appearance."
+summary = "Applies the settings Arch Linux users usually set up by hand, from one list: mirrors, pacman, an AUR helper, a firewall, SSH and more. Every item shows what it will touch, keeps a backup and can be undone."
 
 [family.packages]
 tab = "qpackages"
 title = "Quvyta Packages"
-summary = "One simple place for pacman, AUR, Flatpak and Snap packages. You choose which sources are on; a missing one can be installed from inside."
+summary = "A package manager for Arch Linux that shows exactly what will change before anything does. This first release manages pacman's packages; the AUR, Flatpak and Snap are recognised but not managed yet."

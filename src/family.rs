@@ -1,12 +1,12 @@
 //! The members of the Quvyta family this program introduces.
 
-/// Whether a member can be used today.
+/// How settled a released member is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
-    /// Released and usable.
-    Ready,
-    /// Being built; not released yet.
-    Coming,
+    /// Released, with an interface that is expected to stay.
+    Released,
+    /// Released as a beta: usable, but its interface and files may still change.
+    Beta,
 }
 
 /// A library or application of the family. Names and descriptions live in the language files
@@ -21,9 +21,10 @@ pub struct Member {
     pub command: Option<&'static str>,
     /// Where the source lives.
     pub repository: &'static str,
-    /// What a user runs to start using it, once it is released.
-    pub install: Option<&'static str>,
-    /// Whether it is released.
+    /// What a user runs to start using it: `cargo add` for the library, `cargo install` for an
+    /// application.
+    pub install: &'static str,
+    /// How settled it is.
     pub status: Status,
 }
 
@@ -33,40 +34,40 @@ pub const FAMILY: [Member; 5] = [
         key: "framework",
         package: "quvyta-framework",
         command: None,
-        repository: "github.com/quvyta/framework",
-        install: Some("cargo add quvyta-framework"),
-        status: Status::Ready,
+        repository: "https://github.com/quvyta/framework",
+        install: "cargo add quvyta-framework",
+        status: Status::Released,
     },
     Member {
         key: "code",
         package: "quvyta-code",
         command: Some("qcode"),
-        repository: "github.com/quvyta/code",
-        install: None,
-        status: Status::Coming,
+        repository: "https://github.com/quvyta/code",
+        install: "cargo install quvyta-code",
+        status: Status::Beta,
     },
     Member {
         key: "focus",
         package: "quvyta-focus",
         command: Some("qfocus"),
-        repository: "github.com/quvyta/focus",
-        install: None,
-        status: Status::Coming,
+        repository: "https://github.com/quvyta/focus",
+        install: "cargo install quvyta-focus",
+        status: Status::Beta,
     },
     Member {
         key: "tools",
         package: "quvyta-tools",
         command: Some("qtools"),
-        repository: "github.com/quvyta/tools",
-        install: None,
-        status: Status::Coming,
+        repository: "https://github.com/quvyta/tools",
+        install: "cargo install quvyta-tools",
+        status: Status::Beta,
     },
     Member {
         key: "packages",
         package: "quvyta-packages",
         command: Some("qpackages"),
-        repository: "github.com/quvyta/packages",
-        install: None,
-        status: Status::Coming,
+        repository: "https://github.com/quvyta/packages",
+        install: "cargo install quvyta-packages",
+        status: Status::Beta,
     },
 ];

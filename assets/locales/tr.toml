@@ -7,15 +7,16 @@ fallback = "en"
 tagline = "Özenle yapılmış terminal uygulamaları"
 
 [status]
-ready = "Hazır"
-coming = "Hazırlanıyor"
+released = "Yayında"
+beta = "Beta"
 
 [detail]
 package = "Paket"
 command = "Komut"
 source = "Kaynak"
 add = "Projeye ekle"
-coming = "Henüz yayınlanmadı. Yayınlanınca quvyta senin için kuracak."
+install = "Kur"
+beta = "Beta sürümü: çalışıyor, ama arayüzü ve dosyaları sürümler arasında hâlâ değişebilir."
 
 [hints]
 switch = "geçiş"
@@ -28,19 +29,19 @@ summary = "Bütün Quvyta uygulamalarının üzerinde durduğu Rust framework'ü
 [family.code]
 tab = "qcode"
 title = "Quvyta Code"
-summary = "Kodlama ajanı harness'ları için bir yuva. Podman ya da Docker üzerinde çalışır, harness'lar arasında bir anda geçiş yapar."
+summary = "Kodlama ajanı harness'larını Podman ya da Docker kapsayıcılarında çalıştırır. Bir profili bir kez kurarsın, sonra onu istediğin projede açar, harness'lar ve kabuklar arasında sekme gibi geçersin."
 
 [family.focus]
 tab = "qfocus"
 title = "Quvyta Focus"
-summary = "Terminalde odak takibi. Kendine işler ayırırsın, hangisine ne kadar çalıştığını grafiklerle izlersin."
+summary = "Terminalde odak takibi. Üzerinde çalıştığın şeye bir sayaç başlatırsın, zamanının nereye gittiğini gün, hafta, ay ve yıl grafikleriyle görürsün."
 
 [family.tools]
 tab = "qtools"
 title = "Quvyta Tools"
-summary = "Önce Arch Linux için, terminalde genelde elle yapılan işleri hızlandıran bir Linux aracı: ufw kurulumu, paru kurulumu, GTK ve Qt görünümü."
+summary = "Arch Linux kullanıcılarının genelde elle yaptığı ayarları tek bir listeden uygular: yansılar, pacman, bir AUR yardımcısı, güvenlik duvarı, SSH ve fazlası. Her madde neye dokunacağını gösterir, yedek alır ve geri alınabilir."
 
 [family.packages]
 tab = "qpackages"
 title = "Quvyta Packages"
-summary = "pacman, AUR, Flatpak ve Snap paketleri için tek ve sade bir yer. Hangi kaynakların açık olacağını sen seçersin; eksik olanı içeriden kurabilirsin."
+summary = "Arch Linux için, bir şey değişmeden önce neyin değişeceğini tam olarak gösteren bir paket yöneticisi. Bu ilk sürüm pacman paketlerini yönetir; AUR, Flatpak ve Snap tanınır ama henüz yönetilmez."
