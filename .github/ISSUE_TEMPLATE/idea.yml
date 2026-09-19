@@ -1,0 +1,16 @@
+name: Idea
+description: Something quvyta should do, or do differently.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The situation and what gets in the way today. The need matters more than a finished solution.
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How it could work
+      description: Optional. What you would press, see or type.

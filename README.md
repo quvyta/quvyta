@@ -1,5 +1,10 @@
 # quvyta
 
+One terminal app to find, install, open and update every member of the Quvyta family.
+
+[![crates.io](https://img.shields.io/crates/v/quvyta.svg)](https://crates.io/crates/quvyta)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 ![The family in quvyta: what is installed, which version, and one update waiting](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/family.png)
 
 **quvyta** installs the Quvyta family of terminal applications, opens the ones on your machine,
@@ -108,6 +113,8 @@ and move with `←` `→`. Settings holds quvyta's own choices (checking for upd
 happens when a program closes, and whether `~/.cargo/bin` is on your PATH); `↑` `↓` pick a row,
 `enter` or `space` changes it, every change is saved at once, and `esc` goes back to Apps.
 
+![The Settings tab: checking for updates at start, what happens when an app closes, and whether cargo's folder is on PATH](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/settings.png)
+
 ## Installing, updating and removing
 
 Before anything happens quvyta shows where a member comes from, which version it gets, where the
@@ -127,14 +134,14 @@ them. quvyta can update itself; the new version runs the next time you start it.
 installing it again brings them back. quvyta does not remove itself.
 
 An opened member gets the whole terminal and starts in your home folder; when it closes, quvyta
-comes back. To go straight back to your shell instead, put this in quvyta's settings file,
-`~/.config/quvyta/launcher.conf` on Linux:
+comes back. To go straight back to your shell instead, choose it on the Settings tab, or put this
+in quvyta's settings file, `~/.config/quvyta/launcher.conf` on Linux:
 
 ```toml
 after_close = "shell"
 ```
 
-To stop quvyta from asking crates.io for updates when it starts (`r` still asks), add:
+To stop quvyta from asking crates.io for updates when it starts (`r` still asks), turn it off on the Settings tab or add:
 
 ```toml
 check_updates = false
@@ -159,6 +166,11 @@ Before your first commit, enable the checks (formatting, clippy, tests and docs)
 ```sh
 git config core.hooksPath .githooks
 ```
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) explains how.
+What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 

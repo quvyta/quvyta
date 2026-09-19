@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in quvyta or its install scripts does not work as it should.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: quvyta version
+      description: The output of `quvyta --version`, or "install.sh" / "install.ps1" if the problem is in a script.
+      placeholder: quvyta 0.2.3
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system
+      placeholder: Arch Linux, Ubuntu 24.04, macOS 15, Windows 11
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and its size
+      placeholder: kitty, 120 x 36
+  - type: dropdown
+    id: icons
+    attributes:
+      label: Do the icons look right?
+      description: quvyta draws Nerd Font icons when it can, and plain Unicode or ASCII otherwise.
+      options:
+        - "Yes"
+        - "No: boxes, question marks or wrong symbols"
+        - "Not sure"
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or output
+      description: For a failed install, the log quvyta kept (the error screen says where it is). For a script, what it printed.
+      render: text
+  - type: textarea
+    id: picture
+    attributes:
+      label: Screenshot
+      description: If the problem is on the screen, a picture helps. Drag it in here.

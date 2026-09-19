@@ -1,6 +1,6 @@
 [package]
 name = "quvyta"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -9,7 +9,7 @@ repository = "https://github.com/quvyta/quvyta"
 readme = "README.md"
 keywords = ["tui", "terminal", "quvyta"]
 categories = ["command-line-utilities"]
-include = ["src/**", "assets/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"]
+include = ["src/**", "assets/**", "Cargo.toml", "Cargo.lock", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [dependencies]
 quvyta-framework = "0.1.7"

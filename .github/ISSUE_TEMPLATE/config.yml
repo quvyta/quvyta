@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The rest of the Quvyta family
+    url: https://github.com/quvyta
+    about: A problem in qcode, qfocus, qpac, qtools or the framework belongs in that project's own repository.
