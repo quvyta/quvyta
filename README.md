@@ -36,6 +36,7 @@ open source under the MIT licence.
 | [Focus](https://github.com/quvyta/focus) | `quvyta-focus` | `qfocus` | `cargo install quvyta-focus` | Beta |
 | [Tools](https://github.com/quvyta/tools) | `quvyta-tools` | `qtools` | `cargo install quvyta-tools` | Beta |
 | [Packages](https://github.com/quvyta/packages) | `quvyta-packages` | `qpac` | `cargo install quvyta-packages` | Beta |
+| [Desktop](https://github.com/quvyta/desktop) | `quvyta-desktop` | `qdesk` | not released yet | Coming soon |
 | [Framework](https://github.com/quvyta/framework) showcase | `quvyta-framework-showcase` | `qframe` | `cargo install quvyta-framework-showcase` | Released |
 | [quvyta](https://github.com/quvyta/quvyta) | `quvyta` | `quvyta` | `cargo install quvyta` | Beta |
 
@@ -45,6 +46,9 @@ open source under the MIT licence.
   preview, a backup and an undo.
 - **qpackages** is a package manager for Arch Linux that shows exactly what will change before
   anything does.
+- **qdesk** will be a desktop inside the terminal, with windows, a dock, a launcher and a file
+  manager, made for working over SSH and on small machines. quvyta lists it already, but it is
+  not released yet, so there is nothing to install.
 - **qframe** shows off the framework every member is built on; the framework itself is a Rust
   library you add to a project with `cargo add quvyta-framework`.
 
@@ -112,6 +116,11 @@ back to the list. The header has two tabs, Apps and Settings: click one, or reac
 and move with `←` `→`. Settings holds quvyta's own choices (checking for updates at start, what
 happens when a program closes, and whether `~/.cargo/bin` is on your PATH); `↑` `↓` pick a row,
 `enter` or `space` changes it, every change is saved at once, and `esc` goes back to Apps.
+
+`quvyta show NAME` opens straight on one member's page, for example `quvyta show qfocus`; on a
+narrow terminal `esc` goes back to the list. `quvyta install NAME...` opens on the question
+before installing each member named, one after another. A name is a member's short name, its
+command or its package, and `quvyta --help` lists every form.
 
 ![The Settings tab: checking for updates at start, what happens when an app closes, and whether cargo's folder is on PATH](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/settings.png)
 

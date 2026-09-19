@@ -25,6 +25,8 @@ pub(super) fn show(
         match member.status {
             Status::Released => ui.add(Badge::new(t!("status.released")).variant("success")),
             Status::Beta => ui.add(Badge::new(t!("status.beta")).variant("info")),
+            // The accent, not a warning: nothing is wrong, it is only not out yet.
+            Status::Soon => ui.add(Badge::new(t!("status.soon")).variant("accent")),
         };
     })
     .gap(2);
@@ -60,8 +62,14 @@ pub(super) fn show(
     }
     // Copyable values go under their label so a narrow screen never cuts them short.
     copyable(ui, t!("detail.source"), member.repository, "source");
-    if member.status == Status::Beta {
-        ui.add(Text::new(t!("detail.beta")).role("secondary")).fill_width();
+    match member.status {
+        Status::Beta => {
+            ui.add(Text::new(t!("detail.beta")).role("secondary")).fill_width();
+        }
+        Status::Soon => {
+            ui.add(Text::new(t!("detail.soon")).role("faint")).fill_width();
+        }
+        Status::Released => {}
     }
 }
 

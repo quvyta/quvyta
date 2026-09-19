@@ -9,9 +9,11 @@ tagline = "Özenle yapılmış terminal uygulamaları"
 [status]
 released = "Yayında"
 beta = "Beta"
+soon = "Yakında"
 
 [row]
 missing = "kurulu değil"
+soon = "yakında"
 unknown = "sürümü bilinmiyor"
 this = "{version}  bu uygulama"
 this-short = "bu uygulama"
@@ -39,6 +41,7 @@ where = "{version}, {path}"
 unknown = "sürümü bilinmiyor"
 elsewhere = "cargo dışında bir yoldan kurulmuş; güncel tutmak onu kuranın işi."
 beta = "Beta sürümü: çalışıyor, ama arayüzü ve dosyaları sürümler arasında hâlâ değişebilir."
+soon = "Henüz yayımlanmadı: çıkana kadar kurulacak bir şey yok."
 
 [nav]
 back = "Geri"
@@ -68,6 +71,10 @@ summary = "Arch Linux kullanıcılarının genelde elle yaptığı ayarları tek
 [family.packages]
 title = "Quvyta Packages"
 summary = "Arch Linux için, bir şey değişmeden önce neyin değişeceğini tam olarak gösteren bir paket yöneticisi. Bu ilk sürüm pacman paketlerini yönetir; AUR, Flatpak ve Snap tanınır ama henüz yönetilmez."
+
+[family.desk]
+title = "Quvyta Desktop"
+summary = "Terminalin içinde çalışan bir masaüstü: pencereler, bir dock, bir başlatıcı ve bir dosya yöneticisi; SSH üzerinden çalışmak ve küçük makineler için yapıldı. Bir sunucuda qdesk yazarsın, programları tek bir kısayol ezberlemeden fareyle yan yana açarsın."
 
 [family.framework]
 title = "Quvyta Framework"
@@ -207,6 +214,7 @@ usage = "Kullanım"
 name = "AD"
 list = "aile listesini açar"
 install = "bu üyeleri kurmak için sırayla onay ister"
+show = "bu üyenin sayfasını açar"
 help = "bu yardımı gösterir"
 version = "sürümü gösterir"
 names = "Ad olarak üyenin kısa adı (code), komutu (qcode) ya da paketi (quvyta-code) yazılabilir."
@@ -214,6 +222,9 @@ unknown-option = "{option} diye bir seçenek yok"
 unknown-name = "ailede {name} adında bir üye yok"
 unknown-command = "quvyta {command} diye bir iş bilmiyor"
 no-names = "install en az bir ad bekliyor, örneğin qcode"
+show-no-name = "show bir ad bekliyor, örneğin qfocus"
+show-many = "show yalnızca bir ad alır"
+unreleased = "{command} henüz yayımlanmadı, bu yüzden kurulamaz"
 hint = "Neler yazılabileceğini görmek için: quvyta --help"
 already-installed = "Zaten kurulu: {commands}"
 

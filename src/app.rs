@@ -16,7 +16,7 @@ use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, Termination};
 use qframe::widgets::{ScrollView, Splitter, Tabs, Toast};
 
-use crate::family::FAMILY;
+use crate::family::{FAMILY, Member, Status};
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
 use crate::machine::Machine;
@@ -131,10 +131,23 @@ impl Quvyta {
     }
 
     /// Opens on the install dialogs of `members`, indexes of [`FAMILY`], one after another, as
-    /// soon as it is known which of them are installed.
+    /// soon as it is known which of them are installed. A member not released yet is left out:
+    /// it has no dialog, and it is not there already either.
     #[must_use]
     pub fn asking(mut self, members: Vec<usize>) -> Self {
-        self.asked = members.into_iter().filter(|index| *index < FAMILY.len()).collect();
+        self.asked = members.into_iter().filter(|index| FAMILY.get(*index).is_some_and(Member::published)).collect();
+        self
+    }
+
+    /// Opens on the page of the member at `index` of [`FAMILY`]: selected in the list with its
+    /// details beside it, or on a narrow screen its details alone, as a first `enter` shows them,
+    /// with `esc` back to the list. The size is not known yet, so the page is chosen for both.
+    #[must_use]
+    pub fn showing(mut self, index: usize) -> Self {
+        if index < FAMILY.len() {
+            self.selected = index;
+            self.detail_page = true;
+        }
         self
     }
 
@@ -404,7 +417,7 @@ impl Quvyta {
                 (Some(latest), _) => {
                     t!("row.update", version = state.cargo_version().unwrap_or_default(), latest = latest)
                 }
-                (None, state) => row_state(state, compact),
+                (None, state) => row_state(&FAMILY[index], state, compact),
             })
         })
     }
@@ -501,8 +514,10 @@ fn already_installed(indexes: &[usize]) -> Command<Msg> {
 }
 
 /// `compact` leaves out quvyta's own version, which its details show anyway.
-fn row_state(state: &State, compact: bool) -> String {
+fn row_state(member: &Member, state: &State, compact: bool) -> String {
     match state {
+        // Not there because it is not out yet: "not installed" would suggest installing it.
+        State::Missing if member.status == Status::Soon => t!("row.soon"),
         State::Missing => t!("row.missing"),
         State::Cargo { version, .. } => version.clone(),
         State::Elsewhere { .. } => t!("row.unknown"),
@@ -543,6 +558,8 @@ mod cli_tests;
 mod install_tests;
 #[cfg(test)]
 mod remove_tests;
+#[cfg(test)]
+mod soon_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

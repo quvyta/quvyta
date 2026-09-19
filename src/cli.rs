@@ -2,7 +2,8 @@
 //!
 //! Without arguments quvyta opens the family list. `install` opens it straight into the install
 //! dialog of the members named, one after another, so nothing is installed without the same
-//! consent the screen asks for. `--help` and `--version` answer on standard output; anything
+//! consent the screen asks for. `show` opens it on one member's page, so another program can
+//! send its user to that member. `--help` and `--version` answer on standard output; anything
 //! else is a mistake, told on standard error with exit code 2 and without opening the screen.
 //!
 //! The words come from the language files, in the language the screen would use.
@@ -36,6 +37,8 @@ pub enum Start {
     List,
     /// Asking to install these members, indexes of [`FAMILY`] in the order named.
     Install(Vec<usize>),
+    /// On the page of this member, an index of [`FAMILY`].
+    Show(usize),
 }
 
 /// What is wrong with the arguments.
@@ -49,6 +52,12 @@ pub enum Mistake {
     Command(String),
     /// `install` without a name.
     NoNames,
+    /// `install` naming a member that is not released yet, an index of [`FAMILY`].
+    Unreleased(usize),
+    /// `show` without a name.
+    NoShowName,
+    /// `show` with more than one name: there is one page to open.
+    ShowMany,
 }
 
 /// Reads the arguments, without the program's own name.
@@ -67,21 +76,44 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
         return Parsed::Wrong(Mistake::Option(option.clone()));
     }
     let Some((first, names)) = args.split_first() else { return Parsed::Open(Start::List) };
-    if first != "install" {
-        return Parsed::Wrong(Mistake::Command(first.clone()));
+    match first.as_str() {
+        "install" => install(names),
+        "show" => show(names),
+        _ => Parsed::Wrong(Mistake::Command(first.clone())),
     }
+}
+
+/// `install` with `names`.
+fn install(names: &[String]) -> Parsed {
     if names.is_empty() {
         return Parsed::Wrong(Mistake::NoNames);
     }
     let mut members = Vec::new();
     for name in names {
         let Some(index) = member(name) else { return Parsed::Wrong(Mistake::Name(name.clone())) };
+        // The whole line is refused, as for a wrong name: the ones that can be installed are
+        // better asked for again than half of what was typed started.
+        if !FAMILY[index].published() {
+            return Parsed::Wrong(Mistake::Unreleased(index));
+        }
         // Naming a member twice asks once.
         if !members.contains(&index) {
             members.push(index);
         }
     }
     Parsed::Open(Start::Install(members))
+}
+
+/// `show` with `names`. Every member has a page, the ones not released yet and quvyta too.
+fn show(names: &[String]) -> Parsed {
+    match names {
+        [] => Parsed::Wrong(Mistake::NoShowName),
+        [name] => match member(name) {
+            Some(index) => Parsed::Open(Start::Show(index)),
+            None => Parsed::Wrong(Mistake::Name(name.clone())),
+        },
+        _ => Parsed::Wrong(Mistake::ShowMany),
+    }
 }
 
 /// The member that goes by `name`: its short name, its command or its package, in any case.
@@ -128,6 +160,14 @@ impl Answer {
                     Mistake::Name(name) => t!("cli.unknown-name", name = name),
                     Mistake::Command(command) => t!("cli.unknown-command", command = command),
                     Mistake::NoNames => t!("cli.no-names"),
+                    Mistake::NoShowName => t!("cli.show-no-name"),
+                    Mistake::ShowMany => t!("cli.show-many"),
+                    // The help has nothing to add: the name was right, the member is only not
+                    // out yet.
+                    Mistake::Unreleased(index) => {
+                        let command = FAMILY.get(index).map_or("", |member| member.command);
+                        return Self::Refuse(format!("quvyta: {}\n", t!("cli.unreleased", command = command)));
+                    }
                 };
                 Self::Refuse(format!("quvyta: {what}\n{}\n", t!("cli.hint")))
             }
@@ -159,6 +199,7 @@ fn usage() -> String {
     let forms = [
         ("quvyta".to_owned(), t!("cli.list")),
         (format!("quvyta install {}...", t!("cli.name")), t!("cli.install")),
+        (format!("quvyta show {}", t!("cli.name")), t!("cli.show")),
         ("quvyta --help, -h".to_owned(), t!("cli.help")),
         ("quvyta --version, -V".to_owned(), t!("cli.version")),
     ];
@@ -253,6 +294,7 @@ Installs, opens and updates the Quvyta family of terminal applications.
 Usage
   quvyta                  open the family list
   quvyta install NAME...  ask to install these members, one dialog after another
+  quvyta show NAME        open on this member's page
   quvyta --help, -h       show this help
   quvyta --version, -V    show the version
 
@@ -266,9 +308,12 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
     #[test]
     fn help_reads_naturally_in_turkish() {
         let Answer::Say(text) = answer("tr", &["-h"]) else { panic!("help is said") };
-        for line in
-            ["Kullanım", "  quvyta install AD...  bu üyeleri kurmak için sırayla onay ister", "paketi (quvyta-code)"]
-        {
+        for line in [
+            "Kullanım",
+            "  quvyta install AD...  bu üyeleri kurmak için sırayla onay ister",
+            "  quvyta show AD        bu üyenin sayfasını açar",
+            "paketi (quvyta-code)",
+        ] {
             assert!(text.contains(line), "`{line}` is missing:\n{text}");
         }
     }
@@ -296,6 +341,62 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
         }
         let Answer::Refuse(text) = answer("tr", &["install", "qcod"]) else { panic!("refused") };
         assert_eq!(text, "quvyta: ailede qcod adında bir üye yok\nNeler yazılabileceğini görmek için: quvyta --help\n");
+    }
+
+    #[test]
+    fn show_opens_on_one_member_by_any_of_its_names() {
+        let show = |key: &str| Parsed::Open(Start::Show(index(key)));
+        let cases: [(&[&str], Parsed); 10] = [
+            (&["show", "qfocus"], show("focus")),
+            (&["show", "focus"], show("focus")),
+            (&["show", "Quvyta-Focus"], show("focus")),
+            (&["show", "qdesk"], show("desk")),
+            (&["show", "quvyta"], show("quvyta")),
+            (&["show", "qframe", "--help"], Parsed::Help),
+            (&["show"], wrong(Mistake::NoShowName)),
+            (&["show", "qcode", "qfocus"], wrong(Mistake::ShowMany)),
+            (&["show", "qcode", "qcode"], wrong(Mistake::ShowMany)),
+            (&["show", "qcod"], wrong(Mistake::Name("qcod".to_owned()))),
+        ];
+        for (args, expected) in cases {
+            assert_eq!(parsed(args), expected, "{args:?}");
+        }
+    }
+
+    #[test]
+    fn show_s_mistakes_are_told_in_the_screen_s_language() {
+        let hint = "Run quvyta --help to see what it takes.";
+        for (args, line) in [
+            (&["show"][..], "quvyta: show needs a name, such as qfocus"),
+            (&["show", "qcode", "qfocus"], "quvyta: show takes only one name"),
+            (&["show", "qcod"], "quvyta: no member of the family is called qcod"),
+        ] {
+            let refused = answer("en", args);
+            assert_eq!(refused, Answer::Refuse(format!("{line}\n{hint}\n")), "{args:?}");
+            assert_eq!(refused.code(), Some(ExitCode::from(2)));
+        }
+        let Answer::Refuse(text) = answer("tr", &["show", "a", "b"]) else { panic!("refused") };
+        assert_eq!(text, "quvyta: show yalnızca bir ad alır\nNeler yazılabileceğini görmek için: quvyta --help\n");
+        let Answer::Refuse(text) = answer("tr", &["show"]) else { panic!("refused") };
+        assert!(text.starts_with("quvyta: show bir ad bekliyor, örneğin qfocus\n"), "{text}");
+        assert_eq!(answer("en", &["show", "qdesk"]).code(), None, "a member still to come has a page too");
+    }
+
+    #[test]
+    fn a_member_not_released_yet_is_refused_in_one_line() {
+        let desk = index("desk");
+        for name in ["qdesk", "desk", "QUVYTA-DESKTOP"] {
+            assert_eq!(parsed(&["install", name]), wrong(Mistake::Unreleased(desk)), "{name}");
+        }
+        assert_eq!(parsed(&["install", "qcode", "qdesk"]), wrong(Mistake::Unreleased(desk)), "nothing starts");
+        let refused = answer("en", &["install", "desk"]);
+        assert_eq!(
+            refused,
+            Answer::Refuse("quvyta: qdesk is not released yet, so it cannot be installed\n".to_owned())
+        );
+        assert_eq!(refused.code(), Some(ExitCode::from(2)));
+        let turkish = answer("tr", &["install", "qdesk"]);
+        assert_eq!(turkish, Answer::Refuse("quvyta: qdesk henüz yayımlanmadı, bu yüzden kurulamaz\n".to_owned()));
     }
 
     #[test]

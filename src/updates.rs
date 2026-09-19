@@ -40,12 +40,13 @@ pub struct Latest {
 }
 
 impl Latest {
-    /// The answer of `cargo search`, `text`, at `checked`, keeping only the family's packages:
-    /// another crate named like the family is none of quvyta's business.
+    /// The answer of `cargo search`, `text`, at `checked`, keeping only the packages of the
+    /// family's released members: another crate named like the family, or like a member still
+    /// to come, is none of quvyta's business.
     pub fn from_search(text: &str, checked: u64) -> Self {
         let versions = parse_search(text)
             .into_iter()
-            .filter(|found| FAMILY.iter().any(|member| member.package == found.package))
+            .filter(|found| FAMILY.iter().any(|member| member.published() && member.package == found.package))
             .map(|found| (found.package, found.version))
             .collect();
         Self { checked, versions }
@@ -245,6 +246,13 @@ pub(crate) mod tests {
         assert_eq!(latest.version("quvyta-framework"), None, "the library is not a member");
         assert_eq!(latest.version("quvyta-packages-core"), None);
         assert_eq!(latest.checked, NOW);
+    }
+
+    #[test]
+    fn a_crate_named_like_a_member_still_to_come_is_not_kept() {
+        let latest = Latest::from_search(&format!("{SEARCH_OUT}quvyta-desktop = \"0.0.1\"\n"), NOW);
+        assert_eq!(latest.version("quvyta-desktop"), None);
+        assert_eq!(latest.version("quvyta-code"), Some("0.1.1"));
     }
 
     #[test]

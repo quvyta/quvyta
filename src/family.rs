@@ -1,12 +1,15 @@
 //! The members of the Quvyta family this program lists, opens and will install.
 
-/// How settled a released member is.
+/// How settled a member is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     /// Released, with an interface that is expected to stay.
     Released,
     /// Released as a beta: usable, but its interface and files may still change.
     Beta,
+    /// Not released yet: listed so the family is known whole, but there is nothing on crates.io
+    /// to install or update it from.
+    Soon,
 }
 
 /// A program of the family. Names and descriptions live in the language files under
@@ -34,11 +37,18 @@ impl Member {
     pub(crate) fn is_self(&self) -> bool {
         self.package == env!("CARGO_PKG_NAME")
     }
+
+    /// Whether crates.io has it, so quvyta may install and update it.
+    pub(crate) fn published(&self) -> bool {
+        self.status != Status::Soon
+    }
 }
 
-/// Every member, in the order they are listed. The framework library is not a program, so its
+/// Every member, in the order they are listed: the applications, the ones still to come after
+/// the ones that can be installed, then the framework and quvyta itself, which are about the
+/// family rather than members to work in. The framework library is not a program, so its
 /// showcase stands for it and carries its `cargo add` line.
-pub const FAMILY: [Member; 6] = [
+pub const FAMILY: [Member; 7] = [
     Member {
         key: "code",
         package: "quvyta-code",
@@ -74,6 +84,17 @@ pub const FAMILY: [Member; 6] = [
         repository: "https://github.com/quvyta/packages",
         library: None,
         status: Status::Beta,
+    },
+    Member {
+        key: "desk",
+        package: "quvyta-desktop",
+        command: "qdesk",
+        // A filled square in Unicode, a folder in Nerd Font: a screen of windows with a file
+        // manager on it.
+        icon: "folder",
+        repository: "https://github.com/quvyta/desktop",
+        library: None,
+        status: Status::Soon,
     },
     Member {
         key: "framework",

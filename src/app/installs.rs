@@ -263,11 +263,11 @@ impl Installs {
 }
 
 impl Quvyta {
-    /// Whether the member at `index` can be installed from here: it is not there, it is not
-    /// quvyta itself, and it is not already on its way.
+    /// Whether the member at `index` can be installed from here: it is not there, it is out on
+    /// crates.io, it is not quvyta itself, and it is not already on its way.
     pub(super) fn installable(&self, index: usize) -> bool {
         matches!(self.state(index), Some(State::Missing))
-            && FAMILY.get(index).is_some_and(|member| !member.is_self())
+            && FAMILY.get(index).is_some_and(|member| member.published() && !member.is_self())
             && !self.installs.has(index)
     }
 

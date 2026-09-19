@@ -98,7 +98,9 @@ fn state(machine: &Machine, listed: &[Installed], member: &Member) -> State {
         let cargo = by_cargo.map(|installed| installed.version.clone());
         return State::This { version: env!("CARGO_PKG_VERSION"), cargo };
     }
-    if let Some(installed) = by_cargo {
+    // cargo can only have installed a member still to come from a local build; quvyta did not
+    // put it there and crates.io has nothing to update it to, so it counts as installed elsewhere.
+    if let Some(installed) = by_cargo.filter(|_| member.published()) {
         return State::Cargo { version: installed.version.clone(), path };
     }
     match machine.find_program(member.command) {

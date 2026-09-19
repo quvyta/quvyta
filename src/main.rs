@@ -15,11 +15,12 @@ fn main() -> ExitCode {
         answer.print();
         return code;
     }
-    let asked = match answer {
-        Answer::Start(Start::Install(members)) => members,
-        _ => Vec::new(),
+    let app = Quvyta::new(Machine::from_env());
+    let app = match answer {
+        Answer::Start(Start::Install(members)) => app.asking(members),
+        Answer::Start(Start::Show(member)) => app.showing(member),
+        _ => app,
     };
-    let app = Quvyta::new(Machine::from_env()).asking(asked);
     let run = LOCALES
         .iter()
         .fold(Runtime::new(app), |runtime, (file, text)| runtime.locale_source(*file, *text))

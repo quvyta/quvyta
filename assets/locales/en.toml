@@ -10,9 +10,11 @@ tagline = "Terminal applications, made with care"
 [status]
 released = "Released"
 beta = "Beta"
+soon = "Coming soon"
 
 [row]
 missing = "not installed"
+soon = "coming soon"
 unknown = "unknown version"
 this = "{version}  this application"
 this-short = "this application"
@@ -40,6 +42,7 @@ where = "{version}, {path}"
 unknown = "unknown version"
 elsewhere = "Installed without cargo, so whatever installed it keeps it up to date."
 beta = "A beta: it works, but its interface and files may still change between releases."
+soon = "Not released yet: there is nothing to install until it is out."
 
 [nav]
 back = "Back"
@@ -69,6 +72,10 @@ summary = "Applies the settings Arch Linux users usually set up by hand, from on
 [family.packages]
 title = "Quvyta Packages"
 summary = "A package manager for Arch Linux that shows exactly what will change before anything does. This first release manages pacman's packages; the AUR, Flatpak and Snap are recognised but not managed yet."
+
+[family.desk]
+title = "Quvyta Desktop"
+summary = "A desktop that runs inside the terminal: windows, a dock, a launcher and a file manager, made for working over SSH and on small machines. Type qdesk on a server and open programs side by side with the mouse, without learning a single shortcut."
 
 [family.framework]
 title = "Quvyta Framework"
@@ -208,6 +215,7 @@ usage = "Usage"
 name = "NAME"
 list = "open the family list"
 install = "ask to install these members, one dialog after another"
+show = "open on this member's page"
 help = "show this help"
 version = "show the version"
 names = "A name is a member's short name (code), its command (qcode) or its package (quvyta-code)."
@@ -215,6 +223,9 @@ unknown-option = "there is no {option} option"
 unknown-name = "no member of the family is called {name}"
 unknown-command = "{command} is not something quvyta does"
 no-names = "install needs at least one name, such as qcode"
+show-no-name = "show needs a name, such as qfocus"
+show-many = "show takes only one name"
+unreleased = "{command} is not released yet, so it cannot be installed"
 hint = "Run quvyta --help to see what it takes."
 already-installed = "Already installed: {commands}"
 

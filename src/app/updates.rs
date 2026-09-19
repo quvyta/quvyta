@@ -42,9 +42,10 @@ impl Quvyta {
     }
 
     /// The newest version of the member at `index` on crates.io, when known: what an install
-    /// pins, so the version the dialog shows is the one installed.
+    /// pins, so the version the dialog shows is the one installed. A member not released yet has
+    /// none, whatever crates.io says: a crate under its name is not the member.
     pub(super) fn latest_version(&self, index: usize) -> Option<String> {
-        let member = FAMILY.get(index)?;
+        let member = FAMILY.get(index).filter(|member| member.published())?;
         Some(self.updates.latest.as_ref()?.version(member.package)?.to_owned())
     }
 

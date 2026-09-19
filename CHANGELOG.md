@@ -2,6 +2,11 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.2.4 (2026-09-20)
+
+- qdesk, a desktop that runs inside the terminal, joins the family list as "Coming soon". Its page shows what it will be, its command, package and source; quvyta does not offer to install or update it until it is released, and `quvyta install qdesk` says so. A build of qdesk already on your PATH opens like any other member.
+- `quvyta show NAME` opens straight on one member's page, so another program can send you to it; on a narrow terminal `esc` goes back to the list.
+
 ## 0.2.3 (2026-09-19)
 
 - The README opens with what quvyta is for in one sentence, and shows the Settings tab.

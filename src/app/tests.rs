@@ -103,6 +103,7 @@ fn the_list_shows_every_program_with_how_it_is_installed() {
         ("qfocus", "unknown version".to_owned()),
         ("qtools", "not installed".to_owned()),
         ("qpac", "not installed".to_owned()),
+        ("qdesk", "coming soon".to_owned()),
         ("qframe", "0.1.4".to_owned()),
         ("quvyta", format!("{version}  this application")),
     ] {
@@ -110,7 +111,7 @@ fn the_list_shows_every_program_with_how_it_is_installed() {
         assert!(line.contains(&state), "`{command}` should say `{state}`:\n{screen}");
     }
     let rows: Vec<&str> = screen.lines().skip(1).collect();
-    let order: Vec<usize> = ["qcode ", "qfocus ", "qtools ", "qpac ", "qframe ", "quvyta "]
+    let order: Vec<usize> = ["qcode ", "qfocus ", "qtools ", "qpac ", "qdesk ", "qframe ", "quvyta "]
         .iter()
         .map(|command| rows.iter().position(|row| row.contains(command)).expect("listed"))
         .collect();
@@ -184,7 +185,11 @@ fn quvyta_itself_shows_the_running_version() {
 fn every_program_installs_under_its_package_name() {
     for member in FAMILY {
         assert!(member.repository.starts_with("https://github.com/quvyta/"), "{}", member.repository);
-        let expected = if member.key == "framework" { Status::Released } else { Status::Beta };
+        let expected = match member.key {
+            "framework" => Status::Released,
+            "desk" => Status::Soon,
+            _ => Status::Beta,
+        };
         assert_eq!(member.status, expected, "{}", member.package);
     }
 }

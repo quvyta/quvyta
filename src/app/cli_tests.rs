@@ -1,5 +1,6 @@
 //! Starting from the command line: `quvyta install <name>...` opens on the install dialogs of
-//! the members named, one after another, and never installs without them.
+//! the members named, one after another, and never installs without them; `quvyta show <name>`
+//! opens on one member's page.
 
 use std::path::Path;
 
@@ -16,11 +17,12 @@ fn started(root: &Path, args: &[&str], width: u16) -> Harness<Quvyta> {
     let Parsed::Open(start) = cli::parse(args.iter().map(std::ffi::OsString::from)) else {
         panic!("{args:?} opens the screen")
     };
-    let asked = match start {
-        Start::Install(members) => members,
-        Start::List => Vec::new(),
+    let app = Quvyta::new(machine(root));
+    let app = match start {
+        Start::Install(members) => app.asking(members),
+        Start::Show(member) => app.showing(member),
+        Start::List => app,
     };
-    let app = Quvyta::new(machine(root)).asking(asked);
     let mut h = Harness::with_env(app, env(), width, 30);
     h.set_locale("en").set_glyph_mode(GlyphMode::Unicode);
     // The first frame asked cargo what is installed; this one hears it.
@@ -105,4 +107,42 @@ fn a_dialog_the_command_line_asked_for_opens_over_the_list_even_from_the_setting
     let _ = app.update(Msg::Inventory(crate::inventory::Inventory::read(&app.machine)));
     assert_eq!(app.tab, Tab::Apps, "the dialog belongs to the list, which shows what it starts");
     assert_eq!(app.selected, index("tools"));
+}
+
+#[test]
+fn show_opens_on_the_member_s_details_beside_the_list() {
+    let root = tempfile::tempdir().expect("temp");
+    let h = started(root.path(), &["show", "qfocus"], 100);
+    let screen = h.screen();
+    assert_eq!(h.app().selected, index("focus"));
+    assert_eq!(h.app().tab, Tab::Apps);
+    assert!(screen.contains("Quvyta Focus") && screen.contains("qtools"), "{screen}");
+    assert!(super::tests::line_with(&screen, "qfocus").contains('▌'), "its row is the one selected:\n{screen}");
+    assert!(h.app().installs.dialog.is_none() && h.handoffs().is_empty(), "showing starts nothing");
+    assert!(h.is_focused("family"), "the list keeps the keys:\n{screen}");
+}
+
+#[test]
+fn show_on_a_narrow_screen_opens_the_member_s_page_and_esc_goes_back_to_the_list() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = started(root.path(), &["show", "qfocus"], 48);
+    let screen = h.screen();
+    assert!(h.app().detail_page, "{screen}");
+    assert!(screen.contains("Quvyta Focus") && screen.contains("Back") && !screen.contains("qtools"), "{screen}");
+    h.press("esc");
+    let screen = h.screen();
+    assert!(!h.app().detail_page && screen.contains("qtools"), "{screen}");
+    assert!(super::tests::line_with(&screen, "qfocus").contains('▌'), "the member stays selected:\n{screen}");
+}
+
+#[test]
+fn show_opens_any_member_even_one_still_to_come_and_quvyta_itself() {
+    let root = tempfile::tempdir().expect("temp");
+    for (name, title) in [("qdesk", "Quvyta Desktop"), ("quvyta", "Running"), ("QTOOLS", "Quvyta Tools")] {
+        for width in [100, 48] {
+            let h = started(root.path(), &["show", name], width);
+            assert!(h.screen().contains(title), "{name} at {width}:\n{}", h.screen());
+            assert!(h.app().installs.dialog.is_none(), "{name} at {width}:\n{}", h.screen());
+        }
+    }
 }
