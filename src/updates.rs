@@ -22,20 +22,20 @@ use crate::machine::Machine;
 /// The file in the data folder that keeps the last answer.
 const FILE: &str = "latest.toml";
 /// How long an answer is used before crates.io is asked again.
-pub const FRESH: Duration = Duration::from_secs(6 * 60 * 60);
+pub(crate) const FRESH: Duration = Duration::from_secs(6 * 60 * 60);
 /// The key of the time the answer came, in seconds since 1970.
 const CHECKED: &str = "checked";
 /// The table of the versions, by package.
 const VERSIONS: &str = "versions";
 /// What cargo is asked. Every member's package starts with `quvyta`, and twenty is room for the
 /// family and the crates around it that share the name.
-pub const SEARCH: [&str; 4] = ["search", "quvyta", "--limit", "20"];
+pub(crate) const SEARCH: [&str; 4] = ["search", "quvyta", "--limit", "20"];
 
 /// The newest version of each member's package on crates.io, and when that was asked.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Latest {
     /// When crates.io answered, in seconds since 1970.
-    pub checked: u64,
+    pub(crate) checked: u64,
     versions: BTreeMap<String, String>,
 }
 
@@ -52,19 +52,19 @@ impl Latest {
     }
 
     /// The newest version of `package`, when crates.io named it.
-    pub fn version(&self, package: &str) -> Option<&str> {
+    pub(crate) fn version(&self, package: &str) -> Option<&str> {
         self.versions.get(package).map(String::as_str)
     }
 
     /// Whether the answer is younger than [`FRESH`] at `now`. One from the future, after the
     /// clock was turned back, is not trusted.
-    pub fn fresh(&self, now: u64) -> bool {
+    pub(crate) fn fresh(&self, now: u64) -> bool {
         now.checked_sub(self.checked).is_some_and(|age| age < FRESH.as_secs())
     }
 
     /// Reads the answer kept at `path`; `None` when there is none, or when the file is not one
     /// quvyta wrote whole, which is only asked again.
-    pub fn read(path: &Path) -> Option<Self> {
+    pub(crate) fn read(path: &Path) -> Option<Self> {
         let text = std::fs::read_to_string(path).ok()?;
         let settings = Settings::parse_str(FILE, &text);
         if settings.diagnostics().iter().any(|diagnostic| diagnostic.severity == Severity::Error) {
@@ -123,7 +123,7 @@ pub enum Check {
 
 /// Finds the newest versions at `now`: the kept answer while it is fresh, unless `again` asks
 /// crates.io anyway. Runs cargo and waits on the network, so it belongs in the background.
-pub fn check(machine: &Machine, again: bool, now: u64) -> Check {
+pub(crate) fn check(machine: &Machine, again: bool, now: u64) -> Check {
     let path = cache_path(machine);
     let kept = path.as_deref().and_then(Latest::read);
     if !again && let Some(kept) = kept.as_ref().filter(|kept| kept.fresh(now)) {
@@ -156,7 +156,7 @@ fn ask(machine: &Machine, now: u64) -> Option<Latest> {
 /// Whether `candidate` is a newer version than `installed`. Versions are compared as numbers,
 /// part by part, so `0.1.10` is newer than `0.1.9`; a pre-release such as `0.2.0-beta.1` comes
 /// before its release. Anything that does not read as a version is never newer.
-pub fn newer(candidate: &str, installed: &str) -> bool {
+pub(crate) fn newer(candidate: &str, installed: &str) -> bool {
     compare(candidate, installed) == Some(Ordering::Greater)
 }
 

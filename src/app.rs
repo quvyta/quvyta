@@ -9,6 +9,8 @@ mod open;
 mod path_notice;
 mod updates;
 
+use std::collections::VecDeque;
+
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, Termination};
 use qframe::widgets::{ScrollView, Splitter, Toast};
@@ -17,7 +19,8 @@ use crate::family::FAMILY;
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
 use crate::machine::Machine;
-use installs::{InstallMsg, Installs};
+pub use installs::InstallMsg;
+use installs::Installs;
 use open::Opening;
 pub use path_notice::PathMsg;
 use path_notice::PathNotice;
@@ -51,6 +54,8 @@ pub struct Quvyta {
     path_notice: Option<PathNotice>,
     /// The newest versions on crates.io and how the last check went.
     updates: Updates,
+    /// Members the command line asked to install whose dialog has not opened yet, in order.
+    asked: VecDeque<usize>,
 }
 
 /// Everything that can happen.
@@ -99,7 +104,37 @@ impl Quvyta {
             installs: Installs::default(),
             path_notice: None,
             updates: Updates::default(),
+            asked: VecDeque::new(),
         }
+    }
+
+    /// Opens on the install dialogs of `members`, indexes of [`FAMILY`], one after another, as
+    /// soon as it is known which of them are installed.
+    #[must_use]
+    pub fn asking(mut self, members: Vec<usize>) -> Self {
+        self.asked = members.into_iter().filter(|index| *index < FAMILY.len()).collect();
+        self
+    }
+
+    /// Opens the dialog of the next member asked for that can be installed. The ones that are
+    /// there already are not installed again: the first of them is shown with its details,
+    /// where its version and any update are, and a toast names them all.
+    fn ask_next(&mut self) -> Command<Msg> {
+        let mut there = Vec::new();
+        while let Some(index) = self.asked.pop_front() {
+            if self.installable(index) {
+                self.selected = index;
+                return Command::batch([already_installed(&there), self.install_update(InstallMsg::Ask(index))]);
+            }
+            there.push(index);
+        }
+        if let Some(first) = there.first().copied()
+            && self.installs.dialog.is_none()
+        {
+            let shown = self.update(if self.wide() { Msg::Select(first) } else { Msg::ShowDetail(first) });
+            return Command::batch([already_installed(&there), shown]);
+        }
+        already_installed(&there)
     }
 
     fn wide(&self) -> bool {
@@ -199,7 +234,7 @@ impl App for Quvyta {
             Msg::Inventory(inventory) => {
                 let first = self.inventory.replace(inventory).is_none();
                 if first {
-                    return self.check_path_at_start();
+                    return Command::batch([self.check_path_at_start(), self.ask_next()]);
                 }
             }
             // On a narrow list the details come first; the button is on their page.
@@ -229,7 +264,15 @@ impl App for Quvyta {
                 // The member may have changed what is installed, even itself.
                 return Command::batch([open::report(member, &outcome), self.read_inventory()]);
             }
-            Msg::Install(msg) => return self.install_update(msg),
+            Msg::Install(msg) => {
+                // Answering one dialog the command line asked for opens the next.
+                let answered = matches!(msg, InstallMsg::Close | InstallMsg::Confirm);
+                let done = self.install_update(msg);
+                if answered && self.installs.dialog.is_none() {
+                    return Command::batch([done, self.ask_next()]);
+                }
+                return done;
+            }
             Msg::Path(msg) => return self.update_path(msg),
             Msg::Updates(msg) => return self.update_update(msg),
         }
@@ -324,6 +367,11 @@ impl Quvyta {
         self.size.width.saturating_sub(if self.wide() { DETAIL_MIN } else { 1 })
     }
 
+    /// The columns the details have: beside the list, or the screen.
+    fn detail_width(&self) -> u16 {
+        if self.wide() { self.size.width.saturating_sub(self.list_column()) } else { self.size.width }
+    }
+
     /// Whether the rows are too wide for their room and should say less.
     fn compact(&self) -> bool {
         self.list_width(false) > self.list_room()
@@ -391,6 +439,15 @@ impl Quvyta {
 }
 
 /// What a list row says about how its member is installed: in words, never in colour alone.
+/// Says which of the members at `indexes` were asked for but are installed already.
+fn already_installed(indexes: &[usize]) -> Command<Msg> {
+    if indexes.is_empty() {
+        return Command::none();
+    }
+    let commands: Vec<&str> = indexes.iter().map(|index| FAMILY[*index].command).collect();
+    Command::toast(Toast::info(t!("cli.already-installed", commands = commands.join(", "))))
+}
+
 /// `compact` leaves out quvyta's own version, which its details show anyway.
 fn row_state(state: &State, compact: bool) -> String {
     match state {
@@ -415,11 +472,11 @@ fn header(ui: &mut View<'_, Msg>) {
 }
 
 #[cfg(test)]
+mod cli_tests;
+#[cfg(test)]
 mod install_tests;
 #[cfg(test)]
 mod remove_tests;
-#[cfg(test)]
-mod scenes;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

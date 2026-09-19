@@ -66,8 +66,7 @@ impl Machine {
     /// A machine whose home is `root/home`, whose `PATH` is `root/bin`, whose settings are in
     /// `root/config` (the family's folder), whose data in `root/data` and whose distribution is named in
     /// `root/etc/os-release`, with no `SHELL`, `XDG_CONFIG_HOME` or `ZDOTDIR`. Nothing outside
-    /// `root` is touched.
-    #[cfg(test)]
+    /// `root` is touched: the screen can be shown, and tried, without the real home.
     pub fn in_root(root: &Path) -> Self {
         let home = root.join("home");
         let path = root.join("bin");
@@ -114,7 +113,7 @@ impl Machine {
 
     /// The first executable file named `name` in cargo's `bin` folder or on `PATH`. Only the file
     /// is looked at; nothing is run.
-    pub fn find_program(&self, name: &str) -> Option<PathBuf> {
+    pub(crate) fn find_program(&self, name: &str) -> Option<PathBuf> {
         std::iter::once(self.cargo_bin())
             .chain(self.path.iter().cloned())
             .map(|dir| dir.join(name))
@@ -123,20 +122,20 @@ impl Machine {
 
     /// The first C linker on `PATH`, or `None` when there is none. Like [`Machine::find_program`]
     /// it only looks at the files, so a linker installed while quvyta runs is found the next time.
-    pub fn linker(&self) -> Option<PathBuf> {
+    pub(crate) fn linker(&self) -> Option<PathBuf> {
         LINKERS.iter().find_map(|name| self.find_program(name))
     }
 
     /// Cargo with `args`, told this machine's `CARGO_HOME` so it never falls back to its own
     /// idea of it; `None` when there is no cargo.
-    pub fn cargo(&self, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Option<Command> {
+    pub(crate) fn cargo(&self, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Option<Command> {
         let mut command = Command::new(self.cargo.as_ref()?);
         command.args(args).env("CARGO_HOME", &self.cargo_home);
         Some(command)
     }
 
     /// What the PATH rules look at on this machine.
-    pub fn shell_env(&self) -> Environment<'_> {
+    pub(crate) fn shell_env(&self) -> Environment<'_> {
         Environment {
             home: &self.home,
             cargo_home: Some(&self.cargo_home),
@@ -148,7 +147,7 @@ impl Machine {
     }
 
     /// `path` for people to read: the home folder is written as `~`.
-    pub fn show(&self, path: &Path) -> String {
+    pub(crate) fn show(&self, path: &Path) -> String {
         match path.strip_prefix(&self.home) {
             Ok(rest) if !self.home.as_os_str().is_empty() => Path::new("~").join(rest).display().to_string(),
             _ => path.display().to_string(),

@@ -19,7 +19,7 @@ trap 'rm -rf "$work"' EXIT
 # The basic tools install.sh relies on, and nothing else from the machine.
 tools="$work/tools"
 mkdir -p "$tools"
-for tool in grep sed basename dirname mkdir cat; do
+for tool in grep sed basename dirname mkdir cat uname; do
     ln -s "$(command -v "$tool")" "$tools/$tool"
 done
 ln -s "$shell_path" "$tools/sh"
@@ -407,6 +407,150 @@ while [ "$case_number" -le "$case_count" ]; do
     case_number=$((case_number + 1))
 done
 
+# --- macOS
+#
+# uname and xcode-select are stand-ins here: uname says Darwin, and xcode-select answers like it
+# does once Apple's Command Line Tools are installed. A C compiler stand-in stays in place, as
+# /usr/bin/cc is always there on macOS even without the tools.
+
+# Sets up a fresh home that looks like macOS with the Command Line Tools installed.
+fresh_mac() {
+    fresh "$1"
+    # shellcheck disable=SC2016 # the stand-ins expand their own arguments
+    printf '#!/bin/sh\n[ "$1" = -s ] && echo Darwin\n' >"$stubs/uname"
+    # shellcheck disable=SC2016
+    printf '#!/bin/sh\n[ "$1" = -p ] && echo /Library/Developer/CommandLineTools\n' >"$stubs/xcode-select"
+    chmod +x "$stubs/uname" "$stubs/xcode-select"
+    user_shell=/bin/zsh
+}
+
+# shellcheck disable=SC2016 # rustup's line, left unexpanded as it writes it
+rustup_line='. "$HOME/.cargo/env"'
+
+fresh_mac mac-zsh
+run --yes code
+expect_status 0
+expect_logged "cargo install --locked quvyta-code"
+expect_output "This line would be added to $home/.zprofile"
+expect_count "$home/.zprofile" "$bash_line" 1
+[ ! -e "$home/.zshrc" ] || fail ".zshrc written on macOS"
+expect_output "Open a new terminal"
+run --yes code
+expect_output "$home/.zprofile already adds it"
+expect_count "$home/.zprofile" "$bash_line" 1
+
+fresh_mac mac-zsh-zdotdir
+mkdir -p "$home/zdot"
+extra_env="ZDOTDIR=$home/zdot"
+run --yes code
+expect_status 0
+expect_count "$home/zdot/.zprofile" "$bash_line" 1
+[ ! -e "$home/.zprofile" ] || fail ".zprofile written outside ZDOTDIR"
+
+fresh_mac mac-bash
+user_shell=/bin/bash
+run --yes code
+expect_status 0
+expect_count "$home/.bash_profile" "$bash_line" 1
+[ ! -e "$home/.bashrc" ] || fail ".bashrc written on macOS"
+
+fresh_mac mac-empty-shell
+user_shell=
+run --yes code
+expect_status 0
+expect_count "$home/.zprofile" "$bash_line" 1
+
+fresh_mac mac-unknown-shell
+user_shell=/bin/tcsh
+run --yes code
+expect_status 0
+expect_count "$home/.zprofile" "$bash_line" 1
+
+fresh_mac mac-fish
+user_shell=/opt/homebrew/bin/fish
+run --yes code
+expect_status 0
+expect_count "$home/.config/fish/config.fish" "fish_add_path \$HOME/.cargo/bin" 1
+
+fresh_mac mac-rustup-line-present
+printf '%s\n' "$rustup_line" >"$home/.zprofile"
+before=$(cksum <"$home/.zprofile")
+run --yes code
+expect_status 0
+expect_output "$home/.zprofile already adds it"
+[ "$(cksum <"$home/.zprofile")" = "$before" ] || fail ".zprofile changed"
+
+fresh_mac mac-no-tty-shows-zprofile
+run code
+expect_status 1
+expect_output "cargo install --locked quvyta-code"
+expect_home_untouched
+
+fresh_mac mac-no-command-line-tools
+rm "$stubs/xcode-select"
+run --yes code
+expect_status 1
+expect_output "Command Line Tools"
+expect_output "  xcode-select --install"
+expect_not_logged "cargo install"
+expect_home_untouched
+
+fresh_mac mac-command-line-tools-removed
+printf '#!/bin/sh\necho "xcode-select: error: unable to get active developer directory" >&2\nexit 2\n' >"$stubs/xcode-select"
+run --yes code
+expect_status 1
+expect_output "  xcode-select --install"
+expect_not_logged "cargo install"
+expect_not_logged "xcode-select --install"
+expect_home_untouched
+
+fresh_mac mac-list-marks-arch-only
+run
+expect_status 1
+expect_output "packages   qpac"
+expect_output "Arch Linux only, not for macOS"
+[ "$(grep -c 'Arch Linux only, not for macOS' "$home/.out")" = 2 ] || fail "not exactly two members marked"
+expect_not_logged "cargo"
+
+fresh_mac mac-arch-only-named
+run --yes packages code
+expect_status 0
+expect_output "Skipping packages (qpac): it runs on Arch Linux only."
+expect_logged "cargo install --locked quvyta-code"
+expect_not_logged "quvyta-packages"
+
+fresh_mac mac-arch-only-alone
+run --yes tools
+expect_status 1
+expect_output "Skipping tools (qtools)"
+expect_output "Nothing left to install on macOS."
+expect_not_logged "cargo"
+expect_home_untouched
+
+fresh_mac mac-all
+run --yes all
+expect_status 0
+for crate in quvyta-framework-showcase quvyta-code quvyta-focus quvyta; do
+    expect_logged "cargo install --locked $crate"
+done
+expect_not_logged "quvyta-packages"
+expect_not_logged "quvyta-tools"
+
+fresh linux-list-has-no-mark
+run
+expect_status 1
+if grep -qF "not for macOS" "$home/.out"; then
+    fail "Linux list marks members as not for macOS"
+fi
+
+fresh linux-empty-shell-unknown
+user_shell=
+run --yes code
+expect_status 0
+expect_output "is not one this script knows"
+extra=$(cd "$home" && find . -mindepth 1 -maxdepth 1 ! -name .out ! -name .stub.log ! -name .cargo)
+[ -z "$extra" ] || fail "home folder changed: $extra"
+
 # --- On a terminal
 
 if [ "$have_script" = 1 ]; then
@@ -456,6 +600,17 @@ y
     expect_status 1
     expect_not_logged "cargo install"
     expect_home_untouched
+
+    fresh_mac tty-mac-pick
+    run_tty "1 4
+y
+y
+"
+    expect_status 0
+    expect_output "Skipping packages (qpac)"
+    expect_logged "cargo install --locked quvyta-framework-showcase"
+    expect_not_logged "quvyta-packages"
+    expect_count "$home/.zprofile" "$bash_line" 1
 
     fresh tty-decline-rustup
     rm "$stubs/cargo"

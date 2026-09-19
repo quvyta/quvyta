@@ -172,7 +172,7 @@ impl Quvyta {
             Outcome::Installed { .. } | Outcome::Removed | Outcome::Cancelled => String::new(),
         };
         ui.add(Text::new(reason)).fill_width();
-        problems(found, false, ui);
+        problems(found, false, self.detail_width(), ui);
         // cargo builds before it touches anything, so a failed install changed nothing; a failed
         // removal may have got part of the way, and says only what cargo said.
         if !removing {

@@ -163,6 +163,44 @@ fn the_command_in_the_dialog_is_copied_whole() {
     assert_eq!(h.copied(), [format!("{} install --locked quvyta-tools", root.path().join("bin/cargo").display())]);
 }
 
+/// The machine of the list's tests under a folder with a long name, as a home folder often
+/// is, so the commands in the dialogs are as long as on a real machine.
+fn long_named() -> (TempDir, std::path::PathBuf) {
+    let root = tempfile::tempdir().expect("temp");
+    let deep = root.path().join("home-of-somebody-with-a-long-name");
+    std::fs::create_dir_all(&deep).expect("folder");
+    (root, deep)
+}
+
+#[test]
+fn a_long_command_is_shown_whole_on_a_wide_screen() {
+    let (_root, deep) = long_named();
+    let mut h = super::tests::start(&deep, 120, 36);
+    h.send(install(InstallMsg::Ask(index("packages")))).advance(DIALOG_IN);
+    let command = format!("{} install --locked quvyta-packages", deep.join("bin/cargo").display());
+    assert!(has(&h, &command), "`{command}` is cut:\n{}", h.screen());
+    h.send(install(InstallMsg::Close)).send(install(InstallMsg::AskRemove(index("code")))).advance(DIALOG_IN);
+    let command = format!("{} uninstall quvyta-code", deep.join("bin/cargo").display());
+    assert!(has(&h, &command), "`{command}` is cut:\n{}", h.screen());
+}
+
+#[test]
+fn a_long_command_wraps_on_a_narrow_screen_and_is_still_copied_whole() {
+    for width in [80, 72] {
+        let (_root, deep) = long_named();
+        let mut h = super::tests::start(&deep, width, 36);
+        h.send(install(InstallMsg::Ask(index("packages")))).advance(DIALOG_IN);
+        let cargo = deep.join("bin/cargo").display().to_string();
+        let screen = h.screen();
+        for word in [cargo.as_str(), "install", "--locked", "quvyta-packages"] {
+            let whole = screen.split_whitespace().any(|shown| shown == word);
+            assert!(whole, "`{word}` is not shown whole at {width} columns:\n{screen}");
+        }
+        h.click_text("copy");
+        assert_eq!(h.copied(), [format!("{cargo} install --locked quvyta-packages")], "at {width} columns");
+    }
+}
+
 #[test]
 fn quvyta_never_offers_to_install_itself() {
     let (_root, mut h) = harness(100, 30);
@@ -180,15 +218,15 @@ fn without_cargo_the_dialog_shows_the_install_script_and_rustup() {
     let screen = h.screen();
     for text in [
         "cargo, Rust's package tool, is not installed",
-        // Cut short on screen, whole when copied.
-        "curl -fsSL https://raw.githubusercontent.com/quvyta/",
+        // Too long for one line here, so it is shown whole, wrapped, above its copyable value.
+        crate::checks::INSTALL_SCRIPT,
         "https://rustup.rs",
         "Check again",
     ] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
     assert!(!screen.contains("install --locked"), "there is no cargo to show a command for:\n{screen}");
-    h.click_text("curl -fsSL");
+    click_beside(&mut h, "curl -fsSL", "copy");
     assert_eq!(h.copied(), [crate::checks::INSTALL_SCRIPT]);
     h.send(install(InstallMsg::Confirm));
     assert!(h.app().installs.running.is_none(), "a dialog with problems installs nothing");

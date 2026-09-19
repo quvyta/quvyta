@@ -71,6 +71,17 @@ What the script does, asking before each step:
 
 It never uses sudo. Questions are read from the terminal even though the script arrives through a pipe; with no terminal it changes nothing and only says what it would do. `--yes` answers every question with yes, and `--help` explains the options.
 
+On macOS the same line works. The PATH line goes to `.zprofile` for zsh or `.bash_profile` for bash, the Command Line Tools are checked because Rust links with them (the script shows `xcode-select --install` if they are missing), and qpackages and qtools, which run on Arch Linux only, are skipped.
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1 | iex
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1))) code -Yes
+```
+
+The second form passes names and options. It needs no administrator: Rust comes from rustup, the chosen members from crates.io, and the only setting it writes is your own user PATH, after you agree to the folder it shows. If the Visual Studio C++ Build Tools that Rust links with are missing, it prints the command that installs them and stops. `-Help` explains the options.
+
 To read the script before running it:
 
 ```sh

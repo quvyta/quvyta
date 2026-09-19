@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs members of the Quvyta family with cargo.
+# Installs members of the Quvyta family with cargo, on Linux and macOS.
 #
 #   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- code
@@ -45,13 +45,30 @@ about() {
         focus) echo "tracks what you focus on and where your time went" ;;
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
         tools) echo "the settings Arch Linux users usually set up by hand, with undo" ;;
-        quvyta) echo "introduces the family and how to install each member" ;;
+        quvyta) echo "installs, opens, updates and removes the family's programs" ;;
     esac
+}
+
+# Members that only run on Arch Linux; they are not built on macOS.
+arch_only() {
+    case $1 in
+        packages | tools) return 0 ;;
+    esac
+    return 1
+}
+
+on_mac() {
+    [ "$os" = Darwin ]
+}
+
+# Whether a member can be installed on this system.
+supported() {
+    ! { on_mac && arch_only "$1"; }
 }
 
 usage() {
     cat <<EOF
-Installs members of the Quvyta family with cargo.
+Installs members of the Quvyta family with cargo, on Linux and macOS.
 
 Usage:
   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh
@@ -62,8 +79,8 @@ Names (several may be given; none lets you choose):
   framework   quvyta-framework-showcase, command qframe
   code        quvyta-code, command qcode
   focus       quvyta-focus, command qfocus
-  packages    quvyta-packages, command qpac
-  tools       quvyta-tools, command qtools
+  packages    quvyta-packages, command qpac; Arch Linux only
+  tools       quvyta-tools, command qtools; Arch Linux only
   quvyta      quvyta, command quvyta
   all         every one of the above
 
@@ -150,7 +167,9 @@ parse_args() {
 list_family() {
     number=1
     for name in $names; do
-        printf '  %s  %-10s %-8s %s\n' "$number" "$name" "$(command_of "$name")" "$(about "$name")"
+        text=$(about "$name")
+        supported "$name" || text="$text; Arch Linux only, not for macOS"
+        printf '  %s  %-10s %-8s %s\n' "$number" "$name" "$(command_of "$name")" "$text"
         number=$((number + 1))
     done
 }
@@ -208,6 +227,24 @@ pick() {
         chosen=
         pick_from "$reply" && [ -n "$chosen" ] && return 0
     done
+}
+
+# Leaves out of $chosen the members this system cannot run, saying so for each.
+drop_unsupported() {
+    kept=
+    for name in $chosen; do
+        if supported "$name"; then
+            kept="${kept:+$kept }$name"
+        else
+            say "Skipping $name ($(command_of "$name")): it runs on Arch Linux only."
+        fi
+    done
+    chosen=$kept
+    if [ -z "$chosen" ]; then
+        say "Nothing left to install on macOS."
+        return 1
+    fi
+    return 0
 }
 
 download() {
@@ -287,6 +324,16 @@ ensure_rust_version() {
 }
 
 ensure_linker() {
+    if on_mac; then
+        # /usr/bin/cc is there even without the Command Line Tools: it is a stand-in that opens
+        # an install dialog instead of linking, so only xcode-select tells whether they are there.
+        xcode-select -p >/dev/null 2>&1 && return 0
+        say ""
+        say "Rust needs Apple's Command Line Tools to link programs, and they are not installed."
+        say "Install them with this command, confirm in the window that opens, then run this script again:"
+        say "  xcode-select --install"
+        return 1
+    fi
     for linker in cc gcc clang; do
         command -v "$linker" >/dev/null 2>&1 && return 0
     done
@@ -337,10 +384,12 @@ install_chosen() {
 }
 
 detect_shell() {
-    shell_name=$(basename "${SHELL:-}")
+    shell_name=${SHELL:-}
+    shell_name=${shell_name##*/}
     case $shell_name in
         fish | bash | zsh) echo "$shell_name" ;;
-        *) echo other ;;
+        # zsh is macOS's own shell, so it is the best guess there.
+        *) if on_mac; then echo zsh; else echo other; fi ;;
     esac
 }
 
@@ -357,11 +406,21 @@ path_line_for() {
             path_line="fish_add_path $shown_dir"
             ;;
         zsh)
-            rc_file="${ZDOTDIR:-$HOME}/.zshrc"
+            # macOS terminals open login shells, which read .zprofile; Linux ones read .zshrc.
+            if on_mac; then
+                rc_file="${ZDOTDIR:-$HOME}/.zprofile"
+            else
+                rc_file="${ZDOTDIR:-$HOME}/.zshrc"
+            fi
             path_line="export PATH=\"$shown_dir:\$PATH\""
             ;;
         bash)
-            rc_file="$HOME/.bashrc"
+            # A login bash, as macOS terminals start, reads .bash_profile and not .bashrc.
+            if on_mac; then
+                rc_file="$HOME/.bash_profile"
+            else
+                rc_file="$HOME/.bashrc"
+            fi
             path_line="export PATH=\"$shown_dir:\$PATH\""
             ;;
         *)
@@ -455,6 +514,7 @@ summary() {
 }
 
 main() {
+    os=$(uname -s 2>/dev/null) || os=
     parse_args "$@" || exit 2
     if [ "$show_help" = 1 ]; then
         usage
@@ -472,6 +532,7 @@ main() {
     if [ -z "$chosen" ]; then
         pick || exit 1
     fi
+    drop_unsupported || exit 1
     ensure_cargo || exit 1
     ensure_rust_version || exit 1
     ensure_linker || exit 1

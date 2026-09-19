@@ -31,7 +31,7 @@ pub struct Member {
 
 impl Member {
     /// Whether this member is the program that is running.
-    pub fn is_self(&self) -> bool {
+    pub(crate) fn is_self(&self) -> bool {
         self.package == env!("CARGO_PKG_NAME")
     }
 }

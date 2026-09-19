@@ -67,7 +67,7 @@ impl Inventory {
     /// Asks cargo what it installed, then looks for the commands of the rest. Without cargo, or
     /// when it fails, only the files are looked at. Runs a program, so it belongs in the
     /// background.
-    pub fn read(machine: &Machine) -> Self {
+    pub(crate) fn read(machine: &Machine) -> Self {
         let output = machine.cargo(["install", "--list"]).and_then(|mut cargo| cargo.output().ok());
         let listed = match output {
             Some(output) if output.status.success() => parse_install_list(&String::from_utf8_lossy(&output.stdout)),
@@ -82,7 +82,7 @@ impl Inventory {
     }
 
     /// The state of the member at `index` of [`FAMILY`].
-    pub fn state(&self, index: usize) -> &State {
+    pub(crate) fn state(&self, index: usize) -> &State {
         self.states.get(index).unwrap_or(&State::Missing)
     }
 }

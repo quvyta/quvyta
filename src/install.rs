@@ -30,8 +30,9 @@ const BUILD_LOCK: &str = "build.lock";
 /// The folder under the data folder that logs go to.
 const LOGS: &str = "logs";
 
-/// The size of the terminal cargo is given. Wide enough that crate names are not cut; its
-/// progress line is not drawn as it is anyway.
+/// The size of the terminal cargo is given. Wide enough that crate names are not cut. cargo
+/// draws its progress line on it, but ends each frame with `\r`, and the reader delivers only
+/// the text that stays on the screen, so the frames do not arrive as lines.
 pub const TERMINAL: (u16, u16) = (120, 30);
 
 /// One `cargo install`, with everything it needs from the machine.
@@ -414,6 +415,29 @@ pub(crate) mod tests {
             machine.home.display()
         );
         assert!(calls.lines().any(|line| line == expected), "{calls}");
+    }
+
+    /// A real install's bytes, recorded on a pseudo-terminal the size of [`TERMINAL`], played
+    /// back through the same reader cargo's output goes through.
+    #[test]
+    fn a_recorded_install_arrives_through_the_reader_without_its_progress_frames() {
+        let root = tempfile::tempdir().expect("temp");
+        let machine = machine_with_cargo(root.path(), "", 0);
+        scenario(root.path(), include_str!("../tests/cargo-output/install-pty.txt"), 0);
+        packages(root.path());
+        let (outcome, lines) = run(&Job::new(&machine, member("tools"), None).expect("cargo"));
+        assert!(matches!(outcome, Outcome::Installed { .. }), "{outcome:?}");
+        let steps: Vec<cargo::Step> = lines.iter().filter_map(|line| cargo::step(line)).collect();
+        let compiling = steps.iter().filter(|step| matches!(step, cargo::Step::Compiling { .. })).count();
+        assert_eq!(compiling, 33, "every `Compiling` line arrives: {lines:?}");
+        assert_eq!(steps.last(), Some(&cargo::Step::Placing));
+        // The reader treats a `\r` as a screen does: the text before it is overwritten and never
+        // delivered. cargo ends every progress frame with `\r`, so the counts cannot reach the
+        // install view until the framework can hand over the text a `\r` overwrites.
+        assert!(
+            !steps.iter().any(|step| matches!(step, cargo::Step::Counted { .. })),
+            "a progress frame arrived; the install view can now show counts: {lines:?}"
+        );
     }
 
     #[test]

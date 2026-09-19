@@ -356,8 +356,8 @@ quvyta-inject = \"0.1.0\n\"
         assert_eq!(parse_search(""), []);
     }
 
-    /// What `cargo install quvyta-tools` wrote on an 80-column terminal, in the byte format of a
-    /// recorded run: colours, `\r` progress lines erased with `ESC [K`, `\r\n` line ends.
+    /// An install of `quvyta-tools`, written in the byte format of the recorded one below:
+    /// colours, `\r` progress lines erased with `ESC [K`, `\r\n` line ends.
     const INSTALL: &str = include_str!("../tests/cargo-output/install-ok.txt");
 
     /// Every line a terminal shows over time, the ones overwritten in place included.
@@ -393,6 +393,31 @@ quvyta-inject = \"0.1.0\n\"
         let placing = steps.iter().position(|step| *step == Step::Placing).expect("placing");
         let compiling = steps.iter().rposition(|step| matches!(step, Step::Compiling { .. })).expect("compiling");
         assert!(compiling < placing, "the early `Installing quvyta-tools v0.1.2` is not the placing: {steps:?}");
+    }
+
+    /// What `cargo install --locked hexyl` wrote on a 120 by 30 pseudo-terminal, byte for byte,
+    /// recorded in a disposable container: progress frames that end in `\r` and are followed
+    /// either by the next frame or by `ESC [K` and the line that replaces them.
+    const RECORDED: &str = include_str!("../tests/cargo-output/install-pty.txt");
+
+    #[test]
+    fn every_progress_frame_of_a_recorded_install_gives_its_counts() {
+        let counted: Vec<(u32, u32, String)> = shown(RECORDED)
+            .iter()
+            .filter_map(|line| match step(line) {
+                Some(Step::Counted { done, total, krate }) => Some((done, total, krate)),
+                _ => None,
+            })
+            .collect();
+        let frames = RECORDED.matches("Building\u{1b}[0m [").count();
+        assert_eq!(counted.len(), frames, "{counted:?}");
+        assert_eq!(counted.first(), Some(&(0, 46, "anstyle".to_owned())), "names cut with `...` still give the first");
+        assert_eq!(counted.last(), Some(&(45, 46, "hexyl".to_owned())), "`hexyl(bin)` is the crate `hexyl`");
+        assert!(counted.iter().all(|(_, total, _)| *total == 46), "{counted:?}");
+        let steps: Vec<Step> = shown(RECORDED).iter().filter_map(|line| step(line)).collect();
+        assert_eq!(steps.first(), Some(&Step::Downloading));
+        assert_eq!(steps.last(), Some(&Step::Placing));
+        assert_eq!(installed_version("hexyl", &shown(RECORDED)).as_deref(), Some("0.17.0"));
     }
 
     #[test]

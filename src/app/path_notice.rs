@@ -18,7 +18,7 @@ use crate::shell_path::{self, PathAction};
 /// What the notice hears.
 #[derive(Debug, Clone)]
 pub enum PathMsg {
-    /// What [`Quvyta::check_path`] decided in the background.
+    /// What the check of `PATH` after an install, or at start, decided in the background.
     Checked {
         /// The member just installed, an index of [`FAMILY`]; `None` at start.
         installed: Option<usize>,
