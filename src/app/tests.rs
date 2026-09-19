@@ -297,7 +297,7 @@ fn narrow_ascii_screens_keep_the_rules() {
 /// With `QUVYTA_REVIEW=1`, writes every member in both languages, wide, narrow and short, to
 /// `target/quvyta-review.html` in colour for a visual review; a narrow screen shows its list and
 /// then every member's page. The notices after a member closes, for a broken settings file and
-/// about PATH follow.
+/// about PATH follow, then the Settings tab.
 #[test]
 fn visual_review() {
     if std::env::var_os("QUVYTA_REVIEW").is_none() {
@@ -331,6 +331,7 @@ fn visual_review() {
         println!("broken launcher.conf {locale}\n{}", h.screen());
     }
     fragments.extend(super::path_notice::tests::review());
+    fragments.extend(super::settings::tests::review());
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target/quvyta-review.html");
     std::fs::write(path, qframe::runtime::html_page(&fragments)).expect("review page written");
 }

@@ -52,6 +52,7 @@ back = "back"
 install = "install"
 update = "update"
 refresh = "check for updates"
+apps = "apps"
 
 [family.code]
 title = "Quvyta Code"
@@ -216,3 +217,20 @@ unknown-command = "{command} is not something quvyta does"
 no-names = "install needs at least one name, such as qcode"
 hint = "Run quvyta --help to see what it takes."
 already-installed = "Already installed: {commands}"
+
+[tabs]
+apps = "Apps"
+settings = "Settings"
+
+[settings]
+title = "quvyta"
+check-updates = "Check for updates at start"
+after-close = "When an app closes"
+after-close-return = "back to quvyta"
+after-close-shell = "quit to shell"
+path = "{folder} on PATH"
+path-yes = "yes"
+path-new-terminals = "in new terminals"
+path-no = "no"
+path-add = "Add"
+not-saved = "The setting could not be saved"

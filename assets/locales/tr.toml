@@ -51,6 +51,7 @@ back = "geri"
 install = "kur"
 update = "güncelle"
 refresh = "güncellemeleri denetle"
+apps = "uygulamalar"
 
 [family.code]
 title = "Quvyta Code"
@@ -215,3 +216,20 @@ unknown-command = "quvyta {command} diye bir iş bilmiyor"
 no-names = "install en az bir ad bekliyor, örneğin qcode"
 hint = "Neler yazılabileceğini görmek için: quvyta --help"
 already-installed = "Zaten kurulu: {commands}"
+
+[tabs]
+apps = "Uygulamalar"
+settings = "Ayarlar"
+
+[settings]
+title = "quvyta"
+check-updates = "Açılışta güncellemeleri denetle"
+after-close = "Uygulama kapanınca"
+after-close-return = "quvyta'ya dön"
+after-close-shell = "kabuğa çık"
+path = "{folder} PATH'te"
+path-yes = "evet"
+path-new-terminals = "yeni terminallerde"
+path-no = "hayır"
+path-add = "Ekle"
+not-saved = "Ayar kaydedilemedi"

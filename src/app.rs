@@ -7,13 +7,14 @@ mod install_view;
 mod installs;
 mod open;
 mod path_notice;
+mod settings;
 mod updates;
 
 use std::collections::VecDeque;
 
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, Termination};
-use qframe::widgets::{ScrollView, Splitter, Toast};
+use qframe::widgets::{ScrollView, Splitter, Tabs, Toast};
 
 use crate::family::FAMILY;
 use crate::inventory::{Inventory, State};
@@ -24,6 +25,7 @@ use installs::Installs;
 use open::Opening;
 pub use path_notice::PathMsg;
 use path_notice::PathNotice;
+pub use settings::{Change, SettingMsg};
 pub use updates::UpdateMsg;
 use updates::Updates;
 
@@ -33,6 +35,19 @@ const WIDE: u16 = 60;
 const DETAIL_MIN: u16 = 28;
 /// The fewest columns the list takes.
 const LIST_MIN: u16 = 24;
+
+/// The tabs in the header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Tab {
+    /// The family: the list and the chosen member's details.
+    #[default]
+    Apps,
+    /// quvyta's own settings.
+    Settings,
+}
+
+/// The tabs in the order the header shows them.
+const TABS: [Tab; 2] = [Tab::Apps, Tab::Settings];
 
 /// The application's state.
 #[derive(Debug)]
@@ -56,6 +71,8 @@ pub struct Quvyta {
     updates: Updates,
     /// Members the command line asked to install whose dialog has not opened yet, in order.
     asked: VecDeque<usize>,
+    /// The tab shown.
+    tab: Tab,
 }
 
 /// Everything that can happen.
@@ -89,6 +106,10 @@ pub enum Msg {
     Path(PathMsg),
     /// Something about updates.
     Updates(UpdateMsg),
+    /// Shows this tab.
+    Tab(Tab),
+    /// Something on the Settings tab.
+    Setting(SettingMsg),
 }
 
 impl Quvyta {
@@ -105,6 +126,7 @@ impl Quvyta {
             path_notice: None,
             updates: Updates::default(),
             asked: VecDeque::new(),
+            tab: Tab::default(),
         }
     }
 
@@ -123,6 +145,8 @@ impl Quvyta {
         let mut there = Vec::new();
         while let Some(index) = self.asked.pop_front() {
             if self.installable(index) {
+                // The dialog belongs to the list, which shows what it starts.
+                self.tab = Tab::Apps;
                 self.selected = index;
                 return Command::batch([already_installed(&there), self.install_update(InstallMsg::Ask(index))]);
             }
@@ -209,6 +233,11 @@ impl App for Quvyta {
     }
 
     fn action(&self, name: &str) -> Option<Msg> {
+        // The family's keys act on the list; on the Settings tab they would act on a member
+        // nobody sees.
+        if self.tab == Tab::Settings {
+            return (name == "back").then_some(Msg::Back);
+        }
         match name {
             "back" if self.detail_page && !self.wide() => Some(Msg::Back),
             "primary" => Some(Msg::Primary),
@@ -227,6 +256,14 @@ impl App for Quvyta {
                 self.detail_page = true;
             }
             Msg::Select(_) | Msg::ShowDetail(_) => {}
+            // From the settings esc goes back to the family as it was left, a member's page
+            // included; the keys go to the list when it is on screen.
+            Msg::Back if self.tab == Tab::Settings => {
+                self.tab = Tab::Apps;
+                if self.wide() || !self.detail_page {
+                    return Command::focus("family");
+                }
+            }
             Msg::Back => {
                 self.detail_page = false;
                 return Command::focus("family");
@@ -275,12 +312,22 @@ impl App for Quvyta {
             }
             Msg::Path(msg) => return self.update_path(msg),
             Msg::Updates(msg) => return self.update_update(msg),
+            // The header's keys and a click leave the keys on the tabs, where they were.
+            Msg::Tab(tab) => self.tab = tab,
+            Msg::Setting(msg) => return self.update_setting(msg),
         }
         Command::none()
     }
 
     fn view(&self, ui: &mut View<'_, Msg>) {
-        AppShell::new().header(header).body(|ui| self.body(ui)).footer(|ui| self.footer(ui)).show(ui);
+        AppShell::new()
+            .header(|ui| self.header(ui))
+            .body(|ui| match self.tab {
+                Tab::Apps => self.body(ui),
+                Tab::Settings => self.settings_page(ui),
+            })
+            .footer(|ui| self.footer(ui))
+            .show(ui);
         self.install_dialogs(ui);
     }
 }
@@ -405,7 +452,12 @@ impl Quvyta {
     }
 
     fn footer(&self, ui: &mut View<'_, Msg>) {
-        let hints = if self.wide() || self.detail_page {
+        let hints = if self.tab == Tab::Settings {
+            KeyHints::new()
+                .hint("↑↓", t!("hints.choose"))
+                .hint("esc", t!("hints.apps"))
+                .action(Scope::Global, "focus-next")
+        } else if self.wide() || self.detail_page {
             let hints = KeyHints::new();
             let hints = if self.installable(self.selected) {
                 hints.hint("enter", t!("hints.install"))
@@ -459,16 +511,30 @@ fn row_state(state: &State, compact: bool) -> String {
     }
 }
 
-fn header(ui: &mut View<'_, Msg>) {
-    ui.add(
-        Text::rich([
-            Span::new("quvyta").color("accent").bold(),
-            Span::new(format!("  {}", t!("header.tagline"))).role("faint"),
-        ])
-        .no_wrap(),
-    )
-    .padding(Padding::symmetric(0, 2))
-    .fill_width();
+impl Quvyta {
+    /// The name, the tagline when there is room for it whole, and the tabs at the right.
+    fn header(&self, ui: &mut View<'_, Msg>) {
+        let labels = [t!("tabs.apps"), t!("tabs.settings")];
+        // Each tab pads its label with two cells on both sides; one cell parts them.
+        let tabs_width: u16 = labels.iter().map(|label| qframe::text::width(label) + 4).sum::<u16>() + 1;
+        let tagline = format!("  {}", t!("header.tagline"));
+        // The name and the tagline keep at least four cells from the tabs, so the first tab does
+        // not read as the tagline's last word.
+        let room = self.size.width.saturating_sub(4 + tabs_width + 4);
+        let mut spans = vec![Span::new("quvyta").color("accent").bold()];
+        // A tagline cut short reads worse than none.
+        if qframe::text::width("quvyta") + qframe::text::width(&tagline) <= room {
+            spans.push(Span::new(tagline).role("faint"));
+        }
+        ui.row(|ui| {
+            ui.add(Text::rich(spans).no_wrap()).fill_width();
+            let active = TABS.iter().position(|tab| *tab == self.tab).unwrap_or(0);
+            let open = |index: usize| Msg::Tab(TABS.get(index).copied().unwrap_or_default());
+            ui.add(Tabs::new(labels).active(active).on_select(open)).id("tabs");
+        })
+        .padding(Padding::symmetric(0, 2))
+        .fill_width();
+    }
 }
 
 #[cfg(test)]

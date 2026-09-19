@@ -19,11 +19,12 @@ mod machine;
 mod shell_path;
 pub mod updates;
 
-pub use app::{InstallMsg, Msg, PathMsg, Quvyta, UpdateMsg};
+pub use app::{Change, InstallMsg, Msg, PathMsg, Quvyta, SettingMsg, Tab, UpdateMsg};
 pub use cargo::Installed;
 pub use family::{FAMILY, Member, Status};
 pub use install::Outcome;
 pub use inventory::Inventory;
+pub use launcher::AfterClose;
 pub use machine::Machine;
 
 /// The language files, compiled in so an installed binary needs nothing beside it: file name

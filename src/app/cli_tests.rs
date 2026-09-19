@@ -95,3 +95,14 @@ fn without_arguments_the_list_opens_as_before() {
     assert_eq!(h.app().selected, 0);
     assert!(!has(&h, "Already installed"));
 }
+
+#[test]
+fn a_dialog_the_command_line_asked_for_opens_over_the_list_even_from_the_settings() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut app = Quvyta::new(machine(root.path())).asking(vec![index("tools")]);
+    // The Settings tab is opened while cargo is still answering what is installed.
+    let _ = app.update(Msg::Tab(Tab::Settings));
+    let _ = app.update(Msg::Inventory(crate::inventory::Inventory::read(&app.machine)));
+    assert_eq!(app.tab, Tab::Apps, "the dialog belongs to the list, which shows what it starts");
+    assert_eq!(app.selected, index("tools"));
+}

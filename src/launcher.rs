@@ -15,7 +15,7 @@ use std::io;
 use std::path::Path;
 
 use qframe::diagnostics::Diagnostic;
-use qframe::storage::{Schema, Settings};
+use qframe::storage::{Schema, Setting, Settings};
 
 /// The key saying what happens after a member closes.
 const AFTER_CLOSE: &str = "after_close";
@@ -94,10 +94,40 @@ impl Launcher {
     ///
     /// Returns the I/O error when the file or its folder cannot be written.
     pub fn dismiss_path_prompt(path: &Path) -> io::Result<()> {
-        let mut settings = Settings::open(path).schema(schema());
-        settings.set(PATH_PROMPT, "dismissed".to_owned());
-        settings.save()
+        write(path, PATH_PROMPT, "dismissed".to_owned())
     }
+
+    /// Writes `check_updates` to `path` the way [`Launcher::dismiss_path_prompt`] writes its
+    /// key: every other setting stays as the file has it now.
+    ///
+    /// # Errors
+    ///
+    /// Returns the I/O error when the file or its folder cannot be written.
+    pub fn save_check_updates(path: &Path, on: bool) -> io::Result<()> {
+        write(path, CHECK_UPDATES, on)
+    }
+
+    /// Writes `after_close` to `path`, keeping every other setting as the file has it now.
+    ///
+    /// # Errors
+    ///
+    /// Returns the I/O error when the file or its folder cannot be written.
+    pub fn save_after_close(path: &Path, after_close: AfterClose) -> io::Result<()> {
+        let value = match after_close {
+            AfterClose::Return => "return",
+            AfterClose::Shell => "shell",
+        };
+        write(path, AFTER_CLOSE, value.to_owned())
+    }
+}
+
+/// Sets `key` in the file at `path` and writes it back. The file is read again rather than taken
+/// from what quvyta loaded at start, so a change made meanwhile is not lost; it is replaced in one
+/// step, never left half written.
+fn write(path: &Path, key: &str, value: impl Setting) -> io::Result<()> {
+    let mut settings = Settings::open(path).schema(schema());
+    settings.set(key, value);
+    settings.save()
 }
 
 /// Every key quvyta reads and what it accepts.
@@ -184,6 +214,37 @@ mod tests {
         std::fs::write(&path, "check_updates = false\n").expect("settings");
         Launcher::dismiss_path_prompt(&path).expect("saved");
         assert!(!Launcher::load(Some(&path)).check_updates);
+    }
+
+    #[test]
+    fn each_setting_is_written_alone_and_the_others_stay() {
+        let root = tempfile::tempdir().expect("temp");
+        let path = root.path().join("launcher.conf");
+        std::fs::write(&path, "path_prompt = \"dismissed\"\nafter_close = \"shell\"\n").expect("settings");
+        Launcher::save_check_updates(&path, false).expect("saved");
+        let launcher = Launcher::load(Some(&path));
+        assert!(!launcher.check_updates);
+        assert_eq!((launcher.after_close, launcher.path_prompt), (AfterClose::Shell, PathPrompt::Dismissed));
+
+        Launcher::save_after_close(&path, AfterClose::Return).expect("saved");
+        let launcher = Launcher::load(Some(&path));
+        assert_eq!(launcher.after_close, AfterClose::Return);
+        assert!(!launcher.check_updates, "the earlier change stays");
+        assert_eq!((launcher.path_prompt, launcher.diagnostics.as_slice()), (PathPrompt::Dismissed, &[][..]));
+
+        Launcher::save_after_close(&path, AfterClose::Shell).expect("saved");
+        let text = std::fs::read_to_string(&path).expect("written");
+        assert!(text.contains("after_close = \"shell\"") && text.contains("check_updates = false"), "{text}");
+    }
+
+    #[test]
+    fn a_folder_that_cannot_be_written_is_an_error() {
+        let root = tempfile::tempdir().expect("temp");
+        // A file where the settings folder should be: nothing can go inside it.
+        std::fs::write(root.path().join("quvyta"), "").expect("file");
+        let path = root.path().join("quvyta/launcher.conf");
+        assert!(Launcher::save_check_updates(&path, false).is_err());
+        assert!(Launcher::save_after_close(&path, AfterClose::Shell).is_err());
     }
 
     #[test]

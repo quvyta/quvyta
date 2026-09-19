@@ -31,6 +31,12 @@
 set -u
 here=$(dirname "$0")
 
+# The CARGO_TARGET_DIR of the shell that runs the tests, written by the test, is not quvyta's
+# choice: forget it, so an install or removal looks the same wherever the tests run.
+if [ -f "$here/inherited-target" ] && [ "${CARGO_TARGET_DIR:-}" = "$(cat "$here/inherited-target")" ]; then
+    unset CARGO_TARGET_DIR
+fi
+
 name=${1:-none}
 package=
 version=

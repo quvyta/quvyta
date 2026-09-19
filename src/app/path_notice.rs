@@ -24,6 +24,9 @@ pub enum PathMsg {
         installed: Option<usize>,
         /// What it takes.
         action: PathAction,
+        /// Whether the user asked for the notice, from the Settings tab: then it shows even
+        /// after Not now, which only silences the offers quvyta makes on its own.
+        asked: bool,
     },
     /// Appends the line to the start-up file.
     Add,
@@ -35,7 +38,18 @@ pub enum PathMsg {
     Dismissed(Result<(), String>),
 }
 
-/// The notice shown in the detail area.
+/// How far cargo's folder is from `PATH`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PathReach {
+    /// It is on this terminal's `PATH`.
+    Here,
+    /// A start-up file adds it, so terminals opened from now on have it.
+    NewTerminals,
+    /// Nothing adds it, as far as quvyta knows.
+    Missing,
+}
+
+/// The notice shown in the detail area, or under the settings.
 #[derive(Debug, Clone)]
 pub(super) struct PathNotice {
     /// The member the text names; `None` for the general wording.
@@ -64,11 +78,35 @@ impl Quvyta {
     /// `index`, `update` returns `self.check_path(Some(index))`, and the notice names that
     /// member. At start it runs with `None`, and the wording is general.
     pub(super) fn check_path(&self, installed: Option<usize>) -> Command<Msg> {
+        self.decide_path(installed, false)
+    }
+
+    /// The check the Settings tab's Add asks for: the same notice, shown even after Not now.
+    pub(super) fn ask_path(&self) -> Command<Msg> {
+        self.decide_path(None, true)
+    }
+
+    fn decide_path(&self, installed: Option<usize>, asked: bool) -> Command<Msg> {
         let machine = self.machine.clone();
         Command::perform(move || {
             let action = shell_path::decide(&machine.shell_env(), shell_path::read_file);
-            Msg::Path(PathMsg::Checked { installed, action })
+            Msg::Path(PathMsg::Checked { installed, action, asked })
         })
+    }
+
+    /// How far cargo's folder is from `PATH`, for the Settings tab.
+    pub(super) fn path_reach(&self) -> PathReach {
+        if self.machine.path.contains(&self.machine.cargo_bin()) {
+            return PathReach::Here;
+        }
+        match &self.path_notice {
+            Some(notice)
+                if matches!(notice.action, PathAction::AlreadyConfigured { .. }) || notice.stage == Stage::Added =>
+            {
+                PathReach::NewTerminals
+            }
+            _ => PathReach::Missing,
+        }
     }
 
     /// The check at start: only when something is installed by cargo, quvyta itself included,
@@ -87,19 +125,26 @@ impl Quvyta {
 
     pub(super) fn update_path(&mut self, msg: PathMsg) -> Command<Msg> {
         match msg {
-            PathMsg::Checked { installed, action } => {
+            PathMsg::Checked { installed, action, asked } => {
                 let asks = matches!(action, PathAction::Add { .. } | PathAction::Unknown { .. });
+                // Asked for, the notice takes the keys, so its Add is one enter away.
+                let focus = if asked && matches!(action, PathAction::Add { .. }) {
+                    Command::focus("path-add")
+                } else {
+                    Command::none()
+                };
                 self.path_notice = match action {
                     PathAction::OnPath => None,
                     // Not now silences the offer; saying that a new terminal already works is not
                     // an offer, so it still shows.
-                    _ if asks && self.launcher.path_prompt == PathPrompt::Dismissed => None,
+                    _ if asks && !asked && self.launcher.path_prompt == PathPrompt::Dismissed => None,
                     action => Some(PathNotice {
                         command: installed.and_then(|index| FAMILY.get(index)).map(|member| member.command),
                         action,
                         stage: Stage::Offered,
                     }),
                 };
+                return focus;
             }
             PathMsg::Add => {
                 let Some(notice) = self.path_notice.as_mut() else { return Command::none() };

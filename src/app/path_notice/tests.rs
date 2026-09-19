@@ -141,7 +141,7 @@ fn after_an_install_the_notice_names_the_member() {
     let action = shell_path::decide(&machine.shell_env(), shell_path::read_file);
     let tools = FAMILY.iter().position(|member| member.key == "tools").expect("qtools");
     let mut h = start(machine);
-    h.send(Msg::Path(PathMsg::Checked { installed: Some(tools), action }));
+    h.send(Msg::Path(PathMsg::Checked { installed: Some(tools), action, asked: false }));
     assert!(h.screen().contains("For qtools to open when you type its name in a"), "{}", h.screen());
     h.click_text("Add").render();
     assert!(h.screen().contains("Added. Terminals you open from now on can start qtools by"), "{}", h.screen());

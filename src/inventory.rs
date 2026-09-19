@@ -133,6 +133,11 @@ pub(crate) mod tests {
         write_program(&cargo, FAKE_CARGO);
         std::fs::write(root.join("bin/list.out"), list).expect("scenario");
         std::fs::write(root.join("bin/list.code"), code.to_string()).expect("scenario");
+        // A CARGO_TARGET_DIR of the shell running the tests reaches every child; the stand-in
+        // drops that one value, so it only ever sees a folder quvyta itself chose.
+        if let Some(inherited) = std::env::var_os("CARGO_TARGET_DIR") {
+            std::fs::write(root.join("bin/inherited-target"), inherited.as_encoded_bytes()).expect("scenario");
+        }
         wait_until_runnable(&cargo);
         Machine::in_root(root)
     }

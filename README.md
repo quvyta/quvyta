@@ -103,7 +103,10 @@ Rust 1.95 or later is required. The interface follows your system language (Engl
 are included). `↑` `↓` move through the list, `enter` opens the selected member or installs one
 you do not have, `u` updates it, `r` looks for updates again, `tab` moves between controls and
 `ctrl+q` quits. On a narrow terminal the first `enter` shows a member's details and `esc` goes
-back to the list.
+back to the list. The header has two tabs, Apps and Settings: click one, or reach them with `tab`
+and move with `←` `→`. Settings holds quvyta's own choices (checking for updates at start, what
+happens when a program closes, and whether `~/.cargo/bin` is on your PATH); `↑` `↓` pick a row,
+`enter` or `space` changes it, every change is saved at once, and `esc` goes back to Apps.
 
 ## Installing, updating and removing
 
