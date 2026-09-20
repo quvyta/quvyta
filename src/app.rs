@@ -14,12 +14,13 @@ use std::collections::VecDeque;
 
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, Termination};
-use qframe::widgets::{ScrollView, Splitter, Tabs, Toast};
+use qframe::storage::{Family, Preferences, Settings};
+use qframe::widgets::{Appearance, ScrollView, Splitter, Tabs, Toast};
 
 use crate::family::{FAMILY, Member, Status};
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
-use crate::machine::Machine;
+use crate::machine::{LAUNCHER, Machine};
 pub use installs::InstallMsg;
 use installs::Installs;
 use open::Opening;
@@ -62,6 +63,11 @@ pub struct Quvyta {
     detail_page: bool,
     /// quvyta's own settings, read when it starts.
     launcher: Launcher,
+    /// The same file as the framework reads it, `launcher.conf` of the family: what the
+    /// appearance rows write their own settings into.
+    settings: Settings,
+    /// The family's shared appearance, language, theme and icons, and the rows that change it.
+    appearance: Appearance,
     /// Installs running, waiting and ended.
     installs: Installs,
     /// What the detail area says about starting members by name; `None` when there is nothing
@@ -114,7 +120,25 @@ pub enum Msg {
 
 impl Quvyta {
     /// The application for `machine`.
+    ///
+    /// The family's shared appearance is resolved here, before the first frame: quvyta's own file
+    /// when it names a language, theme or icon set of its own, else the family's shared file,
+    /// else what the machine asks for. [`Quvyta::preferences`] and [`Quvyta::settings`] hand it
+    /// to the runtime, so quvyta opens the way the family looks.
     pub fn new(machine: Machine) -> Self {
+        let settings = crate::launcher::open(machine.launcher_conf.as_deref());
+        let i18n = crate::cli::i18n(|name| std::env::var(name).ok());
+        let preferences = match machine.settings_dir.as_deref() {
+            Some(folder) => Family::QUVYTA.preferences_in(folder, LAUNCHER, &i18n),
+            None => Family::QUVYTA.preferences(LAUNCHER, &i18n),
+        };
+        let appearance = Appearance::new(Family::QUVYTA, LAUNCHER, preferences);
+        // The rows write into the same folder the preferences were read from, so a machine rooted
+        // in a folder of its own never touches the user's settings.
+        let appearance = match machine.settings_dir.as_deref() {
+            Some(folder) => appearance.in_folder(folder),
+            None => appearance,
+        };
         Self {
             machine,
             inventory: None,
@@ -122,6 +146,8 @@ impl Quvyta {
             size: Size::default(),
             detail_page: false,
             launcher: Launcher::default(),
+            settings,
+            appearance,
             installs: Installs::default(),
             path_notice: None,
             updates: Updates::default(),
@@ -149,6 +175,20 @@ impl Quvyta {
             self.detail_page = true;
         }
         self
+    }
+
+    /// The family's shared language, theme and icons as quvyta resolved them for itself, for the
+    /// runtime to start with.
+    #[must_use]
+    pub fn preferences(&self) -> &Preferences {
+        self.appearance.preferences()
+    }
+
+    /// quvyta's own `launcher.conf` as the framework reads it, for the runtime to start with what
+    /// it says about reduced motion and the pillar.
+    #[must_use]
+    pub fn settings(&self) -> &Settings {
+        &self.settings
     }
 
     /// Opens the dialog of the next member asked for that can be installed. The ones that are
@@ -201,13 +241,19 @@ impl Quvyta {
 
     /// Tells what was wrong in `launcher.conf`, once, as it starts.
     fn settings_problems(&self) -> Command<Msg> {
-        if self.launcher.diagnostics.is_empty() {
+        // A broken shared file is told here too: it is read at start like quvyta's own, and its
+        // keys decide how quvyta looks.
+        let shared = self.appearance.preferences().diagnostics();
+        if self.launcher.diagnostics.is_empty() && shared.is_empty() {
             return Command::none();
         }
         // The diagnostics name the file only; the full path says where to find it.
         let path = self.machine.launcher_conf.as_deref().map(|path| self.machine.show(path));
-        let lines: Vec<String> =
-            path.into_iter().chain(self.launcher.diagnostics.iter().map(ToString::to_string)).collect();
+        let lines: Vec<String> = path
+            .into_iter()
+            .chain(self.launcher.diagnostics.iter().map(ToString::to_string))
+            .chain(shared.iter().map(ToString::to_string))
+            .collect();
         Command::toast(Toast::warning(t!("launcher.problems")).body(lines.join("\n")))
     }
 }
@@ -216,7 +262,7 @@ impl App for Quvyta {
     type Msg = Msg;
 
     fn init(&mut self) -> Command<Msg> {
-        self.launcher = Launcher::load(self.machine.launcher_conf.as_deref());
+        self.launcher = Launcher::from_settings(&self.settings);
         // Turned off, nothing asks crates.io unasked; `r` still does, since that is asking.
         let updates = if self.launcher.check_updates { self.check_updates(false) } else { Command::none() };
         Command::batch([

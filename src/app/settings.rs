@@ -1,4 +1,10 @@
-//! The Settings tab: quvyta's own settings from `launcher.conf`, changed in place.
+//! The Settings tab: the family's shared appearance and quvyta's own settings from
+//! `launcher.conf`, changed in place.
+//!
+//! The appearance rows come from the framework, the same rows in the same order as in every other
+//! Quvyta application, and each of them carries the box that says whether the change holds
+//! everywhere or here only. quvyta is where someone installs the family, so this is where the
+//! family's language, theme and icons are chosen.
 //!
 //! There is no Save button. A change applies to the running quvyta at once and is written in the
 //! background; when the file cannot be written the value goes back and a notice says where and
@@ -6,7 +12,7 @@
 
 use qframe::prelude::*;
 use qframe::widget::NodeMut;
-use qframe::widgets::{ScrollView, Select, SettingRow, SettingsList, Switch, Toast};
+use qframe::widgets::{AppearanceChange, ScrollView, Select, SettingRow, SettingsList, Switch, Toast};
 
 use super::path_notice::PathReach;
 use super::{Msg, Quvyta};
@@ -44,6 +50,8 @@ pub enum SettingMsg {
     },
     /// Shows the PATH notice, the same one quvyta offers on its own.
     AddToPath,
+    /// A change on the appearance rows the whole family shares.
+    Appearance(AppearanceChange),
 }
 
 impl Quvyta {
@@ -74,6 +82,9 @@ impl Quvyta {
                 Command::toast(Toast::warning(t!("settings.not-saved")).body(body))
             }
             SettingMsg::AddToPath => self.ask_path(),
+            // The framework's rows write their own files, key by key, and keep the settings
+            // quvyta holds in step, so nothing more is saved here.
+            SettingMsg::Appearance(change) => self.appearance.update(change, &mut self.settings),
         }
     }
 
@@ -91,9 +102,12 @@ impl Quvyta {
 
     /// The Settings tab.
     pub(super) fn settings_page(&self, ui: &mut View<'_, Msg>) {
-        let width = self.size.width.min(SECTION);
+        // Two cells are the scrolling page's bar; the sections keep clear of it, so nothing on
+        // them is cut short when the page is longer than the screen.
+        let width = self.size.width.saturating_sub(2).min(SECTION);
         let page = |ui: &mut View<'_, Msg>| {
             ui.column(|ui| {
+                self.appearance_settings(ui).width(Length::Cells(width)).id("appearance");
                 self.section_title(width, ui);
                 self.own_settings(ui).width(Length::Cells(width)).id("settings");
                 self.show_path_notice_within(width, ui);
@@ -102,14 +116,18 @@ impl Quvyta {
             .padding(Padding { top: 1, right: 0, bottom: 1, left: 0 })
             .fill_width();
         };
-        // The settings alone fit any screen quvyta draws on; only the PATH notice under them can
-        // outgrow a short one. A scroll view takes a stop of its own in the tab order, so it is
-        // there only when it may be needed.
-        if self.path_notice.is_some() {
-            ui.add_with(ScrollView::new(), page).fill();
-        } else {
-            ui.column(page).fill();
-        }
+        // The shared appearance, quvyta's own settings and the PATH notice together outgrow a
+        // short screen, so the page scrolls.
+        ui.add_with(ScrollView::new(), page).fill().id("page");
+    }
+
+    /// The appearance every Quvyta application shows the same way: language, theme and icons with
+    /// their boxes, then reduced motion and the pillar. The rows are the framework's; quvyta adds
+    /// none of its own, so a member's settings and quvyta's read alike.
+    fn appearance_settings<'v>(&self, ui: &'v mut View<'_, Msg>) -> NodeMut<'v, Msg> {
+        SettingsList::show(ui, |list| {
+            self.appearance.section(list, |change| Msg::Setting(SettingMsg::Appearance(change)));
+        })
     }
 
     /// The faint title of quvyta's own section and, fainter, the file it is kept in: beside the

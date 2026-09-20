@@ -17,8 +17,8 @@ not find them. Every member is built on [quvyta-framework](https://github.com/qu
 they look and behave alike: the same themes, icons, languages, keys and mouse behaviour. quvyta is
 open source under the MIT licence.
 
-> **Beta.** quvyta is new, and so is the family it introduces. Shared settings for the whole
-> family are planned. The interface may still change between releases. Please report anything
+> **Beta.** quvyta is new, and so is the family it introduces. The interface may still change
+> between releases. Please report anything
 > that looks wrong at <https://github.com/quvyta/quvyta/issues>.
 
 <p>
@@ -42,7 +42,7 @@ open source under the MIT licence.
 | [Framework](https://github.com/quvyta/framework) showcase | `quvyta-framework-showcase` | `qframe` | `cargo install quvyta-framework-showcase` | Released |
 | [quvyta](https://github.com/quvyta/quvyta) | `quvyta` | `quvyta` | `cargo install quvyta` | Beta |
 
-- **qcode** runs coding agent harnesses inside Podman or Docker containers.
+- **qcode** runs coding agents inside Podman or Docker containers.
 - **qfocus** tracks what you focus on and shows where your time went in charts.
 - **qtools** applies the settings Arch Linux users usually set up by hand, from one list, with a
   preview, a backup and an undo.
@@ -115,16 +115,20 @@ are included). `↑` `↓` move through the list, `enter` opens the selected mem
 you do not have, `u` updates it, `r` looks for updates again, `tab` moves between controls and
 `ctrl+q` quits. On a narrow terminal the first `enter` shows a member's details and `esc` goes
 back to the list. The header has two tabs, Apps and Settings: click one, or reach them with `tab`
-and move with `←` `→`. Settings holds quvyta's own choices (checking for updates at start, what
-happens when a program closes, and whether `~/.cargo/bin` is on your PATH); `↑` `↓` pick a row,
-`enter` or `space` changes it, every change is saved at once, and `esc` goes back to Apps.
+and move with `←` `→`. Settings opens with the appearance the whole family
+shares: the language, the colour theme and the icon set, each with a box saying whether the
+choice holds in every Quvyta application or in quvyta alone, and under them Reduce motion and
+the pillar. Below them are quvyta's own choices (checking for updates at start, what happens
+when a program closes, and whether `~/.cargo/bin` is on your PATH). `↑` `↓` pick a row, `enter`
+or `space` changes it, every change is saved at once and takes effect straight away, and `esc`
+goes back to Apps. A member that follows the family opens with what you chose here.
 
 `quvyta show NAME` opens straight on one member's page, for example `quvyta show qfocus`; on a
 narrow terminal `esc` goes back to the list. `quvyta install NAME...` opens on the question
 before installing each member named, one after another. A name is a member's short name, its
 command or its package, and `quvyta --help` lists every form.
 
-![The Settings tab: checking for updates at start, what happens when an app closes, and whether cargo's folder is on PATH](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/settings.png)
+![The Settings tab: the language, theme and icons the whole family shares, each with the box for changing it everywhere, and under them checking for updates at start, what happens when an app closes, and whether cargo's folder is on PATH](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/settings.png)
 
 ## Installing, updating and removing
 

@@ -16,7 +16,7 @@ function Get-QuvytaFamily {
     # The same names, crates and commands as install.sh; a test keeps the two in step.
     @(
         [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; About = 'the showcase of the framework every member is built on' }
-        [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; About = 'coding agent harnesses inside Podman or Docker containers' }
+        [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; About = 'coding agents inside Podman or Docker containers' }
         [pscustomobject]@{ Name = 'focus'; Crate = 'quvyta-focus'; Command = 'qfocus'; ArchOnly = $false; About = 'tracks what you focus on and where your time went' }
         [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; About = 'a package manager for Arch Linux that shows every change first' }
         [pscustomobject]@{ Name = 'tools'; Crate = 'quvyta-tools'; Command = 'qtools'; ArchOnly = $true; About = 'the settings Arch Linux users usually set up by hand, with undo' }

@@ -6,13 +6,13 @@
 pkgname=quvyta-code
 pkgver=0.1.7
 pkgrel=1
-pkgdesc="Runs coding agent harnesses inside Podman or Docker containers, from the terminal (beta)"
+pkgdesc="Runs coding agents inside Podman or Docker containers, from the terminal (beta)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/quvyta/code"
 license=('MIT')
 depends=('gcc-libs' 'glibc')
 makedepends=('cargo')
-optdepends=('podman: to run the harnesses in containers without root'
+optdepends=('podman: to run the agents in containers without root'
             'docker: another container engine quvyta-code can use')
 source=("$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate")
 sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')

@@ -2,6 +2,11 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.2.6 (2026-09-20)
+
+- The Settings tab now opens with the appearance every Quvyta application shares: the language, the colour theme and the icon set, each with a box saying whether the choice holds in every Quvyta application or in quvyta alone, and under them Reduce motion and the pillar. Choosing here takes at once, and every member that follows the family opens with it.
+- qcode is described as running coding agents, the words the family uses everywhere now.
+
 ## 0.2.5 (2026-09-20)
 
 - The README opens with a short recording of a visit: the family list, choosing a member, the question with the exact command, the install running, and Open on it at the end. It is drawn from the same invented scenes as the pictures, so nothing in it comes from a real machine.

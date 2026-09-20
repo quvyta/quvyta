@@ -58,7 +58,7 @@ apps = "uygulamalar"
 
 [family.code]
 title = "Quvyta Code"
-summary = "Kodlama ajanı harness'larını Podman ya da Docker kapsayıcılarında çalıştırır. Bir profili bir kez kurarsın, sonra onu istediğin projede açar, harness'lar ve kabuklar arasında sekme gibi geçersin."
+summary = "Kodlama ajanlarını Podman ya da Docker kapsayıcılarında çalıştırır. Bir profili bir kez kurarsın, sonra onu istediğin projede açar, ajanlar ve kabuklar arasında sekme gibi geçersin."
 
 [family.focus]
 title = "Quvyta Focus"

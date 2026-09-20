@@ -59,7 +59,7 @@ apps = "apps"
 
 [family.code]
 title = "Quvyta Code"
-summary = "Runs coding agent harnesses inside Podman or Docker containers. Set up a profile once, open it in any of your projects and move between harnesses and shells like tabs."
+summary = "Runs coding agents inside Podman or Docker containers. Set up a profile once, open it in any of your projects and move between agents and shells like tabs."
 
 [family.focus]
 title = "Quvyta Focus"

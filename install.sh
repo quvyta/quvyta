@@ -41,7 +41,7 @@ command_of() {
 about() {
     case $1 in
         framework) echo "the showcase of the framework every member is built on" ;;
-        code) echo "coding agent harnesses inside Podman or Docker containers" ;;
+        code) echo "coding agents inside Podman or Docker containers" ;;
         focus) echo "tracks what you focus on and where your time went" ;;
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
         tools) echo "the settings Arch Linux users usually set up by hand, with undo" ;;

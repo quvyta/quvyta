@@ -67,10 +67,16 @@ pub(super) fn start(root: &Path, width: u16, height: u16) -> Harness<Quvyta> {
 
 /// The application with `launcher.conf` holding `settings`.
 pub(super) fn harness_with_settings(settings: &str) -> (TempDir, Harness<Quvyta>) {
+    harness_with_settings_at(settings, 100, 24)
+}
+
+/// [`harness_with_settings`] on a screen of `width` by `height`, for the whole Settings tab,
+/// which is longer than a screen of the usual height.
+pub(super) fn harness_with_settings_at(settings: &str, width: u16, height: u16) -> (TempDir, Harness<Quvyta>) {
     let root = tempfile::tempdir().expect("temp");
     std::fs::create_dir_all(root.path().join("config")).expect("folder");
     std::fs::write(root.path().join("config/launcher.conf"), settings).expect("settings");
-    let h = start(root.path(), 100, 24);
+    let h = start(root.path(), width, height);
     (root, h)
 }
 

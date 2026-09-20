@@ -321,6 +321,19 @@ pub(crate) mod tests {
         })
     }
 
+    /// The build folder taken, waiting out the same moment [`free_soon`] waits out: between a
+    /// program being started and it running, the child holds a copy of every open file of this
+    /// process, the lock among them, so a folder nobody holds can still refuse a claim.
+    pub(crate) fn claim_soon(machine: &Machine) -> Claim {
+        for _ in 0..200 {
+            match claim(machine) {
+                Claim::Busy => std::thread::sleep(std::time::Duration::from_millis(5)),
+                taken => return taken,
+            }
+        }
+        claim(machine)
+    }
+
     fn run(job: &Job) -> (Outcome, Vec<String>) {
         let mut lines = Vec::new();
         let outcome = job.run(&|| false, &mut |line| lines.push(line));
@@ -504,8 +517,7 @@ pub(crate) mod tests {
 
         std::fs::create_dir_all(build.join("release")).expect("in use");
         // Children other tests start meanwhile can hold the released lock for a moment.
-        assert!(free_soon(&machine));
-        let Claim::Held(lock) = claim(&machine) else { panic!("the folder is free") };
+        let Claim::Held(lock) = claim_soon(&machine) else { panic!("the folder is free") };
         assert!(held_elsewhere(&machine), "a second claim sees it taken");
         assert!(clear_leftover(&machine), "another window holds it");
         assert!(build.exists(), "a folder in use is kept");

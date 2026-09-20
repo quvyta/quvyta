@@ -10,12 +10,17 @@
 //! # Whether quvyta asks crates.io for newer versions when it starts. `r` asks at any time.
 //! check_updates = true
 //! ```
+//!
+//! The appearance of quvyta itself is not read here: `language`, `theme` and `icons` are the
+//! family's shared keys, resolved for every member alike by the framework, and the Settings tab
+//! writes them where the box under each row says. Written in this file they hold for quvyta
+//! alone; written as `"quvyta"` they follow the family's shared file.
 
 use std::io;
 use std::path::Path;
 
 use qframe::diagnostics::Diagnostic;
-use qframe::storage::{Schema, Setting, Settings};
+use qframe::storage::{Family, Schema, Setting, Settings};
 
 /// The key saying what happens after a member closes.
 const AFTER_CLOSE: &str = "after_close";
@@ -69,11 +74,13 @@ impl Default for Launcher {
 }
 
 impl Launcher {
-    /// Reads `path`. A missing file, or no settings folder at all, gives the defaults; a broken
-    /// one gives the defaults for what is broken and says what is wrong.
-    pub fn load(path: Option<&Path>) -> Self {
-        let Some(path) = path else { return Self::default() };
-        let settings = Settings::open(path).schema(schema());
+    /// quvyta's own settings as they stand in `settings`, which [`open`] read from
+    /// `launcher.conf`: a missing file, or no settings folder at all, gives the defaults, and a
+    /// broken one gives the defaults for what is broken and says what is wrong.
+    ///
+    /// The shared keys of the family are not here: they are resolved together with every other
+    /// member's, from the shared file.
+    pub(crate) fn from_settings(settings: &Settings) -> Self {
         let after_close = match settings.get::<String>(AFTER_CLOSE).as_deref() {
             Some("shell") => AfterClose::Shell,
             _ => AfterClose::Return,
@@ -121,18 +128,43 @@ impl Launcher {
     }
 }
 
+#[cfg(test)]
+impl Launcher {
+    /// The settings at `path`, read as quvyta reads them when it starts. The application reads
+    /// the file once, into the [`Settings`] the appearance rows write too, so only a test reads a
+    /// file of its own.
+    pub(crate) fn load(path: Option<&Path>) -> Self {
+        Self::from_settings(&open(path))
+    }
+}
+
+/// quvyta's own settings, read from `launcher.conf` at `path`, or kept in memory when the
+/// platform names no settings folder.
+///
+/// They are marked a member of the family, so `"quvyta"` under `language`, `theme` or `icons`
+/// means "follow the family's shared value" instead of being an unknown theme or language.
+pub(crate) fn open(path: Option<&Path>) -> Settings {
+    let settings = match path {
+        Some(path) => Settings::open(path),
+        None => Settings::in_memory(),
+    };
+    settings.member_of(&Family::QUVYTA).schema(schema())
+}
+
 /// Sets `key` in the file at `path` and writes it back. The file is read again rather than taken
 /// from what quvyta loaded at start, so a change made meanwhile is not lost; it is replaced in one
 /// step, never left half written.
 fn write(path: &Path, key: &str, value: impl Setting) -> io::Result<()> {
-    let mut settings = Settings::open(path).schema(schema());
+    let mut settings = Settings::open(path).member_of(&Family::QUVYTA).schema(schema());
     settings.set(key, value);
     settings.save()
 }
 
-/// Every key quvyta reads and what it accepts.
+/// Every key quvyta reads and what it accepts, over the framework's own: the appearance rows of
+/// the Settings tab write the family's shared keys, reduced motion and the pillar into this same
+/// file, so they are known settings here too.
 fn schema() -> Schema {
-    Schema::default()
+    Schema::builtin()
         .choice(AFTER_CLOSE, ["return", "shell"], "return")
         .choice(PATH_PROMPT, ["ask", "dismissed"], "ask")
         .flag(CHECK_UPDATES, true)

@@ -21,9 +21,15 @@ fn main() -> ExitCode {
         Answer::Start(Start::Show(member)) => app.showing(member),
         _ => app,
     };
+    // The family's shared language, theme and icons are in force from the first frame, and
+    // quvyta's own file brings reduced motion and the pillar; the Settings tab writes both back.
+    let preferences = app.preferences().clone();
+    let settings = app.settings().clone();
     let run = LOCALES
         .iter()
         .fold(Runtime::new(app), |runtime, (file, text)| runtime.locale_source(*file, *text))
+        .settings(&settings)
+        .preferences(&preferences)
         .keymap_source("keymap.toml", KEYS)
         .run();
     match run {

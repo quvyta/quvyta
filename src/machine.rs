@@ -13,8 +13,9 @@ use qframe::storage::Family;
 use crate::shell_path::Environment;
 
 /// The id quvyta's own settings go under: `launcher.conf`, since `quvyta.conf` is the file the
-/// whole family shares.
-const LAUNCHER: &str = "launcher";
+/// whole family shares. An application whose id were the family's own would be handed that
+/// shared file instead of one of its own.
+pub(crate) const LAUNCHER: &str = "launcher";
 
 /// The name of quvyta's data folder.
 const DATA: &str = "quvyta";
