@@ -159,6 +159,7 @@ fresh help
 run --help
 expect_status 0
 expect_output "quvyta-packages, command qpac"
+expect_output "desk        quvyta-desktop, command qdesk; not released yet"
 expect_output "-y, --yes"
 expect_home_untouched
 
@@ -190,6 +191,38 @@ done
 for command in qframe qcode qfocus qpac qtools quvyta; do
     expect_output "  $command "
 done
+# all is every member that can be installed, and qdesk is not one of them.
+expect_not_logged "quvyta-desktop"
+expect_not_logged "qdesk"
+
+# --- A member that is not released yet
+
+fresh soon-alone
+run --yes desk
+expect_status 1
+expect_output "qdesk is not released yet, so it cannot be installed; quvyta's own list shows it as coming soon."
+expect_not_logged "cargo"
+expect_home_untouched
+
+fresh soon-with-a-name-that-can-be-installed
+run --yes desk code
+expect_status 0
+expect_output "qdesk is not released yet, so it cannot be installed"
+expect_logged "cargo install --locked quvyta-code"
+expect_not_logged "quvyta-desktop"
+
+fresh soon-in-the-family-list
+run
+expect_status 1
+expect_output "There is no terminal to choose on"
+expect_output "     desk       qdesk    "
+expect_output "coming soon, not released yet"
+# Not a numbered choice: the picker installs, and this cannot be installed.
+if grep -qE '^  [0-9]+  desk ' "$home/.out"; then
+    fail "desk has a number in the picker's list"
+fi
+expect_not_logged "cargo"
+expect_home_untouched
 
 # --- Without a terminal
 
@@ -576,6 +609,17 @@ n
     [ ! -e "$home/.bashrc" ] || fail ".bashrc written after no"
     expect_output "Not added"
     expect_output "start them by their full path"
+
+    fresh tty-pick-soon-then-a-name
+    run_tty "desk
+code
+y
+y
+"
+    expect_status 0
+    expect_output "qdesk is not released yet, so it cannot be installed"
+    expect_logged "cargo install --locked quvyta-code"
+    expect_not_logged "quvyta-desktop"
 
     fresh tty-bad-then-good
     run_tty "9

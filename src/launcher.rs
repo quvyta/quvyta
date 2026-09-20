@@ -114,17 +114,23 @@ impl Launcher {
         write(path, CHECK_UPDATES, on)
     }
 
+    /// Puts quvyta's own defaults into `settings`, for the first start: the setup wizard has just
+    /// made `launcher.conf` with the family's shared keys, and these are the keys that are
+    /// quvyta's own. `path_prompt` is left out: not having answered is its default, and the offer
+    /// is still to be made.
+    pub(crate) fn write_defaults(settings: &mut Settings) {
+        let defaults = Self::default();
+        settings.set(AFTER_CLOSE, after_close_value(defaults.after_close).to_owned());
+        settings.set(CHECK_UPDATES, defaults.check_updates);
+    }
+
     /// Writes `after_close` to `path`, keeping every other setting as the file has it now.
     ///
     /// # Errors
     ///
     /// Returns the I/O error when the file or its folder cannot be written.
     pub fn save_after_close(path: &Path, after_close: AfterClose) -> io::Result<()> {
-        let value = match after_close {
-            AfterClose::Return => "return",
-            AfterClose::Shell => "shell",
-        };
-        write(path, AFTER_CLOSE, value.to_owned())
+        write(path, AFTER_CLOSE, after_close_value(after_close).to_owned())
     }
 }
 
@@ -135,6 +141,14 @@ impl Launcher {
     /// file of its own.
     pub(crate) fn load(path: Option<&Path>) -> Self {
         Self::from_settings(&open(path))
+    }
+}
+
+/// The value `after_close` is written as.
+fn after_close_value(after_close: AfterClose) -> &'static str {
+    match after_close {
+        AfterClose::Return => "return",
+        AfterClose::Shell => "shell",
     }
 }
 

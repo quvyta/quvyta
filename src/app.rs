@@ -9,13 +9,15 @@ mod open;
 mod path_notice;
 mod settings;
 mod updates;
+mod wizard;
 
 use std::collections::VecDeque;
 
+use qframe::icons::nerd_font::Install;
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, Termination};
 use qframe::storage::{Family, Preferences, Settings};
-use qframe::widgets::{Appearance, ScrollView, Splitter, Tabs, Toast};
+use qframe::widgets::{Appearance, ScrollView, Setup, SetupMsg, Splitter, Tabs, Toast};
 
 use crate::family::{FAMILY, Member, Status};
 use crate::inventory::{Inventory, State};
@@ -29,6 +31,7 @@ use path_notice::PathNotice;
 pub use settings::{Change, SettingMsg};
 pub use updates::UpdateMsg;
 use updates::Updates;
+pub use wizard::WizardMsg;
 
 /// Below this many columns the list and the details take turns on the screen.
 const WIDE: u16 = 60;
@@ -79,6 +82,14 @@ pub struct Quvyta {
     asked: VecDeque<usize>,
     /// The tab shown.
     tab: Tab,
+    /// The first-run wizard, while quvyta has no settings file of its own; `None` once it is
+    /// over, and from the start for someone who has quvyta's file already.
+    setup: Option<Setup<Msg>>,
+    /// Which members are checked on the wizard's own step, by index of [`FAMILY`].
+    picked: [bool; FAMILY.len()],
+    /// Whether this is Arch Linux, which is where the members marked `arch_only` run. Asked only
+    /// when the wizard opens, which is the one screen that offers those members.
+    arch: bool,
 }
 
 /// Everything that can happen.
@@ -116,6 +127,39 @@ pub enum Msg {
     Tab(Tab),
     /// Something on the Settings tab.
     Setting(SettingMsg),
+    /// Something on the first step of the setup wizard, which the framework answers.
+    Setup(SetupMsg),
+    /// Something on quvyta's own step of the setup wizard.
+    Wizard(WizardMsg),
+    /// The wizard wrote what it was told and is over.
+    SetUp,
+}
+
+/// The family's shared appearance of `machine`, with the rows writing into the same folder the
+/// preferences were read from: a machine rooted in a folder of its own never touches the user's
+/// settings.
+fn appearance_of(machine: &Machine, preferences: Preferences) -> Appearance {
+    let appearance = Appearance::new(Family::QUVYTA, LAUNCHER, preferences);
+    match machine.settings_dir.as_deref() {
+        Some(folder) => appearance.in_folder(folder),
+        None => appearance,
+    }
+}
+
+/// The first-run wizard when quvyta has no settings file of its own yet, and nothing when it has
+/// one or when this platform names no settings folder at all, where there would be nowhere to
+/// write what the wizard asks.
+fn setup(machine: &Machine, i18n: &qframe::i18n::I18n) -> Option<Setup<Msg>> {
+    let folder = machine.settings_dir.as_deref()?;
+    let mut setup = Setup::new_in(folder, Family::QUVYTA, LAUNCHER, i18n, Msg::Setup).on_finish(Msg::SetUp);
+    // A machine with font folders of its own is a test or a demo: no real font is looked at, and
+    // none is installed or registered.
+    if let Some(dirs) = &machine.font_dirs {
+        let target = dirs.first().cloned().unwrap_or_else(|| folder.join("fonts"));
+        setup = setup.install(Install::new().target(target.join("QuvytaNerdFont")).register(false));
+        setup = setup.font_dirs(dirs.clone());
+    }
+    setup.needed().then_some(setup)
 }
 
 impl Quvyta {
@@ -128,18 +172,22 @@ impl Quvyta {
     pub fn new(machine: Machine) -> Self {
         let settings = crate::launcher::open(machine.launcher_conf.as_deref());
         let i18n = crate::cli::i18n(|name| std::env::var(name).ok());
-        let preferences = match machine.settings_dir.as_deref() {
-            Some(folder) => Family::QUVYTA.preferences_in(folder, LAUNCHER, &i18n),
-            None => Family::QUVYTA.preferences(LAUNCHER, &i18n),
+        let setup = setup(&machine, &i18n);
+        // With the wizard open nothing may be written yet, not even the shared file, so the
+        // preferences are the ones it resolved without saving.
+        let preferences = match &setup {
+            Some(setup) => setup.preferences().clone(),
+            None => match machine.settings_dir.as_deref() {
+                Some(folder) => Family::QUVYTA.preferences_in(folder, LAUNCHER, &i18n),
+                None => Family::QUVYTA.preferences(LAUNCHER, &i18n),
+            },
         };
-        let appearance = Appearance::new(Family::QUVYTA, LAUNCHER, preferences);
-        // The rows write into the same folder the preferences were read from, so a machine rooted
-        // in a folder of its own never touches the user's settings.
-        let appearance = match machine.settings_dir.as_deref() {
-            Some(folder) => appearance.in_folder(folder),
-            None => appearance,
-        };
+        let appearance = appearance_of(&machine, preferences);
+        let arch = setup.is_some() && crate::checks::distro(&machine) == crate::checks::Distro::Arch;
         Self {
+            setup,
+            picked: [false; FAMILY.len()],
+            arch,
             machine,
             inventory: None,
             selected: 0,
@@ -265,8 +313,10 @@ impl App for Quvyta {
         self.launcher = Launcher::from_settings(&self.settings);
         // Turned off, nothing asks crates.io unasked; `r` still does, since that is asking.
         let updates = if self.launcher.check_updates { self.check_updates(false) } else { Command::none() };
+        // On the first start the wizard has the screen, so the appearance rows take the keys.
+        let first = if self.setting_up() { "setup-appearance" } else { "family" };
         Command::batch([
-            Command::focus("family"),
+            Command::focus(first),
             self.read_inventory(),
             self.settings_problems(),
             self.clear_leftover(),
@@ -292,6 +342,11 @@ impl App for Quvyta {
     }
 
     fn action(&self, name: &str) -> Option<Msg> {
+        // While the wizard asks, the family's keys have nothing to act on: its list is not there
+        // and nothing may be installed before Finish.
+        if self.setting_up() {
+            return None;
+        }
         // The family's keys act on the list; on the Settings tab they would act on a member
         // nobody sees.
         if self.tab == Tab::Settings {
@@ -374,11 +429,27 @@ impl App for Quvyta {
             // The header's keys and a click leave the keys on the tabs, where they were.
             Msg::Tab(tab) => self.tab = tab,
             Msg::Setting(msg) => return self.update_setting(msg),
+            // The framework owns its step: it applies the change, writes the two files when the
+            // wizard finishes, and answers with `Msg::SetUp`.
+            Msg::Setup(msg) => {
+                if let Some(mut setup) = self.setup.take() {
+                    let done = setup.update(msg, &mut self.settings);
+                    self.setup = Some(setup);
+                    return done;
+                }
+            }
+            Msg::Wizard(msg) => return self.update_wizard(msg),
+            Msg::SetUp => return self.finish_setup(),
         }
         Command::none()
     }
 
     fn view(&self, ui: &mut View<'_, Msg>) {
+        // The first start asks before it shows the family: the wizard has the screen to itself.
+        if self.setting_up() {
+            self.setup_wizard(ui);
+            return;
+        }
         AppShell::new()
             .header(|ui| self.header(ui))
             .body(|ui| match self.tab {

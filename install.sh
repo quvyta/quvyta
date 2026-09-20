@@ -17,12 +17,19 @@ set -u
 min_rust_major=1
 min_rust_minor=95
 
-names="framework code focus packages tools quvyta"
+names="framework code focus packages tools quvyta desk"
+
+# Members that are not released yet: there is nothing on crates.io to install. Naming one says so
+# and installs nothing for it; they are left out of all and out of the picker's numbers.
+# The day qdesk is published, take desk out of this one line. Two more places change with it:
+# Soon = $false in install.ps1's family, and Status::Soon -> Status::Beta in src/family.rs.
+soon="desk"
 
 crate_of() {
     case $1 in
         framework) echo quvyta-framework-showcase ;;
         quvyta) echo quvyta ;;
+        desk) echo quvyta-desktop ;;
         *) echo "quvyta-$1" ;;
     esac
 }
@@ -35,6 +42,7 @@ command_of() {
         packages) echo qpac ;;
         tools) echo qtools ;;
         quvyta) echo quvyta ;;
+        desk) echo qdesk ;;
     esac
 }
 
@@ -46,7 +54,21 @@ about() {
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
         tools) echo "the settings Arch Linux users usually set up by hand, with undo" ;;
         quvyta) echo "installs, opens, updates and removes the family's programs" ;;
+        desk) echo "a desktop inside the terminal: windows, a dock, a launcher and a file manager" ;;
     esac
+}
+
+# Whether a member is one of the names above that cannot be installed yet.
+unreleased() {
+    case " $soon " in
+        *" $1 "*) return 0 ;;
+    esac
+    return 1
+}
+
+# The one line a person sees for a member that is not out yet, in the words quvyta itself uses.
+say_soon() {
+    say "$(command_of "$1") is not released yet, so it cannot be installed; quvyta's own list shows it as coming soon."
 }
 
 # Members that only run on Arch Linux; they are not built on macOS.
@@ -82,7 +104,8 @@ Names (several may be given; none lets you choose):
   packages    quvyta-packages, command qpac; Arch Linux only
   tools       quvyta-tools, command qtools; Arch Linux only
   quvyta      quvyta, command quvyta
-  all         every one of the above
+  desk        quvyta-desktop, command qdesk; not released yet, so it cannot be installed
+  all         every one of the above that can be installed
 
 Options:
   -y, --yes   agree to every question: installing Rust with rustup, installing the
@@ -140,11 +163,12 @@ parse_args() {
     assume_yes=0
     show_help=0
     chosen=
+    soon_named=
     for arg in "$@"; do
         case $arg in
             -y | --yes) assume_yes=1 ;;
             -h | --help) show_help=1 ;;
-            all) for name in $names; do choose "$name"; done ;;
+            all) for name in $names; do unreleased "$name" || choose "$name"; done ;;
             -*)
                 warn "Unknown option: $arg"
                 warn "Run with --help to see the options."
@@ -152,7 +176,11 @@ parse_args() {
                 ;;
             *)
                 if is_name "$arg"; then
-                    choose "$arg"
+                    if unreleased "$arg"; then
+                        soon_named="${soon_named:+$soon_named }$arg"
+                    else
+                        choose "$arg"
+                    fi
                 else
                     warn "Unknown name: $arg"
                     warn "Known names: $names (or all)."
@@ -168,6 +196,11 @@ list_family() {
     number=1
     for name in $names; do
         text=$(about "$name")
+        # A member still to come has no number: the picker installs, and this cannot be installed.
+        if unreleased "$name"; then
+            printf '     %-10s %-8s %s\n' "$name" "$(command_of "$name")" "$text; coming soon, not released yet"
+            continue
+        fi
         supported "$name" || text="$text; Arch Linux only, not for macOS"
         printf '  %s  %-10s %-8s %s\n' "$number" "$name" "$(command_of "$name")" "$text"
         number=$((number + 1))
@@ -178,19 +211,23 @@ list_family() {
 pick_from() {
     for word in $1; do
         case $word in
-            all) for name in $names; do choose "$name"; done ;;
+            all) for name in $names; do unreleased "$name" || choose "$name"; done ;;
             *[!0-9]*)
-                if is_name "$word"; then
-                    choose "$word"
-                else
+                if ! is_name "$word"; then
                     warn "Unknown choice: $word"
                     return 1
+                fi
+                if unreleased "$word"; then
+                    say_soon "$word"
+                else
+                    choose "$word"
                 fi
                 ;;
             *)
                 number=1
                 found=
                 for name in $names; do
+                    unreleased "$name" && continue
                     if [ "$number" = "$word" ]; then
                         choose "$name"
                         found=1
@@ -529,6 +566,11 @@ main() {
     failed=
     path_state=on-path
 
+    if [ -n "$soon_named" ]; then
+        for name in $soon_named; do say_soon "$name"; done
+        # Named on its own, nothing is left to install; ending here also keeps the picker away.
+        [ -n "$chosen" ] || exit 1
+    fi
     if [ -z "$chosen" ]; then
         pick || exit 1
     fi

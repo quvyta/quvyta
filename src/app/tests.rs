@@ -39,6 +39,7 @@ pub(super) fn machine(root: &Path) -> Machine {
 
 /// The machine of [`machine`] with cargo's folder missing from `PATH`, and no `SHELL`.
 pub(super) fn machine_off_path(root: &Path) -> Machine {
+    set_up(root);
     let machine = machine_with_cargo(root, LIST, 0);
     write_program(&root.join("bin/cc"), "#!/bin/sh\nexit 0\n");
     installed_command(&machine, "qcode");
@@ -53,6 +54,17 @@ pub(super) fn harness(width: u16, height: u16) -> (TempDir, Harness<Quvyta>) {
     let root = tempfile::tempdir().expect("temp");
     let h = start(root.path(), width, height);
     (root, h)
+}
+
+/// Makes `root` a machine quvyta has been set up on: an empty `launcher.conf` is enough, since
+/// the first-run wizard opens only while quvyta has no file of its own. Without this every test
+/// of the family list would see the wizard, which is [`super::wizard::tests`]' own subject.
+pub(super) fn set_up(root: &Path) {
+    let conf = root.join("config/launcher.conf");
+    if !conf.exists() {
+        std::fs::create_dir_all(root.join("config")).expect("folder");
+        std::fs::write(&conf, "").expect("settings");
+    }
 }
 
 /// The application on the machine in `root`, which may already hold a `config/launcher.conf`.
@@ -342,6 +354,7 @@ fn visual_review() {
         println!("broken launcher.conf {locale}\n{}", h.screen());
     }
     fragments.extend(super::path_notice::tests::review());
+    fragments.extend(super::wizard::tests::review());
     fragments.extend(super::settings::tests::review());
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target/quvyta-review.html");
     std::fs::write(path, qframe::runtime::html_page(&fragments)).expect("review page written");

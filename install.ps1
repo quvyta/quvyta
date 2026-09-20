@@ -14,14 +14,26 @@
 
 function Get-QuvytaFamily {
     # The same names, crates and commands as install.sh; a test keeps the two in step.
+    #
+    # Soon marks a member that is not released yet: there is nothing on crates.io to install.
+    # Naming it says so and installs nothing for it; it is left out of all and out of the picker's
+    # numbers. The day qdesk is published, set its Soon to $false on its one line here. Two more
+    # places change with it: the soon= line in install.sh, and Status::Soon -> Status::Beta in
+    # src/family.rs.
     @(
-        [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; About = 'the showcase of the framework every member is built on' }
-        [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; About = 'coding agents inside Podman or Docker containers' }
-        [pscustomobject]@{ Name = 'focus'; Crate = 'quvyta-focus'; Command = 'qfocus'; ArchOnly = $false; About = 'tracks what you focus on and where your time went' }
-        [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; About = 'a package manager for Arch Linux that shows every change first' }
-        [pscustomobject]@{ Name = 'tools'; Crate = 'quvyta-tools'; Command = 'qtools'; ArchOnly = $true; About = 'the settings Arch Linux users usually set up by hand, with undo' }
-        [pscustomobject]@{ Name = 'quvyta'; Crate = 'quvyta'; Command = 'quvyta'; ArchOnly = $false; About = "installs, opens, updates and removes the family's programs" }
+        [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; Soon = $false; About = 'the showcase of the framework every member is built on' }
+        [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; Soon = $false; About = 'coding agents inside Podman or Docker containers' }
+        [pscustomobject]@{ Name = 'focus'; Crate = 'quvyta-focus'; Command = 'qfocus'; ArchOnly = $false; Soon = $false; About = 'tracks what you focus on and where your time went' }
+        [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; Soon = $false; About = 'a package manager for Arch Linux that shows every change first' }
+        [pscustomobject]@{ Name = 'tools'; Crate = 'quvyta-tools'; Command = 'qtools'; ArchOnly = $true; Soon = $false; About = 'the settings Arch Linux users usually set up by hand, with undo' }
+        [pscustomobject]@{ Name = 'quvyta'; Crate = 'quvyta'; Command = 'quvyta'; ArchOnly = $false; Soon = $false; About = "installs, opens, updates and removes the family's programs" }
+        [pscustomobject]@{ Name = 'desk'; Crate = 'quvyta-desktop'; Command = 'qdesk'; ArchOnly = $false; Soon = $true; About = 'a desktop inside the terminal: windows, a dock, a launcher and a file manager' }
     )
+}
+
+# The members that can be installed today, which is what all and the picker's numbers offer.
+function Get-QuvytaInstallable {
+    @(Get-QuvytaFamily | Where-Object { -not $_.Soon })
 }
 
 function Get-QuvytaMember {
@@ -54,7 +66,8 @@ Names (several may be given; none lets you choose):
   packages    quvyta-packages, command qpac; Arch Linux only, not installed on Windows
   tools       quvyta-tools, command qtools; Arch Linux only, not installed on Windows
   quvyta      quvyta, command quvyta
-  all         every one of the above that runs on Windows
+  desk        quvyta-desktop, command qdesk; not released yet, so it cannot be installed
+  all         every one of the above that runs on Windows and is released
 
 Options:
   -Yes        agree to every question: installing Rust with rustup, installing the chosen
@@ -65,6 +78,13 @@ Without a console to ask on and without -Yes nothing is installed or written; th
 says what it would do. The Visual Studio C++ Build Tools that Rust needs are never installed by
 this script: if they are missing it prints the command that installs them and stops.
 '@
+}
+
+# The one line a person sees for a member that is not out yet, in the words quvyta itself uses.
+function Write-QuvytaSoon {
+    param([string]$Name)
+    $command = (Get-QuvytaMember $Name).Command
+    Write-QuvytaLine "$command is not released yet, so it cannot be installed; quvyta's own list shows it as coming soon."
 }
 
 function Test-QuvytaWindows {
@@ -118,7 +138,7 @@ function Read-QuvytaCommandLine {
         if ($word -in @('-Yes', '--yes', '-y')) { $State.Yes = $true; continue }
         if ($word -in @('-Help', '--help', '-h', '-?')) { $State.Help = $true; continue }
         if ($word -eq 'all') {
-            foreach ($member in Get-QuvytaFamily) { Add-QuvytaChoice $State $member.Name }
+            foreach ($member in Get-QuvytaInstallable) { Add-QuvytaChoice $State $member.Name }
             continue
         }
         if ($word.StartsWith('-')) {
@@ -126,8 +146,13 @@ function Read-QuvytaCommandLine {
             Write-QuvytaLine 'Run with -Help to see the options.'
             return 2
         }
-        if (Get-QuvytaMember $word) {
-            Add-QuvytaChoice $State $word
+        $named = Get-QuvytaMember $word
+        if ($named) {
+            if ($named.Soon) {
+                if ($State.Soon -notcontains $named.Name) { $State.Soon += $named.Name }
+            } else {
+                Add-QuvytaChoice $State $word
+            }
         } else {
             Write-QuvytaLine "Unknown name: $word"
             Write-QuvytaLine "Known names: $((Get-QuvytaFamily | ForEach-Object { $_.Name }) -join ' ') (or all)."
@@ -141,6 +166,11 @@ function Write-QuvytaFamily {
     $number = 1
     foreach ($member in Get-QuvytaFamily) {
         $about = $member.About
+        # A member still to come has no number: the picker installs, and this cannot be installed.
+        if ($member.Soon) {
+            Write-QuvytaLine ('     {0,-10} {1,-8} {2}' -f $member.Name, $member.Command, "$about; coming soon, not released yet")
+            continue
+        }
         if ($member.ArchOnly) { $about = "$about; Arch Linux only, not for Windows" }
         Write-QuvytaLine ('  {0}  {1,-10} {2,-8} {3}' -f $number, $member.Name, $member.Command, $about)
         $number++
@@ -151,7 +181,7 @@ function Write-QuvytaFamily {
 # every word was understood.
 function Read-QuvytaPick {
     param($State, [string]$Reply)
-    $family = @(Get-QuvytaFamily)
+    $family = Get-QuvytaInstallable
     foreach ($word in @($Reply -split '[\s,]+' | Where-Object { $_ })) {
         if ($word -eq 'all') {
             foreach ($member in $family) { Add-QuvytaChoice $State $member.Name }
@@ -163,7 +193,11 @@ function Read-QuvytaPick {
             }
             Add-QuvytaChoice $State $family[$number - 1].Name
         } elseif (Get-QuvytaMember $word) {
-            Add-QuvytaChoice $State $word
+            if ((Get-QuvytaMember $word).Soon) {
+                Write-QuvytaSoon $word
+            } else {
+                Add-QuvytaChoice $State $word
+            }
         } else {
             Write-QuvytaLine "Unknown choice: $word"
             return $false
@@ -587,6 +621,7 @@ function Invoke-QuvytaInstall {
         Yes = $false
         Help = $false
         Chosen = @()
+        Soon = @()
         Installed = @()
         Failed = @()
         CargoHome = $cargoHome
@@ -612,6 +647,11 @@ function Invoke-QuvytaInstall {
     }
     $State.Console = Test-QuvytaConsole
 
+    if ($State.Soon.Count -gt 0) {
+        foreach ($name in $State.Soon) { Write-QuvytaSoon $name }
+        # Named on its own, nothing is left to install; ending here also keeps the picker away.
+        if ($State.Chosen.Count -eq 0) { return 1 }
+    }
     if ($State.Chosen.Count -eq 0) {
         if (-not (Select-QuvytaMember $State)) { return 1 }
     }

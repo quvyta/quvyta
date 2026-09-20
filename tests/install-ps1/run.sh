@@ -8,8 +8,16 @@
 # as a file to check how it starts and ends.
 #
 # Usage: tests/install-ps1/run.sh [image]   (default mcr.microsoft.com/powershell:7.5-ubuntu-24.04)
-# Set ANALYZER=<folder holding the PSScriptAnalyzer module> to lint as well; the module has to be
-# saved there beforehand, since the container has no network.
+# Set ANALYZER=<folder holding the PSScriptAnalyzer module> to lint as well. The checks run without
+# a network, so the module is saved into that folder first, in a container of its own:
+#
+#   mkdir -p /tmp/psanalyzer
+#   podman run --rm -v /tmp/psanalyzer:/out:Z mcr.microsoft.com/powershell:7.5-ubuntu-24.04 \
+#     pwsh -NoProfile -Command 'Save-Module PSScriptAnalyzer -Path /out -Force'
+#   ANALYZER=/tmp/psanalyzer tests/install-ps1/run.sh
+#
+# Nothing is installed on the machine: the module stays in that folder and the container is thrown
+# away. Without ANALYZER the cases still run and only the lint is skipped, which they say.
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)

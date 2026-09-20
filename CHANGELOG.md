@@ -2,6 +2,12 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.2.7 (2026-09-20)
+
+- The first start now asks before it shows anything else: the language, the colour theme and the icon set the whole family shares, each with a box saying where the choice holds, and then which members of the family you would like. Nothing is written until you finish, so a quvyta closed half-way leaves the settings folder exactly as it was and asks again next time; the members you checked go through the same question before an install as the list does, one after another, and nothing is installed unasked. Members that run on Arch Linux only, and the ones that are not out yet, are listed but cannot be checked elsewhere. Someone who already has quvyta's settings file is not asked. Requires quvyta-framework 0.1.11.
+- The one-line installers know the name `desk`. Naming it answers the way quvyta itself does, with one line saying qdesk is not released yet and that quvyta's own list shows it as coming soon, and installs nothing for it; other names given with it are installed as usual. It is not part of `all` and has no number in the picker, since there is nothing on crates.io to install, and the family list shows it as coming soon so the family is seen whole.
+- While a member installs, the screen now shows how far cargo has got: the crates built out of the crates in the build, the crate being compiled, and a bar that fills instead of sweeping. cargo redraws those counts over the same line, and quvyta now reads every redraw; the lines under Details and the log file stay exactly the lines cargo wrote.
+
 ## 0.2.6 (2026-09-20)
 
 - The Settings tab now opens with the appearance every Quvyta application shares: the language, the colour theme and the icon set, each with a box saying whether the choice holds in every Quvyta application or in quvyta alone, and under them Reduce motion and the pillar. Choosing here takes at once, and every member that follows the family opens with it.

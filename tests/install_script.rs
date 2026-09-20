@@ -6,6 +6,8 @@
 use std::path::Path;
 use std::process::Command;
 
+use quvyta::{FAMILY, Status};
+
 #[test]
 fn install_script_cases_pass() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -31,12 +33,17 @@ fn ps1_field(line: &str, field: &str) -> String {
     body[..body.find(quote).expect("the value is closed")].to_owned()
 }
 
+/// The body of one function of `install.sh`, from its opening line to the closing brace.
+fn sh_body<'a>(script: &'a str, function: &str) -> &'a str {
+    let body =
+        &script[script.find(&format!("{function}() {{")).unwrap_or_else(|| panic!("no {function} in install.sh"))..];
+    &body[..body.find("\n}").expect("the function is closed")]
+}
+
 /// The text `install.sh` prints for a member from one of its `case` functions, such as
 /// `code) echo qcode ;;` or `code) echo "coding ..." ;;`.
 fn sh_case(script: &str, function: &str, name: &str) -> Option<String> {
-    let body = &script[script.find(&format!("{function}() {{"))?..];
-    let body = &body[..body.find("\n}")?];
-    body.lines().find_map(|line| {
+    sh_body(script, function).lines().find_map(|line| {
         let line = line.trim();
         let (pattern, action) = line.split_once(") echo ")?;
         let matches = pattern.split('|').any(|word| word.trim() == name || word.trim() == "*");
@@ -58,11 +65,19 @@ fn both_installers_know_the_same_family() {
     let sh_names = sh.lines().find_map(|line| line.strip_prefix("names=\"")).expect("install.sh lists names");
     assert_eq!(names.join(" "), sh_names.trim_end_matches('"'), "the same members in the same order");
 
-    let arch_only = sh
+    let arch_only = sh_body(&sh, "arch_only")
         .lines()
         .map(str::trim)
         .find(|line| line.ends_with(") return 0 ;;"))
         .expect("install.sh marks Arch-only members");
+    let soon = sh
+        .lines()
+        .find_map(|line| line.strip_prefix("soon=\""))
+        .expect("install.sh lists the members that are not released yet")
+        .trim_end_matches('"');
+    for name in soon.split_whitespace() {
+        assert!(names.iter().any(|known| known == name), "{name} is not a member of the family");
+    }
     for line in members {
         let name = ps1_field(line, "Name");
         for (field, function) in [("Crate", "crate_of"), ("Command", "command_of"), ("About", "about")] {
@@ -70,6 +85,13 @@ fn both_installers_know_the_same_family() {
         }
         let sh_arch = arch_only.trim_end_matches(") return 0 ;;").split('|').any(|word| word.trim() == name);
         assert_eq!(ps1_field(line, "ArchOnly") == "true", sh_arch, "whether {name} is Arch-only");
+        let sh_soon = soon.split_whitespace().any(|word| word == name);
+        assert_eq!(ps1_field(line, "Soon") == "true", sh_soon, "whether {name} is not released yet");
+        // The screen knows the same members the two installers do: the setup wizard offers a
+        // member that runs on Arch Linux only nowhere else, as they install it nowhere else.
+        let member = FAMILY.iter().find(|member| member.key == name).expect("the screen knows {name}");
+        assert_eq!(member.arch_only, sh_arch, "whether {name} runs on Arch Linux only");
+        assert_eq!(member.status == Status::Soon, sh_soon, "whether {name} is out");
     }
 }
 

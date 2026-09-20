@@ -387,13 +387,6 @@ fn a_path_longer_than_a_narrow_screen_keeps_its_start_and_its_file_name() {
 }
 
 #[test]
-fn a_long_path_is_shortened_in_the_middle() {
-    assert_eq!(shorten_middle("~/.config/quvyta/launcher.conf", 40), "~/.config/quvyta/launcher.conf");
-    assert_eq!(shorten_middle("/a/very/long/folder/launcher.conf", 15), "/a/very…er.conf");
-    assert_eq!(qframe::text::width(&shorten_middle("/home/çağrı/ayarlar/launcher.conf", 20)), 20);
-}
-
-#[test]
 fn narrow_ascii_settings_keep_the_rules() {
     for (width, height) in [(40, 16), (48, 20), (60, 20), (100, 24)] {
         for locale in ["en", "tr"] {

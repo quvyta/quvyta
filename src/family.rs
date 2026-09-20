@@ -28,6 +28,9 @@ pub struct Member {
     pub repository: &'static str,
     /// The line that adds its library to a project, for the member that shows off a library.
     pub library: Option<&'static str>,
+    /// Whether it only runs on Arch Linux, as `install.sh` and `install.ps1` also know it: on
+    /// another system it is listed, and told apart, but not offered for installing.
+    pub arch_only: bool,
     /// How settled it is.
     pub status: Status,
 }
@@ -56,6 +59,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "prompt",
         repository: "https://github.com/quvyta/code",
         library: None,
+        arch_only: false,
         status: Status::Beta,
     },
     Member {
@@ -65,6 +69,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "dot-outline",
         repository: "https://github.com/quvyta/focus",
         library: None,
+        arch_only: false,
         status: Status::Beta,
     },
     Member {
@@ -74,6 +79,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "settings",
         repository: "https://github.com/quvyta/tools",
         library: None,
+        arch_only: true,
         status: Status::Beta,
     },
     Member {
@@ -83,6 +89,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "inbox",
         repository: "https://github.com/quvyta/packages",
         library: None,
+        arch_only: true,
         status: Status::Beta,
     },
     Member {
@@ -94,6 +101,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "folder",
         repository: "https://github.com/quvyta/desktop",
         library: None,
+        arch_only: false,
         status: Status::Soon,
     },
     Member {
@@ -103,6 +111,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "project",
         repository: "https://github.com/quvyta/framework",
         library: Some("cargo add quvyta-framework"),
+        arch_only: false,
         status: Status::Released,
     },
     Member {
@@ -112,6 +121,7 @@ pub const FAMILY: [Member; 7] = [
         icon: "dot",
         repository: "https://github.com/quvyta/quvyta",
         library: None,
+        arch_only: false,
         status: Status::Beta,
     },
 ];

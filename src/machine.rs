@@ -45,6 +45,10 @@ pub struct Machine {
     pub data_dir: Option<PathBuf>,
     /// The file naming the Linux distribution, which says how to install a C linker.
     pub os_release: PathBuf,
+    /// The folders a Nerd Font is looked for and installed in, when they are not this machine's
+    /// own: a test root names folders inside itself, so no real font is ever touched. `None`
+    /// leaves the framework its own font folders.
+    pub font_dirs: Option<Vec<PathBuf>>,
     /// `SHELL`: which start-up file puts cargo's folder on `PATH`.
     pub shell: Option<String>,
     /// `XDG_CONFIG_HOME`, where fish keeps its start-up file.
@@ -65,7 +69,8 @@ impl Machine {
     }
 
     /// A machine whose home is `root/home`, whose `PATH` is `root/bin`, whose settings are in
-    /// `root/config` (the family's folder), whose data in `root/data` and whose distribution is named in
+    /// `root/config` (the family's folder), whose data in `root/data`, whose fonts in
+    /// `root/fonts` and whose distribution is named in
     /// `root/etc/os-release`, with no `SHELL`, `XDG_CONFIG_HOME` or `ZDOTDIR`. Nothing outside
     /// `root` is touched: the screen can be shown, and tried, without the real home.
     pub fn in_root(root: &Path) -> Self {
@@ -80,6 +85,7 @@ impl Machine {
             data_dir: Some(root.join("data")),
             settings_dir: Some(root.join("config")),
             os_release: root.join("etc/os-release"),
+            font_dirs: Some(vec![root.join("fonts")]),
             ..Self::resolve(lookup, Some(root.join("config/launcher.conf")))
         }
     }
@@ -99,6 +105,7 @@ impl Machine {
             settings_dir: None,
             data_dir: None,
             os_release: PathBuf::from("/etc/os-release"),
+            font_dirs: None,
             shell: lookup("SHELL").and_then(|value| value.into_string().ok()),
             xdg_config_home: lookup("XDG_CONFIG_HOME").map(PathBuf::from),
             zdotdir: lookup("ZDOTDIR").map(PathBuf::from),

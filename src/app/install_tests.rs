@@ -213,6 +213,7 @@ fn quvyta_never_offers_to_install_itself() {
 fn without_cargo_the_dialog_shows_the_install_script_and_rustup() {
     let root = tempfile::tempdir().expect("temp");
     write_program(&root.path().join("bin/cc"), "#!/bin/sh\nexit 0\n");
+    super::tests::set_up(root.path());
     let mut h = run(Quvyta::new(Machine::in_root(root.path())), 100, 34);
     h.send(Msg::Select(index("tools"))).press("enter");
     let screen = h.screen();
@@ -368,8 +369,9 @@ fn the_progress_shows_the_phase_the_crate_and_stop() {
     let screen = h.screen();
     assert!(screen.contains("Compiling") && screen.contains("ratatui"), "{screen}");
     let compiling = h.find("Compiling").expect("phase");
-    // Counts are what the progress line gives; they sit beside the phase, which keeps its width.
-    h.send(install(InstallMsg::Line(tools, "    Building [=====>  ] 142/231: ratatui, serde".to_owned())));
+    // Counts come from the frames of cargo's progress line; they sit beside the phase, which
+    // keeps its width.
+    h.send(install(InstallMsg::Frame(tools, "    Building [=====>  ] 142/231: ratatui, serde".to_owned())));
     let screen = h.screen();
     assert!(screen.contains("142 / 231"), "{screen}");
     assert!(line_with(&screen, "qtools ").contains("installing 61%"), "{screen}");
@@ -377,6 +379,89 @@ fn the_progress_shows_the_phase_the_crate_and_stop() {
     h.send(install(InstallMsg::Line(tools, "  Installing /home/ayse/.cargo/bin/qtools".to_owned())));
     assert_eq!(h.find("142 / 231"), Some(counts), "the counts do not move when the phase changes");
     assert_eq!(h.find("Installing").map(|at| at.0), Some(compiling.0));
+}
+
+#[test]
+fn the_counts_climb_with_cargo_s_frames_in_the_row_and_the_view() {
+    let (_root, mut h) = installing();
+    let tools = index("tools");
+    h.send(install(InstallMsg::Line(tools, "   Compiling proc-macro2 v1.0.95".to_owned())));
+    let mut seen = Vec::new();
+    for (done, krate) in [(0_u32, "anstyle"), (12, "serde"), (45, "hexyl")] {
+        h.send(install(InstallMsg::Frame(tools, format!("    Building [==>  ] {done}/46: {krate}, libc"))));
+        let screen = h.screen();
+        assert!(screen.contains(&format!("{done} / 46")), "the view counts {done} of 46:\n{screen}");
+        assert!(screen.contains(krate), "the view names the crate being built:\n{screen}");
+        seen.push(line_with(&screen, "qtools ").to_owned());
+    }
+    // The row climbs with them.
+    for (row, share) in seen.iter().zip(["installing 0%", "installing 26%", "installing 97%"]) {
+        assert!(row.contains(share), "the row says `{share}`: {row}");
+    }
+}
+
+#[test]
+fn a_frame_naming_another_crate_moves_nothing_but_the_crate() {
+    let (_root, mut h) = installing();
+    let (tools, packages) = (index("tools"), index("packages"));
+    h.send(install(InstallMsg::Line(tools, "   Compiling serde v1.0.219".to_owned())));
+    h.send(install(InstallMsg::Frame(tools, "    Building [==>  ] 12/46: serde, libc".to_owned())));
+    let (phase, counts) = (h.find("Compiling").expect("phase"), h.find("12 / 46").expect("counts"));
+    let rows: Vec<String> = h.screen().lines().take(6).map(ToOwned::to_owned).collect();
+
+    h.send(install(InstallMsg::Frame(tools, "    Building [===>  ] 12/46: ratatui, libc".to_owned())));
+    let screen = h.screen();
+    assert!(screen.contains("ratatui"), "the crate being built is the newest one named:\n{screen}");
+    assert!(!screen.contains("serde,"), "no frame text is shown as it came:\n{screen}");
+    assert_eq!(h.find("Compiling").expect("phase"), phase, "the phase stays where it was:\n{screen}");
+    assert_eq!(h.find("12 / 46").expect("counts"), counts, "the counts stay where they were:\n{screen}");
+    assert_eq!(screen.lines().take(6).map(ToOwned::to_owned).collect::<Vec<_>>(), rows, "the list is unchanged");
+
+    // A frame belongs to the install it came from; the one waiting in the queue is untouched.
+    h.send(install(InstallMsg::Frame(packages, "    Building [=====>  ] 40/46: quvyta-packages".to_owned())));
+    let screen = h.screen();
+    assert!(screen.contains("12 / 46") && !screen.contains("40 / 46"), "{screen}");
+    assert!(line_with(&screen, "qpac ").contains("queued"), "{screen}");
+}
+
+#[test]
+fn frames_stay_out_of_the_details_and_the_copied_log() {
+    let (_root, mut h) = installing();
+    let tools = index("tools");
+    h.send(install(InstallMsg::Line(tools, "   Compiling serde v1.0.219".to_owned())));
+    h.send(install(InstallMsg::Frame(tools, "    Building [==>  ] 12/46: serde, libc".to_owned())));
+    h.click_text("Details");
+    let screen = h.screen();
+    assert!(screen.contains("Compiling serde v1.0.219"), "cargo's own lines are there:\n{screen}");
+    assert!(!screen.contains("Building ["), "a frame is no log line:\n{screen}");
+    h.send(install(InstallMsg::CopyLog(tools)));
+    assert_eq!(h.copied(), ["   Compiling serde v1.0.219"]);
+}
+
+#[test]
+fn an_install_that_never_counts_keeps_an_unknown_bar_and_no_share() {
+    let (_root, mut h) = installing();
+    let tools = index("tools");
+    for line in ["    Updating crates.io index", "   Compiling serde v1.0.219"] {
+        h.send(install(InstallMsg::Line(tools, line.to_owned())));
+    }
+    let screen = h.screen();
+    assert!(screen.contains("Compiling") && screen.contains("serde"), "{screen}");
+    assert!(!screen.contains('%'), "nothing pretends to know the share:\n{screen}");
+    assert!(!screen.contains(" / "), "no counts are made up:\n{screen}");
+    assert!(line_with(&screen, "qtools ").contains("installing"), "{screen}");
+    // The bar is drawn all the same, and as the bar of unknown work: a band of light sweeping
+    // the whole track, not a track filled from the left to a share nobody knows.
+    let (x, y) = h.find("Compiling").expect("phase");
+    let (x, y) = (u16::try_from(x).expect("x"), u16::try_from(y + 1).expect("bar row"));
+    h.advance(std::time::Duration::from_millis(600));
+    let bar: Vec<_> = (0..20).map(|dx| h.bg(x + dx, y)).collect();
+    let mut shades = bar.clone();
+    shades.dedup();
+    assert!(shades.len() > 1, "the band of light is on the track: {bar:?}\n{}", h.screen());
+    h.advance(std::time::Duration::from_millis(300));
+    let moved: Vec<_> = (0..20).map(|dx| h.bg(x + dx, y)).collect();
+    assert_ne!(bar, moved, "the band sweeps, as work of unknown size does");
 }
 
 #[test]

@@ -56,6 +56,9 @@ pub enum InstallMsg {
     RustUpdated(HandoffOutcome),
     /// A line cargo wrote while installing the member at this index.
     Line(usize, String),
+    /// A frame of cargo's progress line, which it redraws in place, while installing the member
+    /// at this index. It says where the build is and belongs in no log.
+    Frame(usize, String),
     /// The install of the member at this index ended.
     Finished {
         /// The member.
@@ -359,6 +362,11 @@ impl Quvyta {
                     running.log.push(LogLine::new(level(&line), line));
                 }
             }
+            InstallMsg::Frame(index, frame) => {
+                if let Some(running) = self.installs.running.as_mut().filter(|running| running.index == index) {
+                    running.progress.read(&frame);
+                }
+            }
             InstallMsg::Finished { index, outcome, problems } => return self.finished(index, outcome, problems),
             InstallMsg::Event(index, TaskEvent::Finished { outcome, .. }) => match outcome {
                 TaskOutcome::Done => {}
@@ -574,8 +582,21 @@ impl Quvyta {
     fn install_task(&self, index: usize, job: Job) -> Task<Msg> {
         let machine = self.machine.clone();
         Task::new(FAMILY[index].command, move |cx| {
-            let outcome =
-                job.run(&|| cx.is_cancelled(), &mut |line| cx.send(Msg::Install(InstallMsg::Line(index, line))));
+            // cargo redraws its progress line many times a second, and most redraws only move the
+            // bar inside it. Only a frame that says something new about the build is worth a frame
+            // of the screen's own.
+            let mut last: Option<Step> = None;
+            let outcome = job.run(
+                &|| cx.is_cancelled(),
+                &mut |line| cx.send(Msg::Install(InstallMsg::Line(index, line))),
+                &mut |frame| {
+                    let Some(step) = cargo::step(&frame) else { return };
+                    if last.as_ref() != Some(&step) {
+                        last = Some(step);
+                        cx.send(Msg::Install(InstallMsg::Frame(index, frame)));
+                    }
+                },
+            );
             // Only the problem behind this failure is shown with it, not everything the checks find.
             let explains = |problem: &Problem| {
                 matches!(

@@ -146,14 +146,14 @@ impl Quvyta {
             let beside = room.saturating_sub(qframe::text::width(&words) + 2);
             ui.row(|ui| {
                 ui.add(title).fill_width();
-                ui.add(Text::new(shorten_middle(&path, beside)).role("faint").no_wrap());
+                ui.add(Text::new(qframe::text::truncate_middle(&path, beside)).role("faint").no_wrap());
             })
             .padding(Padding::symmetric(0, 2))
             .width(Length::Cells(width));
         } else {
             ui.column(|ui| {
                 ui.add(title);
-                ui.add(Text::new(shorten_middle(&path, room)).role("faint").no_wrap());
+                ui.add(Text::new(qframe::text::truncate_middle(&path, room)).role("faint").no_wrap());
             })
             .padding(Padding::symmetric(0, 2))
             .width(Length::Cells(width));
@@ -206,36 +206,6 @@ impl Quvyta {
             ui.column(|ui| self.show_path_notice(ui)).width(Length::Cells(width));
         }
     }
-}
-
-/// `text` in at most `width` columns: whole when it fits, else its start and its end with `…`
-/// between them, the end getting the extra column.
-fn shorten_middle(text: &str, width: u16) -> String {
-    if qframe::text::width(text) <= width || width == 0 {
-        return text.to_owned();
-    }
-    let room = width - 1;
-    let (head_room, tail_room) = (room / 2, room - room / 2);
-    let char_width = |c: char| qframe::text::width(c.encode_utf8(&mut [0; 4]));
-    let mut head = String::new();
-    let mut used = 0;
-    for c in text.chars() {
-        if used + char_width(c) > head_room {
-            break;
-        }
-        used += char_width(c);
-        head.push(c);
-    }
-    let mut tail = Vec::new();
-    let mut used = 0;
-    for c in text.chars().rev() {
-        if used + char_width(c) > tail_room {
-            break;
-        }
-        used += char_width(c);
-        tail.push(c);
-    }
-    format!("{head}…{}", tail.into_iter().rev().collect::<String>())
 }
 
 #[cfg(test)]

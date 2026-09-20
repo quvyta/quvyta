@@ -193,11 +193,15 @@ fn not_now_is_remembered_and_keeps_the_other_settings() {
 #[test]
 fn not_now_that_cannot_be_saved_says_so() {
     let root = tempfile::tempdir().expect("temp");
-    // A folder where launcher.conf should be: it cannot be replaced by a file.
-    fs::create_dir_all(root.path().join("config/launcher.conf")).expect("blocker");
     let mut h = start(machine(root.path(), "/bin/bash"));
+    // A settings folder that takes nothing new: launcher.conf is read, but the answer cannot be
+    // written back into it.
+    let config = root.path().join("config");
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o500)).expect("blocker");
     h.click_text("Not now").render();
     let screen = h.advance(TOAST_IN).screen();
+    // The folder is let go again, so the temporary folder can be cleaned up.
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o700)).expect("released");
     assert!(screen.contains("launcher.conf could not remember the answer"), "{screen}");
     assert!(!screen.contains("not on PATH"), "the notice still goes for now:\n{screen}");
 }

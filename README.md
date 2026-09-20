@@ -21,6 +21,10 @@ open source under the MIT licence.
 > between releases. Please report anything
 > that looks wrong at <https://github.com/quvyta/quvyta/issues>.
 
+The first start asks what the whole family should look like — the language, the colour theme and the icons, with **Start with the defaults** for anyone who would rather not choose — and then which of its members you would like. Nothing is written until you finish it, and nothing is ticked for you.
+
+![The first start asking which members of the family you would like, with a box beside each and nothing chosen](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard-family.png)
+
 <p>
 <img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/install-confirm.png" alt="Before an install: the source, the version, where it goes and the exact command" width="49%">
 <img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/installing.png" alt="An install in progress, with cargo's own output under Details and another member queued" width="49%">
@@ -71,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh 
 curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- quvyta
 ```
 
-The names are `framework` (the framework's showcase, `qframe`), `code`, `focus`, `packages`, `tools`, `quvyta` and `all`; several can be given at once.
+The names are `framework` (the framework's showcase, `qframe`), `code`, `focus`, `packages`, `tools`, `quvyta` and `all`; several can be given at once. `desk` is known too, but qdesk is not released yet: naming it says so and installs nothing, and `all` leaves it out.
 
 What the script does, asking before each step:
 

@@ -31,8 +31,8 @@ const BUILD_LOCK: &str = "build.lock";
 const LOGS: &str = "logs";
 
 /// The size of the terminal cargo is given. Wide enough that crate names are not cut. cargo
-/// draws its progress line on it, but ends each frame with `\r`, and the reader delivers only
-/// the text that stays on the screen, so the frames do not arrive as lines.
+/// draws its progress line on it and ends each frame with `\r`, so the frames are not lines:
+/// they arrive on their own, beside the lines, and say how far the build has got.
 pub const TERMINAL: (u16, u16) = (120, 30);
 
 /// One `cargo install`, with everything it needs from the machine.
@@ -88,7 +88,16 @@ impl Job {
     /// Runs the install, handing every line, without its terminal escapes, to `on_line`, and
     /// writes the whole log. `cancel` is asked between lines; when it turns true cargo and
     /// everything it started are killed.
-    pub fn run(&self, cancel: &dyn Fn() -> bool, on_line: &mut dyn FnMut(String)) -> Outcome {
+    ///
+    /// Each frame of cargo's progress line, which a carriage return overwrites in place, goes to
+    /// `on_frame` instead: it says how far the build has got, and it is not a line of output, so
+    /// it is neither logged nor written to the log file.
+    pub fn run(
+        &self,
+        cancel: &dyn Fn() -> bool,
+        on_line: &mut dyn FnMut(String),
+        on_frame: &mut dyn FnMut(String),
+    ) -> Outcome {
         let mut process = Process::new(&self.cargo)
             .args(self.args())
             .dir(&self.dir)
@@ -99,12 +108,19 @@ impl Job {
             process = process.env("CARGO_TARGET_DIR", build);
         }
         let mut lines = Vec::new();
-        let result = process.run(cancel, &mut |line| {
-            let (Line::Out(text) | Line::Err(text)) = line;
-            let text = cargo::plain(&text);
-            lines.push(text.clone());
-            on_line(text);
-        });
+        let result = process.run_with_overwritten(
+            cancel,
+            &mut |line| {
+                let (Line::Out(text) | Line::Err(text)) = line;
+                let text = cargo::plain(&text);
+                lines.push(text.clone());
+                on_line(text);
+            },
+            &mut |frame| {
+                let (Line::Out(text) | Line::Err(text)) = frame;
+                on_frame(cargo::plain(&text));
+            },
+        );
         let outcome = match result {
             Ok(ProcessOutcome::Finished { code: Some(0) }) => {
                 Outcome::Installed { version: cargo::installed_version(self.package, &lines).or(self.version.clone()) }
@@ -335,9 +351,15 @@ pub(crate) mod tests {
     }
 
     fn run(job: &Job) -> (Outcome, Vec<String>) {
-        let mut lines = Vec::new();
-        let outcome = job.run(&|| false, &mut |line| lines.push(line));
+        let (outcome, lines, _) = run_with_frames(job);
         (outcome, lines)
+    }
+
+    /// The install with its lines and, apart from them, the frames of cargo's progress line.
+    fn run_with_frames(job: &Job) -> (Outcome, Vec<String>, Vec<String>) {
+        let (mut lines, mut frames) = (Vec::new(), Vec::new());
+        let outcome = job.run(&|| false, &mut |line| lines.push(line), &mut |frame| frames.push(frame));
+        (outcome, lines, frames)
     }
 
     #[test]
@@ -416,7 +438,7 @@ pub(crate) mod tests {
         assert!(lines.iter().any(|line| line.trim() == "Compiling ratatui v0.29.0"), "{lines:?}");
         assert!(
             !lines.iter().any(|line| line.contains("Building")),
-            "a progress line erased in place never arrives as a line of its own: {lines:?}"
+            "a progress line erased in place is a frame, never a line: {lines:?}"
         );
         let log = std::fs::read_to_string(root.path().join("data/logs/qtools.log")).expect("log written");
         assert!(log.contains("Installed package `quvyta-tools v0.1.2`"), "{log}");
@@ -433,24 +455,37 @@ pub(crate) mod tests {
     /// A real install's bytes, recorded on a pseudo-terminal the size of [`TERMINAL`], played
     /// back through the same reader cargo's output goes through.
     #[test]
-    fn a_recorded_install_arrives_through_the_reader_without_its_progress_frames() {
+    fn a_recorded_install_delivers_its_progress_frames_beside_its_lines() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
-        scenario(root.path(), include_str!("../tests/cargo-output/install-pty.txt"), 0);
+        let recording = include_str!("../tests/cargo-output/install-pty.txt");
+        scenario(root.path(), recording, 0);
         packages(root.path());
-        let (outcome, lines) = run(&Job::new(&machine, member("tools"), None).expect("cargo"));
+        let (outcome, lines, frames) = run_with_frames(&Job::new(&machine, member("tools"), None).expect("cargo"));
         assert!(matches!(outcome, Outcome::Installed { .. }), "{outcome:?}");
         let steps: Vec<cargo::Step> = lines.iter().filter_map(|line| cargo::step(line)).collect();
         let compiling = steps.iter().filter(|step| matches!(step, cargo::Step::Compiling { .. })).count();
-        assert_eq!(compiling, 33, "every `Compiling` line arrives: {lines:?}");
+        assert_eq!(compiling, 33, "every `Compiling` line arrives, as before: {lines:?}");
         assert_eq!(steps.last(), Some(&cargo::Step::Placing));
-        // The reader treats a `\r` as a screen does: the text before it is overwritten and never
-        // delivered. cargo ends every progress frame with `\r`, so the counts cannot reach the
-        // install view until the framework can hand over the text a `\r` overwrites.
-        assert!(
-            !steps.iter().any(|step| matches!(step, cargo::Step::Counted { .. })),
-            "a progress frame arrived; the install view can now show counts: {lines:?}"
-        );
+
+        // The counts cargo redraws in place now arrive too, every frame of them, and they climb.
+        let counted: Vec<(u32, u32, String)> = frames
+            .iter()
+            .filter_map(|frame| match cargo::step(frame) {
+                Some(cargo::Step::Counted { done, total, krate }) => Some((done, total, krate)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(counted.len(), recording.matches("Building\u{1b}[0m [").count(), "{counted:?}");
+        assert_eq!(counted.first(), Some(&(0, 46, "anstyle".to_owned())), "{counted:?}");
+        assert_eq!(counted.last(), Some(&(45, 46, "hexyl".to_owned())), "{counted:?}");
+        assert!(counted.windows(2).all(|pair| pair[0].0 <= pair[1].0), "the counts only climb: {counted:?}");
+
+        // A frame is redrawn in place, not written: it belongs in no log.
+        assert!(!lines.iter().any(|line| line.contains("Building")), "a frame is not a line: {lines:?}");
+        let log = std::fs::read_to_string(root.path().join("data/logs/qtools.log")).expect("log written");
+        assert!(!log.contains("Building"), "the log file holds only real lines:\n{log}");
+        assert_eq!(log.lines().count(), lines.len(), "the log is the lines and nothing else");
     }
 
     #[test]
@@ -490,7 +525,8 @@ pub(crate) mod tests {
         let stop = Arc::new(AtomicBool::new(false));
         let started = std::time::Instant::now();
         let flag = Arc::clone(&stop);
-        let outcome = job.run(&move || flag.load(Ordering::Relaxed), &mut |_| stop.store(true, Ordering::Relaxed));
+        let outcome =
+            job.run(&move || flag.load(Ordering::Relaxed), &mut |_| stop.store(true, Ordering::Relaxed), &mut |_| {});
         assert_eq!(outcome, Outcome::Cancelled);
         assert!(started.elapsed() < std::time::Duration::from_secs(10), "cargo did not run its thirty seconds");
         assert!(!machine.cargo_bin().join("qtools").exists(), "nothing was installed");
@@ -567,12 +603,20 @@ pub(crate) mod tests {
             build: Some(root.path().join("data/build")),
             log: Some(root.path().join("data/logs").join(format!("{}.log", member.command))),
         };
-        let mut steps = Vec::new();
-        let outcome = job.run(&|| false, &mut |line| {
-            if let Some(step) = cargo::step(&line) {
-                steps.push(step);
-            }
-        });
+        let (mut steps, mut frames) = (Vec::new(), Vec::new());
+        let outcome = job.run(
+            &|| false,
+            &mut |line| {
+                if let Some(step) = cargo::step(&line) {
+                    steps.push(step);
+                }
+            },
+            &mut |frame| {
+                if let Some(step) = cargo::step(&frame) {
+                    frames.push(step);
+                }
+            },
+        );
         let log = std::fs::read_to_string(job.log.as_ref().expect("log")).expect("log written");
         let Outcome::Installed { version: Some(version) } = &outcome else { panic!("{outcome:?}\n{log}") };
         println!("installed {package} {version}");
@@ -580,8 +624,19 @@ pub(crate) mod tests {
         assert!(steps.first().is_some_and(|step| *step == cargo::Step::Downloading), "{steps:?}");
         assert!(steps.iter().any(|step| matches!(step, cargo::Step::Compiling { .. })), "{steps:?}");
         assert_eq!(steps.last(), Some(&cargo::Step::Placing), "{steps:?}");
-        let counted = steps.iter().filter(|step| matches!(step, cargo::Step::Counted { .. })).count();
-        println!("{} steps, {counted} of them counted", steps.len());
+        assert!(!steps.iter().any(|step| matches!(step, cargo::Step::Counted { .. })), "a frame is no line: {steps:?}");
+        let counted: Vec<(u32, u32, &str)> = frames
+            .iter()
+            .filter_map(|step| match step {
+                cargo::Step::Counted { done, total, krate } => Some((*done, *total, krate.as_str())),
+                _ => None,
+            })
+            .collect();
+        println!("{} lines with a step, {} frames, {} of them counted", steps.len(), frames.len(), counted.len());
+        println!("first {:?}, last {:?}", counted.first(), counted.last());
+        assert!(!counted.is_empty(), "cargo's progress frames arrive: {frames:?}");
+        assert!(counted.windows(2).all(|pair| pair[0].0 <= pair[1].0), "the counts only climb: {counted:?}");
+        assert!(!log.contains("Building"), "no frame reaches the log:\n{log}");
         assert!(!log.contains('\u{1b}'), "escapes are taken out of the log");
     }
 }
