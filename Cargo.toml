@@ -1,6 +1,6 @@
 [package]
 name = "quvyta"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -9,10 +9,12 @@ repository = "https://github.com/quvyta/quvyta"
 readme = "README.md"
 keywords = ["tui", "terminal", "quvyta"]
 categories = ["command-line-utilities"]
-include = ["src/**", "assets/**", "Cargo.toml", "Cargo.lock", "README.md", "CHANGELOG.md", "LICENSE"]
+# The paths are anchored with a leading slash: an unanchored "README.md" would also
+# match README files further down the tree, such as the one in packaging/.
+include = ["/src/**", "/assets/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/CHANGELOG.md", "/LICENSE"]
 
 [dependencies]
-quvyta-framework = "0.1.7"
+quvyta-framework = "0.1.10"
 
 [dev-dependencies]
 tempfile = "3"

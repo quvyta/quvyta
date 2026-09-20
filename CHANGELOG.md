@@ -2,6 +2,12 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.2.5 (2026-09-20)
+
+- The README opens with a short recording of a visit: the family list, choosing a member, the question with the exact command, the install running, and Open on it at the end. It is drawn from the same invented scenes as the pictures, so nothing in it comes from a real machine.
+- The pictures show only the progress a real install delivers. cargo's `Building 142/231` frames are written over the same line, and quvyta does not receive them yet, so no picture pretends otherwise.
+- Requires quvyta-framework 0.1.10.
+
 ## 0.2.4 (2026-09-20)
 
 - qdesk, a desktop that runs inside the terminal, joins the family list as "Coming soon". Its page shows what it will be, its command, package and source; quvyta does not offer to install or update it until it is released, and `quvyta install qdesk` says so. A build of qdesk already on your PATH opens like any other member.

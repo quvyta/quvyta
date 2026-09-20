@@ -5,6 +5,8 @@ One terminal app to find, install, open and update every member of the Quvyta fa
 [![crates.io](https://img.shields.io/crates/v/quvyta.svg)](https://crates.io/crates/quvyta)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+![A visit in quvyta: choosing qtools in the family list, agreeing to the install after seeing the exact command, cargo building it, and Open on it at the end](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/quvyta.gif)
+
 ![The family in quvyta: what is installed, which version, and one update waiting](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/family.png)
 
 **quvyta** installs the Quvyta family of terminal applications, opens the ones on your machine,

@@ -1,0 +1,59 @@
+# Maintainer: <the name and address of the AUR account, filled in before the first upload>
+
+# A draft. Nothing here is published on the AUR yet, and the checksum below is a
+# placeholder: run `updpkgsums` in this folder once the release is on crates.io.
+
+pkgname=quvyta-packages
+pkgver=0.1.5
+pkgrel=1
+pkgdesc="One simple place for pacman, AUR, Flatpak and Snap packages, in the terminal (beta)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/quvyta/packages"
+license=('MIT')
+depends=('gcc-libs' 'glibc')
+makedepends=('cargo')
+optdepends=('paru: packages from the AUR'
+            'flatpak: Flatpak packages'
+            'snapd: Snap packages')
+source=("$pkgname-$pkgver.tar.gz::https://static.crates.io/crates/$pkgname/$pkgname-$pkgver.crate")
+sha256sums=('0000000000000000000000000000000000000000000000000000000000000000')
+
+# Cargo decides about link-time optimisation itself, so makepkg's flag is turned off
+# to keep the two from disagreeing. makepkg's CFLAGS, CXXFLAGS and LDFLAGS still reach
+# any C a dependency builds, because cargo passes them on through the cc crate.
+options=('!lto')
+
+# The build never writes into the packager's home unless a CARGO_HOME is already set
+# for it, and RUSTUP_TOOLCHAIN keeps a rustup user on the stable toolchain instead of
+# whatever their default happens to be.
+_env() {
+	export CARGO_HOME="${CARGO_HOME:-$srcdir/cargo-home}"
+	export RUSTUP_TOOLCHAIN=stable
+}
+
+prepare() {
+	cd "$pkgname-$pkgver"
+	_env
+	# Everything is downloaded here, once, so build() runs offline.
+	cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+	cd "$pkgname-$pkgver"
+	_env
+	export CARGO_TARGET_DIR=target
+	cargo build --frozen --release --all-features
+}
+
+# There is no check(). The crate published on crates.io does not carry its tests: the
+# `include` list in its Cargo.toml keeps the tests folder and its fixtures out, so a
+# `cargo test` here fails to compile before it runs anything. The tests run in the
+# source repository, where the commit gate makes them pass before a release exists.
+
+package() {
+	cd "$pkgname-$pkgver"
+	install -Dm0755 -t "$pkgdir/usr/bin/" "target/release/qpac"
+	install -Dm0755 -t "$pkgdir/usr/bin/" "target/release/quvyta-packages"
+	install -Dm0644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+	install -Dm0644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
