@@ -29,8 +29,17 @@ pub use machine::Machine;
 
 /// The language files, compiled in so an installed binary needs nothing beside it: file name
 /// and text, each handed to the runtime as a locale source.
-pub const LOCALES: [(&str, &str); 2] =
-    [("en.toml", include_str!("../assets/locales/en.toml")), ("tr.toml", include_str!("../assets/locales/tr.toml"))];
+pub const LOCALES: [(&str, &str); 9] = [
+    ("en.toml", include_str!("../assets/locales/en.toml")),
+    ("tr.toml", include_str!("../assets/locales/tr.toml")),
+    ("de.toml", include_str!("../assets/locales/de.toml")),
+    ("es.toml", include_str!("../assets/locales/es.toml")),
+    ("fr.toml", include_str!("../assets/locales/fr.toml")),
+    ("pt-BR.toml", include_str!("../assets/locales/pt-BR.toml")),
+    ("ru.toml", include_str!("../assets/locales/ru.toml")),
+    ("zh-Hans.toml", include_str!("../assets/locales/zh-Hans.toml")),
+    ("ja.toml", include_str!("../assets/locales/ja.toml")),
+];
 
 /// The application's own keys, layered over the framework's as the keymap source `keymap.toml`.
 pub const KEYS: &str = "[app]\nprimary = \"enter\"\nback = \"esc\"\nrefresh = \"r\"\nupdate = \"u\"\n";

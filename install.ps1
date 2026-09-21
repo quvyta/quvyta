@@ -3,11 +3,12 @@
 #   irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1 | iex
 #   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1))) code -Yes
 #
-# The second form passes arguments, which iex cannot. Run it with -Help for the options. Nothing
-# here needs an administrator: Rust comes from rustup's own address, the applications from
-# crates.io, and the only setting written is the user's own PATH, after you agree to the exact
-# folder shown. System components such as the Visual Studio Build Tools are never installed by
-# this script; it prints the command instead.
+# The second form passes arguments, which iex cannot. Run it with -Help for the options. Rust comes
+# from rustup's own address, the applications from crates.io, and the only setting written is the
+# user's own PATH, after you agree to the exact folder shown. The Visual Studio Build Tools, a
+# system component, are installed only when they are missing and you say yes, at the console, to
+# the one winget command shown; -Yes never says that yes for you, and Windows asks for permission
+# itself.
 #
 # Everything lives in functions and runs from the last line, so a download cut short midway runs
 # nothing at all. It works on Windows PowerShell 5.1 and PowerShell 7.
@@ -75,8 +76,9 @@ Options:
   -Help       show this text (also --help or -h)
 
 Without a console to ask on and without -Yes nothing is installed or written; the script only
-says what it would do. The Visual Studio C++ Build Tools that Rust needs are never installed by
-this script: if they are missing it prints the command that installs them and stops.
+says what it would do. When the Visual Studio C++ Build Tools that Rust needs are missing, it
+shows the winget command that installs them and offers to run it. Only a yes typed at the
+console runs it; -Yes does not, and the answer is no by default.
 '@
 }
 
@@ -120,6 +122,18 @@ function Confirm-QuvytaStep {
     $answer = Read-QuvytaAnswer "$Question (Y/n)"
     if ($null -eq $answer) { return 1 }
     if ($answer.Trim() -match '^(|y|yes)$') { return 0 }
+    return 1
+}
+
+# Asks before a step that changes the system itself, such as installing the Build Tools: 0 yes,
+# 1 no, 2 cannot ask. Only a yes typed at the console counts, so -Yes does not answer it and Enter
+# means no.
+function Confirm-QuvytaSystemStep {
+    param($State, [string]$Question)
+    if ($State.Yes -or -not $State.Console) { return 2 }
+    $answer = Read-QuvytaAnswer "$Question (y/N)"
+    if ($null -eq $answer) { return 1 }
+    if ($answer.Trim() -match '^(y|yes)$') { return 0 }
     return 1
 }
 
@@ -411,6 +425,7 @@ function Find-QuvytaVswhere {
 # The MSVC toolchain links with the Visual Studio C++ Build Tools. A GNU toolchain brings its
 # own linker, so the check is only made when Rust's default host is an MSVC one.
 function Test-QuvytaLinker {
+    param($State)
     $rustc = Find-QuvytaProgram 'rustc.exe'
     if ($rustc) {
         foreach ($line in Get-QuvytaNativeOutput $rustc @('-vV')) {
@@ -429,11 +444,34 @@ function Test-QuvytaLinker {
         $found = Get-QuvytaNativeOutput $vswhere @('-latest', '-products', '*', '-requires', $component, '-property', 'installationPath')
         if (@($found | Where-Object { $_.Trim() }).Count -gt 0) { return $true }
     }
+    $override = "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended$extra"
+    $arguments = @('install', '--id', 'Microsoft.VisualStudio.2022.BuildTools', '--exact', '--override', $override)
+    $download = 'Or download them from https://visualstudio.microsoft.com/visual-cpp-build-tools/ and choose "Desktop development with C++".'
     Write-QuvytaLine ''
     Write-QuvytaLine 'Rust needs the Visual Studio C++ Build Tools to link programs, and they were not found.'
-    Write-QuvytaLine 'Install them with this command, then open a new terminal and run this script again:'
-    Write-QuvytaLine "  winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --override `"--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended$extra`""
-    Write-QuvytaLine 'Or download them from https://visualstudio.microsoft.com/visual-cpp-build-tools/ and choose "Desktop development with C++".'
+    $winget = Find-QuvytaProgram 'winget.exe'
+    if (-not $winget -or $State.Yes -or -not $State.Console) {
+        Write-QuvytaLine 'Install them with this command, then open a new terminal and run this script again:'
+        Write-QuvytaLine "  winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --override `"$override`""
+        Write-QuvytaLine $download
+        return $false
+    }
+    Write-QuvytaLine 'This command installs them:'
+    Write-QuvytaLine "  winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --override `"$override`""
+    Write-QuvytaLine 'Windows will ask for your permission in a window of its own.'
+    if ((Confirm-QuvytaSystemStep $State 'Run it now?') -ne 0) {
+        Write-QuvytaLine 'Nothing was run. Install them, then open a new terminal and run this script again.'
+        Write-QuvytaLine $download
+        return $false
+    }
+    # The Visual Studio installer can still want a restart or a fresh session before its tools
+    # are found, so the build starts again from a new terminal rather than here.
+    if ((Invoke-QuvytaNative $winget $arguments) -eq 0) {
+        Write-QuvytaLine 'The Build Tools are installed. Open a new terminal and run this script again.'
+    } else {
+        Write-QuvytaLine 'winget did not finish the install; its messages above say why.'
+        Write-QuvytaLine $download
+    }
     return $false
 }
 
@@ -609,6 +647,35 @@ function Write-QuvytaSummary {
     }
 }
 
+# PowerShell also runs on Linux and macOS, where install.sh does this installer's work. It is
+# offered to run right here, with the same names and the same -Yes.
+function Invoke-QuvytaUnixInstaller {
+    param($State, [object[]]$Arguments)
+    $url = 'https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh'
+    $forward = @()
+    foreach ($argument in $Arguments) {
+        $word = [string]$argument
+        if ($word -in @('-Yes', '--yes', '-y')) { $word = '--yes' }
+        if ($forward -notcontains $word) { $forward += $word }
+    }
+    $shown = "curl -fsSL $url | sh"
+    if ($forward.Count -gt 0) { $shown = "$shown -s -- $($forward -join ' ')" }
+    Write-QuvytaLine 'This installer is for Windows. On Linux and macOS use:'
+    Write-QuvytaLine "  $shown"
+    $sh = Find-QuvytaProgram 'sh'
+    if (-not $sh -or -not (Find-QuvytaProgram 'curl')) { return 1 }
+    switch (Confirm-QuvytaStep $State 'Run it now?') {
+        0 { }
+        1 {
+            Write-QuvytaLine 'Nothing was run.'
+            return 1
+        }
+        default { return 1 }
+    }
+    # sh keeps the address and the words apart, so none of them is read as shell code.
+    return Invoke-QuvytaNative $sh (@('-c', 'curl -fsSL $0 | sh -s -- $@', $url) + $forward)
+}
+
 # Runs the whole installer and returns its exit code: 0 done, 1 not done or a member failed,
 # 2 an unknown name or option.
 function Invoke-QuvytaInstall {
@@ -640,12 +707,8 @@ function Invoke-QuvytaInstall {
         Write-QuvytaUsage
         return 0
     }
-    if (-not (Test-QuvytaWindows)) {
-        Write-QuvytaLine 'This installer is for Windows. On Linux and macOS use:'
-        Write-QuvytaLine '  curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh'
-        return 1
-    }
     $State.Console = Test-QuvytaConsole
+    if (-not (Test-QuvytaWindows)) { return Invoke-QuvytaUnixInstaller $State $Arguments }
 
     if ($State.Soon.Count -gt 0) {
         foreach ($name in $State.Soon) { Write-QuvytaSoon $name }
@@ -658,7 +721,7 @@ function Invoke-QuvytaInstall {
     if (-not (Select-QuvytaSupported $State)) { return 1 }
     if (-not (Install-QuvytaRust $State)) { return 1 }
     if (-not (Test-QuvytaRustVersion $State)) { return 1 }
-    if (-not (Test-QuvytaLinker)) { return 1 }
+    if (-not (Test-QuvytaLinker $State)) { return 1 }
     if (-not (Install-QuvytaChosen $State)) { return 1 }
     if ($State.Installed.Count -gt 0) { Add-QuvytaCargoToPath $State }
     Write-QuvytaSummary $State

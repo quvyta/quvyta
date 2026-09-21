@@ -6,7 +6,7 @@ use std::path::Path;
 use qframe::icons::GlyphMode;
 
 use super::install_tests::{DIALOG_IN, calls, has, run, settle};
-use super::tests::{LIST, TOAST_IN, harness, index, line_with, machine};
+use super::tests::{LANGUAGES, LIST, TOAST_IN, harness, index, line_with, machine};
 use super::*;
 use crate::install::tests::packages;
 use crate::inventory::tests::installed_command;
@@ -148,14 +148,16 @@ fn a_local_build_is_installed_elsewhere_opens_and_is_never_updated() {
 
 #[test]
 fn ascii_screens_of_it_keep_the_rules() {
-    for (width, height) in [(40, 16), (60, 20), (100, 24)] {
-        let (_root, mut h) = harness(width, height);
-        h.set_glyph_mode(GlyphMode::Ascii);
-        h.send(Msg::ShowDetail(desk()));
-        let screen = h.screen();
-        assert!(screen.contains("Quvyta Desktop"), "{width}x{height}:\n{screen}");
-        for forbidden in ['[', ']', '{', '}', '|', '▌'] {
-            assert!(!screen.contains(forbidden), "`{forbidden}` at {width}x{height}:\n{screen}");
+    for (width, height) in [(40, 16), (48, 20), (60, 20), (100, 24)] {
+        for locale in LANGUAGES {
+            let (_root, mut h) = harness(width, height);
+            h.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
+            h.send(Msg::ShowDetail(desk()));
+            let screen = h.screen();
+            assert!(screen.contains("Quvyta Desktop"), "{locale} at {width}x{height}:\n{screen}");
+            for forbidden in ['[', ']', '{', '}', '|', '▌', '⟦'] {
+                assert!(!screen.contains(forbidden), "`{forbidden}` in {locale} at {width}x{height}:\n{screen}");
+            }
         }
     }
 }

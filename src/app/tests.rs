@@ -104,11 +104,25 @@ pub(super) fn line_with<'a>(screen: &'a str, text: &str) -> &'a str {
     screen.lines().skip(1).find(|line| line.contains(text)).unwrap_or_else(|| panic!("`{text}` is missing:\n{screen}"))
 }
 
+/// Every language quvyta speaks, English first: the sweeps that are cheap walk all of them.
+pub(in crate::app) const LANGUAGES: [&str; 9] = ["en", "tr", "de", "es", "fr", "pt-BR", "ru", "zh-Hans", "ja"];
+
+/// What the expensive sweeps walk instead: English, the longest of the Latin languages, the
+/// Cyrillic one and the one whose characters take two cells. Between them they catch a label
+/// that is cut on a narrow screen and a script that is measured wrongly.
+pub(in crate::app) const LONGEST_LANGUAGES: [&str; 4] = ["en", "de", "ru", "ja"];
+
 #[test]
-fn the_language_files_load_without_problems_and_turkish_is_complete() {
+fn the_language_files_load_without_problems_and_every_language_is_complete() {
     let env = env();
     assert_eq!(env.diagnostics(), &[]);
-    assert_eq!(env.i18n().missing_keys("tr", "en"), Vec::<String>::new());
+    for locale in LANGUAGES {
+        assert_eq!(env.i18n().missing_keys(locale, "en"), Vec::<String>::new(), "keys missing in `{locale}`");
+    }
+    let known: Vec<String> = env.i18n().list().into_iter().map(|(code, _)| code).collect();
+    for locale in LANGUAGES {
+        assert!(known.iter().any(|code| code == locale), "`{locale}` is not among the loaded languages: {known:?}");
+    }
 }
 
 #[test]
@@ -269,7 +283,7 @@ fn widening_the_screen_puts_the_details_beside_the_list() {
 
 #[test]
 fn every_member_reads_fully_in_every_language() {
-    for locale in ["en", "tr"] {
+    for locale in LANGUAGES {
         let (_root, mut h) = harness(100, 30);
         h.set_locale(locale);
         for index in 0..FAMILY.len() {
@@ -295,23 +309,56 @@ fn turkish_uses_its_own_words() {
     }
 }
 
+/// A file that is loaded but never reaches the screen looks exactly like a working one to a
+/// test that only counts keys: the English words come out either way. So each language is asked
+/// here for three lines only it can produce — its own promise and its own two row states.
+#[test]
+fn every_language_shows_its_own_words() {
+    let own_words = [
+        ("en", ["Terminal applications, made with care", "not installed", "unknown version"]),
+        ("tr", ["Özenle yapılmış terminal uygulamaları", "kurulu değil", "sürümü bilinmiyor"]),
+        ("de", ["Terminal-Anwendungen, mit Sorgfalt gemacht", "nicht installiert", "Version unbekannt"]),
+        ("es", ["Aplicaciones de terminal, hechas con cuidado", "no instalado", "versión desconocida"]),
+        ("fr", ["Des applications en terminal, faites avec soin", "non installé", "version inconnue"]),
+        ("pt-BR", ["Aplicativos de terminal, feitos com cuidado", "não instalado", "versão desconhecida"]),
+        ("ru", ["Терминальные приложения, сделанные с заботой", "не установлено", "версия неизвестна"]),
+        ("zh-Hans", ["用心打造的终端应用", "未安装", "版本未知"]),
+        ("ja", ["ていねいに作られたターミナルアプリ", "未インストール", "バージョン不明"]),
+    ];
+    assert_eq!(own_words.len(), LANGUAGES.len(), "every language quvyta speaks is asked for its own words");
+    for (locale, words) in own_words {
+        assert!(LANGUAGES.contains(&locale), "`{locale}` is not one of the languages quvyta speaks");
+        let (_root, mut h) = harness(100, 24);
+        h.set_locale(locale);
+        let screen = h.screen();
+        for text in words {
+            assert!(screen.contains(text), "`{locale}` should say `{text}`:\n{screen}");
+        }
+    }
+}
+
 #[test]
 fn narrow_ascii_screens_keep_the_rules() {
-    for (width, height) in [(40, 16), (60, 20), (100, 24)] {
-        let (_root, mut h) = harness(width, height);
-        h.set_glyph_mode(GlyphMode::Ascii);
-        for index in 0..FAMILY.len() {
-            h.send(Msg::Select(index));
-            for page in [false, true] {
-                if page {
-                    h.send(Msg::ShowDetail(index));
+    for (width, height) in [(40, 16), (48, 20), (60, 20), (100, 24)] {
+        for locale in LONGEST_LANGUAGES {
+            let (_root, mut h) = harness(width, height);
+            h.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
+            for index in 0..FAMILY.len() {
+                h.send(Msg::Select(index));
+                for page in [false, true] {
+                    if page {
+                        h.send(Msg::ShowDetail(index));
+                    }
+                    let screen = h.screen();
+                    assert!(screen.contains("quvyta"), "{locale} at {width}x{height}:\n{screen}");
+                    for forbidden in ['[', ']', '{', '}', '|', '▌', '⟦'] {
+                        assert!(
+                            !screen.contains(forbidden),
+                            "`{forbidden}` in {locale} at {width}x{height}:\n{screen}"
+                        );
+                    }
+                    h.send(Msg::Back);
                 }
-                let screen = h.screen();
-                assert!(screen.contains("quvyta"), "{width}x{height}:\n{screen}");
-                for forbidden in ['[', ']', '{', '}', '|', '▌'] {
-                    assert!(!screen.contains(forbidden), "`{forbidden}` at {width}x{height}:\n{screen}");
-                }
-                h.send(Msg::Back);
             }
         }
     }
@@ -486,4 +533,81 @@ fn on_a_narrow_screen_enter_shows_the_details_then_opens() {
     h.press("enter");
     let [request] = h.handoffs() else { panic!("one handoff: {:?}", h.handoffs()) };
     assert_eq!(request.program, root.path().join("home/.cargo/bin/qcode").as_os_str());
+}
+
+/// The labels the details show for the member at `index`, in the harness' language: its title,
+/// its badge, and the buttons its state puts on the screen. These come from the language files,
+/// so they are the ones a narrow screen cuts.
+fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
+    let say = |key: &str| h.env().i18n().translate(key, &[]);
+    let member = &FAMILY[index];
+    let app = h.app();
+    let mut labels = vec![
+        say(&format!("family.{}.title", member.key)),
+        say(match member.status {
+            Status::Released => "status.released",
+            Status::Beta => "status.beta",
+            Status::Soon => "status.soon",
+        }),
+    ];
+    if app.opening(index).is_some() {
+        labels.push(say("detail.open"));
+        if app.updatable(index) {
+            labels.push(say("detail.update"));
+        }
+        if app.removable(index) {
+            labels.push(say("detail.remove"));
+        }
+    } else if app.updatable(index) {
+        labels.push(say("detail.update"));
+    } else if app.installable(index) {
+        labels.push(say("detail.install"));
+    }
+    labels
+}
+
+/// Whether `line` is the one a `CopyValue` of `member` draws: it begins with the head of the
+/// value it carries, which the widget keeps when it shortens the middle.
+fn carries_a_copyable(line: &str, member: &Member) -> bool {
+    let mut values = member.library.into_iter().chain(std::iter::once(member.repository));
+    values.any(|value| {
+        let head: String = value.chars().take(8).collect();
+        line.trim_start().starts_with(&head)
+    })
+}
+
+/// Nothing the language files say may be cut, in any language, at any width the split or the
+/// page is drawn at. `CopyValue` shortens its own middle by design and is left out of the sweep
+/// by the value it carries; everything else stands whole or the layout is wrong.
+#[test]
+fn no_label_is_cut_on_a_narrow_screen_in_any_language() {
+    for width in [40, 48, 56, 58, 60, 62, 70, 100] {
+        for locale in LANGUAGES {
+            let (_root, mut h) = harness(width, 44);
+            h.set_locale(locale);
+            for (index, member) in FAMILY.iter().enumerate() {
+                for page in [false, true] {
+                    h.send(Msg::Select(index));
+                    if page {
+                        h.send(Msg::ShowDetail(index));
+                    }
+                    let screen = h.screen();
+                    let place = format!("`{}` in {locale} at {width} columns", member.key);
+                    for line in screen.lines() {
+                        assert!(
+                            !line.contains('…') || carries_a_copyable(line, member),
+                            "a line is cut short, {place}: `{}`\n{screen}",
+                            line.trim_end()
+                        );
+                    }
+                    if h.app().wide() || h.app().detail_page {
+                        for label in labels_on_show(&h, index) {
+                            assert!(screen.contains(&label), "`{label}` is not whole, {place}:\n{screen}");
+                        }
+                    }
+                    h.send(Msg::Back);
+                }
+            }
+        }
+    }
 }

@@ -51,7 +51,7 @@ impl Quvyta {
             if running.action == Action::Remove {
                 // Quick enough that a bar would only flash; the title says what happens.
                 let command = FAMILY[index].command;
-                ui.add(Text::new(t!("remove.removing", command = command)).role("title").no_wrap());
+                ui.add(Text::new(t!("remove.removing", command = command)).role("title"));
                 return;
             }
             return self.progress(running, ui);
@@ -103,7 +103,7 @@ impl Quvyta {
 
     fn progress(&self, running: &Running, ui: &mut View<'_, Msg>) {
         let command = FAMILY[running.index].command;
-        ui.add(Text::new(t!("install.installing", command = command)).role("title").no_wrap());
+        ui.add(Text::new(t!("install.installing", command = command)).role("title"));
         let progress = &running.progress;
         ui.column(|ui| {
             // Every phase takes the width of the longest, so the counts beside it never move.
@@ -111,6 +111,9 @@ impl Quvyta {
             let label = phase_label(progress.phase);
             let pad = " ".repeat(usize::from(width.saturating_sub(qframe::text::width(&label))));
             let counts = progress.counted.map(|(done, total)| format!("   {done} / {total}")).unwrap_or_default();
+            // The counts climb while the install runs, so a wrapping line would reflow the
+            // screen mid-install; it stays on one line, and since the phase comes first in a
+            // column as wide as the longest phase, what a narrow screen cuts is the counts.
             ui.add(Text::rich([Span::new(format!("{label}{pad}")), Span::new(counts).role("secondary")]).no_wrap())
                 .fill_width();
             let bar = match progress.fraction() {
@@ -118,23 +121,26 @@ impl Quvyta {
                 None => ProgressBar::indeterminate(),
             };
             ui.add(bar).fill_width().id("progress");
-            // The line keeps its place while no crate is named, so nothing below it jumps.
+            // The line keeps its place while no crate is named, so nothing below it jumps, and
+            // it names a new crate every few frames: it holds nothing but cargo's own word, so
+            // a narrow screen shortens it rather than reflowing everything under it.
             ui.add(Text::new(progress.krate.clone().unwrap_or_default()).role("faint").no_wrap()).fill_width();
         })
         .fill_width();
-        ui.row(|ui| {
+        let side_by_side = running_row_width() <= self.room();
+        actions(side_by_side, ui, |ui| {
             self.details_button(ui);
-            ui.spacer();
+            if side_by_side {
+                ui.spacer();
+            }
             ui.add(Button::new(t!("install.stop")).on_press(Msg::Install(InstallMsg::AskStop))).id("stop");
-        })
-        .gap(2)
-        .fill_width();
+        });
         self.details(running.index, ui);
     }
 
     fn queued(&self, index: usize, ui: &mut View<'_, Msg>) {
         let command = FAMILY[index].command;
-        ui.add(Text::new(t!("install.queued-title", command = command)).role("title").no_wrap());
+        ui.add(Text::new(t!("install.queued-title", command = command)).role("title"));
         let first = self.installs.queue.front().is_some_and(|(queued, _)| *queued == index);
         let note = match self.installs.running.as_ref() {
             Some(running) => t!("install.queued-after", command = FAMILY[running.index].command),
@@ -194,18 +200,34 @@ impl Quvyta {
         if let Some(path) = install::log_path(&self.machine, member).filter(|_| !removing) {
             ui.add(Text::new(t!("install.log-file", path = self.machine.show(&path)))).selectable(true).fill_width();
         }
-        ui.row(|ui| {
+        let row = row_width(
+            &[
+                details_button_width(),
+                button_width(&t!("install.copy-log")),
+                button_width(&t!("install.close")),
+                button_width(&t!("install.retry")),
+            ],
+            true,
+        );
+        let side_by_side = row <= self.room();
+        actions(side_by_side, ui, |ui| {
             self.details_button(ui);
-            ui.spacer();
+            if side_by_side {
+                ui.spacer();
+            }
             ui.add(Button::new(t!("install.copy-log")).on_press(Msg::Install(InstallMsg::CopyLog(index))))
                 .id("copy-log");
             ui.add(Button::new(t!("install.close")).on_press(Msg::Install(InstallMsg::Dismiss(index)))).id("dismiss");
             let retry = Msg::Install(InstallMsg::Retry(index));
             ui.add(Button::new(t!("install.retry")).variant("primary").on_press(retry)).id("retry");
-        })
-        .gap(2)
-        .fill_width();
+        });
         self.details(index, ui);
+    }
+
+    /// The columns the details are drawn in, inside the air they keep on both sides: how wide
+    /// a row of buttons may be before it has to lay itself out down the screen.
+    fn room(&self) -> u16 {
+        self.detail_width().saturating_sub(4)
     }
 
     fn details_button(&self, ui: &mut View<'_, Msg>) {
@@ -223,6 +245,43 @@ impl Quvyta {
             ui.add(LogView::new(log)).height(Length::Cells(LOG_ROWS)).fill_width().id("log");
         }
     }
+}
+
+/// Buttons side by side while they fit, one under another when they do not. A button cannot
+/// shorten its words, and a row wider than its room loses the buttons at its end off the
+/// screen, which after a failure would be Close and Try again.
+fn actions<M: Clone + 'static>(side_by_side: bool, ui: &mut View<'_, M>, build: impl FnOnce(&mut View<'_, M>)) {
+    if side_by_side {
+        ui.row(build).gap(2).fill_width();
+    } else {
+        ui.column(build).fill_width();
+    }
+}
+
+/// The columns a button takes: its words with the theme's air on both sides.
+fn button_width(label: &str) -> u16 {
+    qframe::text::width(label) + 4
+}
+
+/// The details button carries a chevron before its words: a glyph and a space, and the glyph
+/// is one cell in every glyph set, the way a badge's dot is.
+fn details_button_width() -> u16 {
+    button_width(&t!("install.details")) + 2
+}
+
+/// The columns buttons side by side take: each of them, two cells between neighbours, and the
+/// spacer that holds a group apart counted as a neighbour of its own.
+fn row_width(buttons: &[u16], spacer: bool) -> u16 {
+    let neighbours = buttons.len() + usize::from(spacer);
+    let gaps = 2 * u16::try_from(neighbours.saturating_sub(1)).unwrap_or(0);
+    buttons.iter().sum::<u16>() + gaps
+}
+
+/// The columns the row under a running install asks for: the details button, the spacer that
+/// holds Stop apart, and Stop. Nothing about it depends on which member is installing, so the
+/// split can keep room for it without moving the moment an install starts.
+pub(super) fn running_row_width() -> u16 {
+    row_width(&[details_button_width(), button_width(&t!("install.stop"))], true)
 }
 
 /// The phases in order, for the width of the longest.

@@ -4,9 +4,10 @@
 #   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- code
 #
-# Run `sh install.sh --help` for the options. Nothing here uses sudo. Rust comes from rustup's own
-# address and the applications from crates.io. Shell start-up files are only written after you
-# agree to the exact line shown.
+# Run `sh install.sh --help` for the options. Rust comes from rustup's own address and the
+# applications from crates.io. Shell start-up files are only written after you agree to the exact
+# line shown. sudo is used only when a C linker is missing and you say yes, on the terminal, to
+# the one command shown that installs it; --yes never says that yes for you.
 #
 # Everything lives in functions and runs from the last line, so a download cut short midway
 # runs nothing at all.
@@ -115,6 +116,10 @@ Options:
 Questions are read from the terminal, so they work when the script comes through a pipe.
 Without a terminal and without --yes nothing is installed or written; the script only
 says what it would do.
+
+When Rust's C linker is missing, the script shows the command that installs it and
+offers to run it. That command uses sudo, or on macOS opens Apple's own installer, so
+only a yes typed on the terminal runs it; --yes does not, and the answer is no by default.
 EOF
 }
 
@@ -140,6 +145,22 @@ ask() {
     read -r answer </dev/tty || answer=n
     case $answer in
         '' | y | Y | yes | Yes | YES) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# ask_system QUESTION -> 0 yes, 1 no, 2 cannot ask. For the steps that change the system itself,
+# such as a command run with sudo: only a yes typed on the terminal counts, so --yes does not
+# answer it and Enter means no.
+ask_system() {
+    if [ "$assume_yes" = 1 ] || ! have_tty; then
+        return 2
+    fi
+    printf '%s (y/N) ' "$1" >/dev/tty
+    answer=
+    read -r answer </dev/tty || answer=n
+    case $answer in
+        y | Y | yes | Yes | YES) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -360,6 +381,60 @@ ensure_rust_version() {
     return 1
 }
 
+# The distribution /etc/os-release names in ID or ID_LIKE: arch, debian, fedora or other.
+# The same table as quvyta's own check, which a test keeps in step.
+distro() {
+    file=${QUVYTA_OS_RELEASE:-/etc/os-release}
+    ids=
+    if [ -r "$file" ]; then
+        for key in ID ID_LIKE; do
+            ids="$ids $(sed -n "s/^[[:space:]]*$key=//p" "$file" | sed -n "1{s/[\"']//g;p;}")"
+        done
+    fi
+    # shellcheck disable=SC2086 # split into words on purpose, tabs and all
+    set -- $ids
+    case " $* " in
+        *" arch "*) echo arch ;;
+        *" debian "* | *" ubuntu "*) echo debian ;;
+        *" fedora "* | *" rhel "*) echo fedora ;;
+        *) echo other ;;
+    esac
+}
+
+# The distribution's name as people write it.
+distro_name() {
+    case $1 in
+        arch) echo "Arch Linux" ;;
+        debian) echo "Debian, Ubuntu" ;;
+        fedora) echo "Fedora" ;;
+    esac
+}
+
+# The command that installs a C linker there.
+linker_command() {
+    case $1 in
+        arch) echo "sudo pacman -S --needed base-devel" ;;
+        debian) echo "sudo apt install build-essential" ;;
+        fedora) echo "sudo dnf install gcc" ;;
+    esac
+}
+
+have_linker() {
+    for linker in cc gcc clang; do
+        command -v "$linker" >/dev/null 2>&1 && return 0
+    done
+    return 1
+}
+
+# Every known command, for a distribution this script does not know or a person who did not
+# want one run.
+say_linker_commands() {
+    say "Install one with your package manager, then run this script again, for example:"
+    for known in arch debian fedora; do
+        printf '  %-16s %s\n' "$(distro_name "$known"):" "$(linker_command "$known")"
+    done
+}
+
 ensure_linker() {
     if on_mac; then
         # /usr/bin/cc is there even without the Command Line Tools: it is a stand-in that opens
@@ -367,19 +442,48 @@ ensure_linker() {
         xcode-select -p >/dev/null 2>&1 && return 0
         say ""
         say "Rust needs Apple's Command Line Tools to link programs, and they are not installed."
-        say "Install them with this command, confirm in the window that opens, then run this script again:"
+        say "This command opens Apple's installer for them:"
         say "  xcode-select --install"
+        ask_system "Open it now?"
+        case $? in
+            0)
+                if xcode-select --install </dev/null; then
+                    say "Confirm in the window that opened. Once the tools are installed, run this script again."
+                else
+                    say "The installer did not open. Run the command above yourself, confirm in the window that opens, then run this script again."
+                fi
+                ;;
+            *) say "Run it, confirm in the window that opens, then run this script again." ;;
+        esac
+        # The tools install in Apple's own window, which this script cannot wait for.
         return 1
     fi
-    for linker in cc gcc clang; do
-        command -v "$linker" >/dev/null 2>&1 && return 0
-    done
+    have_linker && return 0
     say ""
     say "Rust needs a C linker to build programs, and none was found (cc, gcc or clang)."
-    say "Install one with your package manager, then run this script again, for example:"
-    say "  Arch Linux:      sudo pacman -S --needed base-devel"
-    say "  Debian, Ubuntu:  sudo apt install build-essential"
-    say "  Fedora:          sudo dnf install gcc"
+    found_distro=$(distro)
+    linker_cmd=$(linker_command "$found_distro")
+    if [ -z "$linker_cmd" ] || [ "$assume_yes" = 1 ] || ! have_tty; then
+        say_linker_commands
+        return 1
+    fi
+    say "On $(distro_name "$found_distro") this command installs one:"
+    say "  $linker_cmd"
+    say "sudo will ask for your password here, in this terminal."
+    ask_system "Run it now?"
+    if [ $? != 0 ]; then
+        say "Nothing was run. Install a C linker, then run this script again."
+        return 1
+    fi
+    # The package manager asks its own questions, and they have to come from the person, not from
+    # the rest of this script when it arrives through a pipe.
+    # shellcheck disable=SC2086 # the command is split into its words on purpose
+    $linker_cmd </dev/tty
+    if have_linker; then
+        say "A C linker is installed."
+        return 0
+    fi
+    say "There is still no C linker (cc, gcc or clang). Install one, then run this script again."
     return 1
 }
 

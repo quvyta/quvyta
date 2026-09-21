@@ -33,7 +33,8 @@ pub use updates::UpdateMsg;
 use updates::Updates;
 pub use wizard::WizardMsg;
 
-/// Below this many columns the list and the details take turns on the screen.
+/// The fewest columns the split takes: under this the list and the details take turns on the
+/// screen, however little the words of the day's language ask for.
 const WIDE: u16 = 60;
 /// The fewest columns the details keep beside the list.
 const DETAIL_MIN: u16 = 28;
@@ -263,7 +264,65 @@ impl Quvyta {
     }
 
     fn wide(&self) -> bool {
-        self.size.width >= WIDE
+        self.size.width >= WIDE.max(self.list_width(true) + self.detail_need())
+    }
+
+    /// The columns the details need so nothing in them is cut, with the air around them.
+    ///
+    /// It is the widest the whole family asks for and not the chosen member's own need: a need
+    /// that changed with the selection would move the split while walking down the list.
+    ///
+    /// `wide` asks for this from `update` and `action` as well as from the view, where the
+    /// environment and with it the icon set are out of reach, so it is measured from the
+    /// language files alone and the badge's dot counts as one cell, the way `list_width` counts
+    /// a row's icon.
+    fn detail_need(&self) -> u16 {
+        let widest = (0..FAMILY.len()).map(|index| self.detail_content(index)).max().unwrap_or(0);
+        // The row under a running install counts whether or not one is running: were it counted
+        // only while cargo works, the split would move the moment somebody pressed Install. The
+        // longer rows of a failure and of the queue are not here; they lay themselves out down
+        // the screen instead, since holding the split shut until they fit would cost every
+        // language a third of the screen.
+        DETAIL_MIN.max(widest.max(install_view::running_row_width()) + 4)
+    }
+
+    /// The widest line the details of the member at `index` cannot break: its buttons in a row,
+    /// its title, or its badge. The title and the badge stand alone because `detail::show` puts
+    /// the badge on its own line when they do not fit beside each other.
+    fn detail_content(&self, index: usize) -> u16 {
+        let member = &FAMILY[index];
+        let title = qframe::text::width(&t!(&format!("family.{}.title", member.key)));
+        let badge = detail::badge_width(&match member.status {
+            Status::Released => t!("status.released"),
+            Status::Beta => t!("status.beta"),
+            Status::Soon => t!("status.soon"),
+        });
+        self.buttons_width(index).max(title).max(badge)
+    }
+
+    /// The columns the buttons of the member at `index` take, as `main_action` lays them out:
+    /// each label with the button's air around it, and two cells between neighbours. The spacer
+    /// that holds Remove apart is a neighbour of its own, so it costs two cells even when it is
+    /// squeezed to nothing.
+    fn buttons_width(&self, index: usize) -> u16 {
+        let button = |label: String| qframe::text::width(&label) + 4;
+        let mut row = Vec::new();
+        if self.opening(index).is_some() {
+            row.push(button(t!("detail.open")));
+            if self.updatable(index) {
+                row.push(button(t!("detail.update")));
+            }
+            if self.removable(index) {
+                row.push(0);
+                row.push(button(t!("detail.remove")));
+            }
+        } else if self.updatable(index) {
+            row.push(button(t!("detail.update")));
+        } else if self.installable(index) {
+            row.push(button(t!("detail.install")));
+        }
+        let gaps = 2 * u16::try_from(row.len().saturating_sub(1)).unwrap_or(0);
+        row.iter().sum::<u16>() + gaps
     }
 
     /// Reads what is installed without holding up the screen: cargo takes a moment to answer.
@@ -541,7 +600,7 @@ impl Quvyta {
 
     /// The columns the list may take: beside the details, or the whole screen but a margin.
     fn list_room(&self) -> u16 {
-        self.size.width.saturating_sub(if self.wide() { DETAIL_MIN } else { 1 })
+        self.size.width.saturating_sub(if self.wide() { self.detail_need() } else { 1 })
     }
 
     /// The columns the details have: beside the list, or the screen.
@@ -571,7 +630,8 @@ impl Quvyta {
                 self.show_path_notice(ui);
                 let main = |ui: &mut View<'_, Msg>| self.main_action(self.selected, ui);
                 let latest = self.update_to(self.selected);
-                detail::show(member, self.state(self.selected), latest.as_deref(), main, &self.machine, ui);
+                let room = self.detail_width().saturating_sub(4);
+                detail::show(member, self.state(self.selected), latest.as_deref(), main, &self.machine, room, ui);
             })
             .gap(1)
             .padding(Padding { top: 0, right: 2, bottom: 1, left: 2 })

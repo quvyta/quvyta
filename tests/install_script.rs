@@ -95,6 +95,48 @@ fn both_installers_know_the_same_family() {
     }
 }
 
+/// The quoted text after `Self::<variant> => ` in one `match` of `src/checks.rs`, such as
+/// `Self::Arch => Some("sudo pacman ...")`, found inside the function that opens with `function`.
+fn rs_arm(source: &str, function: &str, variant: &str) -> String {
+    let body = &source[source.find(function).unwrap_or_else(|| panic!("no {function} in src/checks.rs"))..];
+    let line = body
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with(&format!("Self::{variant} => ")))
+        .unwrap_or_else(|| panic!("no {variant} arm in {function}"));
+    let start = line.find('"').expect("a quoted value") + 1;
+    line[start..start + line[start..].find('"').expect("the value is closed")].to_owned()
+}
+
+/// install.sh offers to run the command that installs a C linker; the screen shows the same one
+/// for the same distribution, so the two cannot name different packages.
+#[test]
+fn installer_and_screen_name_the_same_linker_commands() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let sh = std::fs::read_to_string(root.join("install.sh")).expect("install.sh is readable");
+    let rs = std::fs::read_to_string(root.join("src/checks.rs")).expect("src/checks.rs is readable");
+    let known = rs
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("pub const KNOWN: [Self; 3] = ["))
+        .expect("src/checks.rs lists the known distributions");
+    let variants: Vec<&str> =
+        known.trim_end_matches("];").split(',').map(|v| v.trim().trim_start_matches("Self::")).collect();
+    let sh_known = sh_body(&sh, "say_linker_commands")
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("for known in "))
+        .expect("install.sh lists the known distributions")
+        .trim_end_matches("; do");
+    assert_eq!(variants.len(), sh_known.split_whitespace().count(), "the same number of distributions");
+    for (variant, id) in variants.iter().zip(sh_known.split_whitespace()) {
+        assert_eq!(
+            sh_case(&sh, "linker_command", id),
+            Some(rs_arm(&rs, "fn linker_command", variant)),
+            "the linker command for {variant}"
+        );
+        assert_eq!(sh_case(&sh, "distro_name", id), Some(rs_arm(&rs, "fn name", variant)), "the name of {variant}");
+    }
+}
+
 /// Runs the checks of `install.ps1` in a PowerShell container. It needs podman and the image
 /// `mcr.microsoft.com/powershell:7.5-ubuntu-24.04`, so it is run by hand with `--ignored`.
 #[test]

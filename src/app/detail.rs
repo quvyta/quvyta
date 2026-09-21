@@ -17,19 +17,29 @@ pub(super) fn show(
     latest: Option<&str>,
     main: impl FnOnce(&mut View<'_, Msg>),
     machine: &Machine,
+    room: u16,
     ui: &mut View<'_, Msg>,
 ) {
     let text = |field: &str| t!(&format!("family.{}.{field}", member.key));
-    ui.row(|ui| {
-        ui.add(Text::new(text("title")).role("title").no_wrap());
-        match member.status {
-            Status::Released => ui.add(Badge::new(t!("status.released")).variant("success")),
-            Status::Beta => ui.add(Badge::new(t!("status.beta")).variant("info")),
-            // The accent, not a warning: nothing is wrong, it is only not out yet.
-            Status::Soon => ui.add(Badge::new(t!("status.soon")).variant("accent")),
-        };
-    })
-    .gap(2);
+    let title = text("title");
+    let (status, variant) = match member.status {
+        Status::Released => (t!("status.released"), "success"),
+        Status::Beta => (t!("status.beta"), "info"),
+        // The accent, not a warning: nothing is wrong, it is only not out yet.
+        Status::Soon => (t!("status.soon"), "accent"),
+    };
+    // The title never wraps, so when the two do not fit beside each other the badge drops to a
+    // line of its own rather than the title losing its end.
+    let beside = qframe::text::width(&title) + 2 + badge_width(&status) <= room;
+    let heading = |ui: &mut View<'_, Msg>| {
+        ui.add(Text::new(title).role("title").no_wrap());
+        ui.add(Badge::new(status).variant(variant));
+    };
+    if beside {
+        ui.row(heading).gap(2);
+    } else {
+        ui.column(heading).fill_width();
+    }
 
     // Package and command sit on one quiet line under the title and wrap on narrow screens.
     let names = [
@@ -89,4 +99,10 @@ fn copyable(ui: &mut View<'_, Msg>, label: String, value: &str, id: &str) {
         ui.add(CopyValue::new(value)).id(id);
     })
     .fill_width();
+}
+
+/// The columns a badge takes: its words, its air and the dot before them, which is one cell
+/// whichever glyph set is on.
+pub(super) fn badge_width(label: &str) -> u16 {
+    qframe::text::width(label) + 4
 }

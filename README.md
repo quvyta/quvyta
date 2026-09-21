@@ -23,7 +23,10 @@ open source under the MIT licence.
 
 The first start asks what the whole family should look like — the language, the colour theme and the icons, with **Start with the defaults** for anyone who would rather not choose — and then which of its members you would like. Nothing is written until you finish it, and nothing is ticked for you.
 
-![The first start asking which members of the family you would like, with a box beside each and nothing chosen](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard-family.png)
+<p>
+<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard.png" alt="The first start: the language, theme and icons the whole family shares, each with a box saying where the choice holds, and Start with the defaults" width="49%">
+<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard-family.png" alt="The first start asking which members of the family you would like, with a box beside each and nothing chosen" width="49%">
+</p>
 
 <p>
 <img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/install-confirm.png" alt="Before an install: the source, the version, where it goes and the exact command" width="49%">
@@ -84,9 +87,9 @@ What the script does, asking before each step:
 3. If `~/.cargo/bin` is not on your PATH, it shows the line it would add to your shell's start-up file (fish, bash or zsh) and adds it only if you agree. A line that is already there is not added again.
 4. It lists the commands it installed and tells you whether a new terminal is needed.
 
-It never uses sudo. Questions are read from the terminal even though the script arrives through a pipe; with no terminal it changes nothing and only says what it would do. `--yes` answers every question with yes, and `--help` explains the options.
+It uses sudo only for one thing: when Rust's C linker is missing it shows the command that installs it on your system (pacman, apt or dnf) and offers to run it, and only a yes typed on the terminal runs it; `--yes` never does, and the answer is no by default. Questions are read from the terminal even though the script arrives through a pipe; with no terminal it changes nothing and only says what it would do. `--yes` answers every question with yes, and `--help` explains the options.
 
-On macOS the same line works. The PATH line goes to `.zprofile` for zsh or `.bash_profile` for bash, the Command Line Tools are checked because Rust links with them (the script shows `xcode-select --install` if they are missing), and qpackages and qtools, which run on Arch Linux only, are skipped.
+On macOS the same line works. The PATH line goes to `.zprofile` for zsh or `.bash_profile` for bash, the Command Line Tools are checked because Rust links with them (if they are missing the script shows `xcode-select --install` and offers to open Apple's installer), and qpackages and qtools, which run on Arch Linux only, are skipped.
 
 On Windows, in PowerShell:
 
@@ -95,7 +98,7 @@ irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1 | iex
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1))) code -Yes
 ```
 
-The second form passes names and options. It needs no administrator: Rust comes from rustup, the chosen members from crates.io, and the only setting it writes is your own user PATH, after you agree to the folder it shows. If the Visual Studio C++ Build Tools that Rust links with are missing, it prints the command that installs them and stops. `-Help` explains the options.
+The second form passes names and options. It needs no administrator: Rust comes from rustup, the chosen members from crates.io, and the only setting it writes is your own user PATH, after you agree to the folder it shows. If the Visual Studio C++ Build Tools that Rust links with are missing, it shows the winget command that installs them and offers to run it (Windows asks for permission itself; only a yes typed in the console runs it, never `-Yes`), then asks you to open a new terminal and run it again. `-Help` explains the options.
 
 To read the script before running it:
 
@@ -114,8 +117,9 @@ quvyta
 
 If the shell then says the command is not found, add `~/.cargo/bin` to your PATH (fish: `fish_add_path ~/.cargo/bin`).
 
-Rust 1.95 or later is required. The interface follows your system language (English and Turkish
-are included). `↑` `↓` move through the list, `enter` opens the selected member or installs one
+Rust 1.95 or later is required. The interface follows your system language (English, Turkish,
+German, Spanish, French, Brazilian Portuguese, Russian, Simplified Chinese and Japanese are
+included). `↑` `↓` move through the list, `enter` opens the selected member or installs one
 you do not have, `u` updates it, `r` looks for updates again, `tab` moves between controls and
 `ctrl+q` quits. On a narrow terminal the first `enter` shows a member's details and `esc` goes
 back to the list. The header has two tabs, Apps and Settings: click one, or reach them with `tab`
@@ -139,7 +143,10 @@ command or its package, and `quvyta --help` lists every form.
 Before anything happens quvyta shows where a member comes from, which version it gets, where the
 program goes and the exact cargo command, which you can copy. Members are built on your machine
 with `cargo install --locked`, one at a time; while one builds you can keep using the list, and
-more members wait their turn. Nothing needs sudo: everything is written under `~/.cargo`. If a
+more members wait their turn. Nothing needs sudo: everything is written under `~/.cargo`. If
+Rust or a C linker is missing, the question says so with the command that puts it right, and
+**Install here** runs that command in the terminal you are looking at; sudo, when the command
+needs it, asks for your password there itself. If a
 build fails, quvyta says why in a plain sentence, shows cargo's last lines and keeps the whole
 log. If `~/.cargo/bin` is not on your PATH, it shows the line for your shell's start-up file and
 adds it if you agree.

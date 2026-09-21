@@ -1,0 +1,265 @@
+# French: checked against en.toml, the fallback.
+
+[meta]
+name = "Français"
+code = "fr"
+fallback = "en"
+
+[header]
+tagline = "Des applications en terminal, faites avec soin"
+
+[status]
+released = "Publié"
+beta = "Bêta"
+soon = "Bientôt"
+
+[row]
+missing = "non installé"
+soon = "bientôt"
+unknown = "version inconnue"
+this = "{version}  cette application"
+this-short = "cette application"
+installing = "installation"
+installing-share = "installation {percent} %"
+queued = "en attente"
+failed = "échec"
+update = "{version}  màj {latest}"
+removing = "suppression"
+not-removed = "non supprimé"
+
+[detail]
+open = "Ouvrir"
+package = "Paquet"
+command = "Commande"
+source = "Source"
+add = "Ajouter à un projet"
+install = "Installer"
+update = "Mettre à jour"
+remove = "Supprimer"
+new = "nouvelle {version}"
+installed = "Installé"
+running = "En cours"
+where = "{version}, {path}"
+unknown = "version inconnue"
+elsewhere = "Installé sans cargo : c’est à ce qui l’a installé de le tenir à jour."
+beta = "Une bêta : elle marche, mais son interface et ses fichiers peuvent encore changer d’une version à l’autre."
+soon = "Pas encore publié : il n’y a rien à installer tant qu’il n’est pas sorti."
+
+[nav]
+back = "Retour"
+
+[hints]
+open = "ouvrir"
+choose = "choisir"
+details = "détails"
+back = "retour"
+install = "installer"
+update = "mettre à jour"
+refresh = "chercher les mises à jour"
+apps = "applis"
+
+[family.code]
+title = "Quvyta Code"
+summary = "Fait tourner des agents de code dans des conteneurs Podman ou Docker. Vous réglez un profil une fois, vous l’ouvrez dans n’importe lequel de vos projets et vous passez d’un agent ou d’un shell à l’autre comme entre des onglets."
+
+[family.focus]
+title = "Quvyta Focus"
+summary = "Le suivi du temps dans le terminal. Lancez un compteur sur ce que vous faites et voyez où votre temps est passé, en graphiques du jour, de la semaine, du mois et de l’année."
+
+[family.tools]
+title = "Quvyta Tools"
+summary = "Applique depuis une seule liste les réglages que les utilisateurs d’Arch Linux font d’habitude à la main : miroirs, pacman, un assistant AUR, un pare-feu, SSH et le reste. Chaque point montre ce qu’il va toucher, garde une sauvegarde et se défait."
+
+[family.packages]
+title = "Quvyta Packages"
+summary = "Un gestionnaire de paquets pour Arch Linux qui montre exactement ce qui va changer avant que quoi que ce soit ne change. Cette première version gère les paquets de pacman ; AUR, Flatpak et Snap sont reconnus mais pas encore gérés."
+
+[family.desk]
+title = "Quvyta Desktop"
+summary = "Un bureau qui tourne dans le terminal : des fenêtres, un dock, un lanceur et un gestionnaire de fichiers, pensés pour travailler en SSH et sur de petites machines. Tapez qdesk sur un serveur et ouvrez vos programmes côte à côte à la souris, sans apprendre le moindre raccourci."
+
+[family.framework]
+title = "Quvyta Framework"
+summary = "La vitrine du framework : tous les composants, thèmes, jeux d’icônes et langues de la famille, à essayer en direct."
+library = "Le framework lui-même est une bibliothèque Rust : le moteur, les composants et les fichiers de thème, d’icônes et de langue sur lesquels repose chaque application Quvyta. Chacun peut s’en servir pour écrire ses propres applications en terminal."
+
+[family.quvyta]
+title = "Quvyta"
+summary = "Cette application : elle liste la famille, installe ses membres, les ouvre, les tient à jour et les supprime."
+
+[open]
+notice = "Ouverture de {command}…"
+exited = "{command} s’est fermé avec le code {code}"
+signal = "{command} a été arrêté par un signal"
+failed = "impossible d’ouvrir {command}"
+
+[launcher]
+problems = "Une partie de launcher.conf a été ignorée"
+
+[confirm]
+title = "Installer {command} ?"
+source = "Source"
+version = "Version"
+target = "Destination"
+command = "Commande"
+crates-io = "crates.io, {package}"
+latest = "la dernière version sur crates.io"
+built-here = "Il est compilé sur cette machine, ce qui peut prendre quelques minutes."
+no-sudo = "Pas besoin de sudo ; rien n’est écrit hors de {folder}."
+cancel = "Annuler"
+install = "Installer"
+update-title = "Mettre à jour {command} de {from} vers {to} ?"
+update = "Mettre à jour"
+
+[checks]
+no-cargo = "cargo, l’outil de paquets de Rust, n’est pas installé, et c’est avec lui que la famille se compile."
+rustup = "Installez Rust avec rustup, son installateur officiel"
+rustup-site = "La page de rustup, avec les autres façons de l’installer"
+install-here = "Installer ici"
+rustup-here = "La commande s’exécute dans ce terminal ; rustup pose ses propres questions et n’a pas besoin de sudo."
+old-rust = "Rust {version} est installé ; la famille demande {needed} ou plus récent."
+rustup-update = "rustup peut le mettre à jour avec rustup update stable."
+update-rust = "Mettre Rust à jour"
+update-rust-yourself = "Mettez Rust à jour avec l’outil qui l’a installé, puis vérifiez de nouveau."
+updating-rust = "Mise à jour de Rust avec rustup…"
+rustup-failed = "rustup n’a pas pu mettre Rust à jour"
+no-linker = "Rust a besoin d’un éditeur de liens C pour compiler, et aucun n’a été trouvé : cc, gcc ou clang."
+linker-on = "Pour en installer un sur {distro}"
+sudo-here = "La commande s’exécute dans ce terminal. sudo y demande votre mot de passe ; il va à sudo, et quvyta ne le voit jamais."
+run-yourself = "Lancez vous-même la commande de votre système, puis vérifiez de nouveau."
+running = "Exécution de {command}"
+fix-failed = "La commande ne s’est pas terminée correctement"
+again = "Vérifier de nouveau"
+
+[install]
+installing = "installation de {command}"
+stop = "Arrêter"
+details = "Détails"
+queued-title = "{command} en attente"
+queued-after = "Elle démarre quand {command} est fini."
+queued = "Elle démarre dans un instant."
+waiting-other-window = "En attente qu’une autre fenêtre quvyta finisse son installation."
+dequeue = "Retirer de la file"
+other-window = "Une autre fenêtre quvyta installe ; celle-ci attend qu’elle ait fini."
+stopped = "Arrêté, rien n’a été installé."
+failed = "impossible d’installer {command}"
+not-started = "cargo n’a pas pu démarrer : {reason}"
+nothing-changed = "Rien n’a été installé ; rien n’a changé sur la machine."
+last-lines = "Dernières lignes"
+log-file = "Le journal entier est dans {path}"
+copy-log = "Copier le journal"
+close = "Fermer"
+retry = "Réessayer"
+done = "{command} {version} installé"
+next-time = "La nouvelle version tournera la prochaine fois."
+done-unknown = "{command} installé"
+
+[install.phase]
+starting = "Démarrage"
+downloading = "Téléchargement"
+compiling = "Compilation"
+placing = "Installation"
+
+[install.failure]
+linker = "Il n’y a pas d’éditeur de liens C sur cette machine, et sans lui les programmes Rust ne se compilent pas."
+rust = "Il demande un Rust plus récent que celui qui est installé."
+network = "crates.io est resté injoignable. Vérifiez la connexion et réessayez."
+disk = "Le disque est plein. Une compilation demande quelques gigaoctets libres ; faites de la place et réessayez."
+not-found = "crates.io n’a pas cette version de {package}."
+build = "La compilation a échoué."
+
+[stop]
+title = "Arrêter l’installation de {command} ?"
+message = "Rien n’est installé et rien ne change sur la machine ; il pourra être installé plus tard."
+queued = "Arrêter aussi ceux qui attendent"
+keep = "Continuer l’installation"
+confirm = "Arrêter"
+
+[quit]
+title = "Une installation est en cours"
+message = "Quitter l’arrête ; rien n’est installé et rien ne change sur la machine."
+confirm = "Quitter"
+
+[remove]
+title = "Supprimer {command} ?"
+message = "Le programme {program} est effacé, avec la trace que cargo en garde."
+settings-kept = "Ses réglages dans {folder} restent : une nouvelle installation les retrouve."
+settings-kept-anywhere = "Ses réglages restent : une nouvelle installation les retrouve."
+confirm = "Supprimer"
+removing = "suppression de {command}"
+done = "{command} supprimé"
+failed = "impossible de supprimer {command}"
+failed-reason = "cargo n’a pas pu le supprimer ; ses dernières lignes disent pourquoi."
+
+[updates]
+count = { one = "{n} mise à jour", other = "{n} mises à jour" }
+install-all = "Installer les mises à jour"
+checking = "Recherche des mises à jour…"
+failed = "Recherche des mises à jour impossible"
+
+[path]
+title = "{folder} n’est pas dans le PATH"
+why = "Pour que {command} s’ouvre quand vous tapez son nom dans un terminal, cette ligne doit être ajoutée au fichier de démarrage de votre shell. L’ouvrir depuis quvyta ne dépend pas de cela."
+why-any = "Pour que les programmes installés par cargo s’ouvrent quand vous tapez leur nom dans un terminal, cette ligne doit être ajoutée au fichier de démarrage de votre shell. Les ouvrir depuis quvyta ne dépend pas de cela."
+unknown = "Pour que {command} s’ouvre quand vous tapez son nom dans un terminal, ajoutez cette ligne au fichier de démarrage de votre shell. L’ouvrir depuis quvyta ne dépend pas de cela."
+unknown-any = "Pour que les programmes installés par cargo s’ouvrent quand vous tapez leur nom dans un terminal, ajoutez cette ligne au fichier de démarrage de votre shell. Les ouvrir depuis quvyta ne dépend pas de cela."
+file = "Fichier"
+line = "Ligne"
+not-now = "Pas maintenant"
+add = "Ajouter"
+added = "Ajoutée. Dans les terminaux ouverts à partir de maintenant, {command} s’ouvre par son nom."
+added-any = "Ajoutée. Dans les terminaux ouverts à partir de maintenant, les programmes installés par cargo s’ouvrent par leur nom."
+open-terminals = "Les terminaux déjà ouverts ne changent pas."
+ready = "Dans les terminaux ouverts à partir de maintenant, {command} s’ouvre par son nom."
+ready-any = "Dans les terminaux ouverts à partir de maintenant, les programmes installés par cargo s’ouvrent par leur nom."
+failed = "La ligne n’a pas pu être ajoutée. Vous pouvez l’ajouter vous-même : un clic sur la ligne la copie."
+not-remembered = "launcher.conf n’a pas pu retenir la réponse"
+
+[cli]
+about = "Installe, ouvre et met à jour les applications en terminal de la famille Quvyta."
+usage = "Utilisation"
+name = "NOM"
+list = "ouvre la liste de la famille"
+install = "demande d’installer ces membres, un dialogue après l’autre"
+show = "ouvre sur la page de ce membre"
+help = "montre cette aide"
+version = "montre la version"
+names = "Un nom est le nom court d’un membre (code), sa commande (qcode) ou son paquet (quvyta-code)."
+unknown-option = "l’option {option} n’existe pas"
+unknown-name = "aucun membre de la famille ne s’appelle {name}"
+unknown-command = "{command} n’est pas quelque chose que quvyta fait"
+no-names = "install demande au moins un nom, par exemple qcode"
+show-no-name = "show demande un nom, par exemple qfocus"
+show-many = "show ne prend qu’un seul nom"
+unreleased = "{command} n’est pas encore publié, il ne peut donc pas être installé"
+hint = "Lancez quvyta --help pour voir ce qu’il accepte."
+already-installed = "Déjà installé : {commands}"
+
+[tabs]
+apps = "Applis"
+settings = "Réglages"
+
+[settings]
+title = "quvyta"
+check-updates = "Chercher les mises à jour au démarrage"
+after-close = "Quand une appli se ferme"
+after-close-return = "revenir à quvyta"
+after-close-shell = "quitter vers le shell"
+path = "{folder} dans le PATH"
+path-yes = "oui"
+path-new-terminals = "dans les nouveaux terminaux"
+path-no = "non"
+path-add = "Ajouter"
+not-saved = "Le réglage n’a pas pu être enregistré"
+
+[wizard]
+step-apps = "Applications"
+apps-intro = "Lesquelles voulez-vous ? quvyta demande avant d’installer quoi que ce soit."
+line-code = "Des agents de code dans des conteneurs Podman ou Docker."
+line-focus = "Note ce qui vous occupe et où votre temps est passé."
+line-tools = "Les réglages d’Arch Linux, tous réversibles."
+line-packages = "Un gestionnaire de paquets qui montre tout avant."
+line-desk = "Un bureau dans le terminal : fenêtres et fichiers."
+line-framework = "La vitrine du framework sur lequel ils reposent tous."
+arch-only = "{line}  Arch Linux seulement."
+soon = "{line}  Pas encore sorti."

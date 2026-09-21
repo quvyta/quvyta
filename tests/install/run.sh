@@ -2,8 +2,9 @@
 # Checks install.sh without a network and without touching the real home folder.
 #
 # Every case runs in a fresh temporary HOME with CARGO_HOME inside it and a PATH that holds only
-# a few basic tools plus stand-ins for cargo, rustup's download and a C linker. The stand-ins
-# write down what they were asked to do, so a case can check that nothing was installed.
+# a few basic tools plus stand-ins for cargo, rustup's download, a C linker, sudo and the package
+# managers. The stand-ins write down what they were asked to do, so a case can check that nothing
+# was installed. The PATH holds nothing else from the machine, so a real sudo can never be reached.
 #
 # Usage: tests/install/run.sh [shell]   (the shell that runs install.sh; default sh)
 set -u
@@ -83,6 +84,37 @@ EOF
     chmod +x "$stubs/cargo" "$stubs/curl" "$stubs/cc"
     cp "$stubs/cargo" "$stubs/cargo.real"
 
+    # sudo writes down what it was asked to run and whether its input was the terminal, and runs
+    # nothing. With FAKE_SUDO_GIVES_LINKER=1 it leaves a C compiler behind, as the package would.
+    cat >"$stubs/sudo" <<EOF
+#!/bin/sh
+echo "sudo \$*" >>"\$HOME/.stub.log"
+[ -t 0 ] && echo "sudo read the terminal" >>"\$HOME/.stub.log"
+if [ "\${FAKE_SUDO_GIVES_LINKER:-}" = 1 ]; then
+    printf '#!/bin/sh\\nexit 0\\n' >"$stubs/cc"
+    $(command -v chmod) +x "$stubs/cc"
+fi
+exit 0
+EOF
+    chmod +x "$stubs/sudo"
+    # The package managers are only ever to be reached through sudo; called directly, they say so.
+    for manager in pacman apt dnf; do
+        printf '#!/bin/sh\necho "%s $*" >>"$HOME/.stub.log"\nexit 0\n' "$manager" >"$stubs/$manager"
+        chmod +x "$stubs/$manager"
+    done
+    # No distribution unless a case names one, so the machine the checks run on never counts.
+    os_release="$work/os-release-$case_name"
+
+    # Nothing in the installer opens a browser or hands anything to the desktop today, and these
+    # stand-ins are here so that it stays true: they only write down that they were called, and
+    # every case then asks that the note was never written. A case runs under `env -i`, so the
+    # session the tester is sitting in is out of reach anyway; this catches the other half, a
+    # program called by name that would have found the real one on a machine that has it.
+    for handover in xdg-open gio sensible-browser www-browser open; do
+        printf '#!/bin/sh\necho "%s $*" >>"$HOME/.desktop.log"\nexit 0\n' "$handover" >"$stubs/$handover"
+        chmod +x "$stubs/$handover"
+    done
+
     path="$stubs:$tools"
     user_shell=/bin/bash
     extra_env=
@@ -92,26 +124,44 @@ EOF
 # shellcheck disable=SC2086
 run() {
     if [ "$have_setsid" = 1 ]; then
-        env -i HOME="$home" CARGO_HOME="$home/.cargo" PATH="$path" SHELL="$user_shell" $extra_env \
+        env -i HOME="$home" CARGO_HOME="$home/.cargo" PATH="$path" SHELL="$user_shell" \
+            QUVYTA_OS_RELEASE="$os_release" $extra_env \
             "$setsid_bin" -w "$shell_path" "$script" "$@" >"$home/.out" 2>&1 </dev/null
     else
-        env -i HOME="$home" CARGO_HOME="$home/.cargo" PATH="$path" SHELL="$user_shell" $extra_env \
+        env -i HOME="$home" CARGO_HOME="$home/.cargo" PATH="$path" SHELL="$user_shell" \
+            QUVYTA_OS_RELEASE="$os_release" $extra_env \
             "$shell_path" "$script" "$@" >"$home/.out" 2>&1 </dev/null
     fi
     status=$?
+    check_no_desktop_handover
 }
 
 # Runs install.sh on a terminal of its own and answers its questions with the given lines.
+# With piped=1 the script comes in on standard input, as it does from curl.
 # shellcheck disable=SC2086
 run_tty() {
     answers=$1
     shift
     printf '%s' "$answers" >"$home/.answers"
     # script starts the command with $SHELL, so the case's own SHELL is set inside it.
-    command="SHELL=$user_shell exec $shell_path $script $*"
-    env -i HOME="$home" CARGO_HOME="$home/.cargo" PATH="$path" SHELL="$shell_path" $extra_env \
+    if [ "${piped:-0}" = 1 ]; then
+        command="SHELL=$user_shell exec $shell_path -s -- $* <$script"
+    else
+        command="SHELL=$user_shell exec $shell_path $script $*"
+    fi
+    env -i HOME="$home" CARGO_HOME="$home/.cargo" PATH="$path" SHELL="$shell_path" \
+        QUVYTA_OS_RELEASE="$os_release" $extra_env \
         TERM=dumb "$script_bin" -qec "$command" /dev/null <"$home/.answers" >"$home/.out" 2>&1
     status=$?
+    check_no_desktop_handover
+}
+
+# Every run ends here: the installer must never have handed anything to the desktop session.
+# It is checked after each run rather than once at the end, so the case that did it is named.
+check_no_desktop_handover() {
+    if [ -s "$home/.desktop.log" ]; then
+        fail "the installer handed something to the desktop: $(cat "$home/.desktop.log")"
+    fi
 }
 
 fail() {
@@ -273,12 +323,40 @@ expect_status 1
 expect_output "Rust 1.80 is installed"
 expect_not_logged "cargo install"
 
+# The three commands that install a C linker, as the installer shows them all.
+expect_linker_commands() {
+    expect_output "  Arch Linux:      sudo pacman -S --needed base-devel"
+    expect_output "  Debian, Ubuntu:  sudo apt install build-essential"
+    expect_output "  Fedora:          sudo dnf install gcc"
+}
+
+# Nothing run with sudo and no package manager reached any other way.
+expect_nothing_run() {
+    expect_not_logged "sudo"
+    for manager in pacman apt dnf; do
+        expect_not_logged "$manager"
+    done
+}
+
 fresh no-linker
 rm "$stubs/cc"
+printf 'ID=arch\n' >"$os_release"
 run --yes code
 expect_status 1
 expect_output "C linker"
+expect_linker_commands
 expect_not_logged "cargo install"
+# --yes agrees to Rust, the crates and PATH, never to sudo.
+expect_nothing_run
+
+fresh no-linker-no-tty
+rm "$stubs/cc"
+printf 'ID=arch\n' >"$os_release"
+run code
+expect_status 1
+expect_linker_commands
+expect_nothing_run
+expect_home_untouched
 
 # --- PATH and the shell's start-up file
 #
@@ -528,12 +606,29 @@ expect_output "  xcode-select --install"
 expect_not_logged "cargo install"
 expect_home_untouched
 
+# Makes xcode-select answer as it does without the Command Line Tools, and write down any request
+# to open Apple's installer for them.
+no_command_line_tools() {
+    # shellcheck disable=SC2016 # the stand-in expands its own arguments
+    printf '#!/bin/sh\necho "xcode-select $*" >>"$HOME/.stub.log"\n[ "$1" = --install ] && exit 0\necho "xcode-select: error: unable to get active developer directory" >&2\nexit 2\n' >"$stubs/xcode-select"
+    chmod +x "$stubs/xcode-select"
+}
+
 fresh_mac mac-command-line-tools-removed
-printf '#!/bin/sh\necho "xcode-select: error: unable to get active developer directory" >&2\nexit 2\n' >"$stubs/xcode-select"
+no_command_line_tools
 run --yes code
 expect_status 1
 expect_output "  xcode-select --install"
 expect_not_logged "cargo install"
+expect_not_logged "xcode-select --install"
+expect_home_untouched
+
+fresh_mac mac-command-line-tools-no-tty
+no_command_line_tools
+run code
+expect_status 1
+expect_output "  xcode-select --install"
+expect_logged "xcode-select -p"
 expect_not_logged "xcode-select --install"
 expect_home_untouched
 
@@ -664,6 +759,159 @@ y
     expect_output "Rust was not installed"
     expect_not_logged "curl"
     expect_home_untouched
+
+    # --- A C linker, installed on the terminal
+    #
+    # Each distribution as /etc/os-release describes it, the same samples quvyta's own check is
+    # tested with, and the one command the installer runs for it.
+
+    for sample in \
+        "arch|NAME=\"Arch Linux\"\nID=arch\n|sudo pacman -S --needed base-devel" \
+        "endeavouros|NAME=\"EndeavourOS\"\nID=\"endeavouros\"\nID_LIKE=\"arch\"\n|sudo pacman -S --needed base-devel" \
+        "ubuntu|ID=ubuntu\nID_LIKE=debian\n|sudo apt install build-essential" \
+        "linuxmint|ID=linuxmint\nID_LIKE=\"ubuntu debian\"\n|sudo apt install build-essential" \
+        "fedora|ID=fedora\n|sudo dnf install gcc" \
+        "rocky|ID=\"rocky\"\nID_LIKE=\"rhel centos fedora\"\n|sudo dnf install gcc"; do
+        sample_name=${sample%%|*}
+        rest=${sample#*|}
+        sample_text=${rest%%|*}
+        sample_command=${rest#*|}
+
+        fresh "tty-linker-yes-$sample_name"
+        rm "$stubs/cc"
+        # shellcheck disable=SC2059 # the sample holds the escapes to expand
+        printf "$sample_text" >"$os_release"
+        extra_env="FAKE_SUDO_GIVES_LINKER=1"
+        run_tty "y
+y
+y
+" code
+        expect_status 0
+        expect_output "  $sample_command"
+        expect_output "sudo will ask for your password here, in this terminal."
+        expect_output "Run it now? (y/N)"
+        expect_logged "$sample_command"
+        expect_count "$log" "$sample_command" 1
+        expect_output "A C linker is installed."
+        expect_logged "cargo install --locked quvyta-code"
+        # Only the command shown ran: no other one, and no package manager outside sudo.
+        [ "$(grep -c '^sudo [^r]' "$log")" = 1 ] || fail "sudo ran more than the one command"
+        for manager in pacman apt dnf; do
+            grep -q "^$manager" "$log" && fail "$manager was run without sudo"
+        done
+    done
+
+    fresh tty-linker-yes-still-missing
+    rm "$stubs/cc"
+    printf 'ID=fedora\n' >"$os_release"
+    run_tty "y
+" code
+    expect_status 1
+    expect_logged "sudo dnf install gcc"
+    expect_output "There is still no C linker"
+    expect_not_logged "cargo install"
+
+    fresh tty-linker-no
+    rm "$stubs/cc"
+    printf 'ID=arch\n' >"$os_release"
+    run_tty "n
+" code
+    expect_status 1
+    expect_output "  sudo pacman -S --needed base-devel"
+    expect_output "Nothing was run."
+    expect_nothing_run
+    expect_not_logged "cargo install"
+    expect_home_untouched
+
+    fresh tty-linker-enter-means-no
+    rm "$stubs/cc"
+    printf 'ID=ubuntu\n' >"$os_release"
+    run_tty "
+" code
+    expect_status 1
+    expect_output "Nothing was run."
+    expect_nothing_run
+    expect_home_untouched
+
+    fresh tty-linker-yes-flag-does-not-answer
+    rm "$stubs/cc"
+    printf 'ID=arch\n' >"$os_release"
+    run_tty "y
+y
+" --yes code
+    expect_status 1
+    expect_linker_commands
+    if grep -qF "(y/N)" "$home/.out"; then
+        fail "the sudo question was asked under --yes"
+    fi
+    expect_nothing_run
+
+    for unknown in alpine missing; do
+        fresh "tty-linker-unknown-$unknown"
+        rm "$stubs/cc"
+        [ "$unknown" = missing ] || printf 'ID=alpine\n' >"$os_release"
+        run_tty "y
+y
+" code
+        expect_status 1
+        expect_linker_commands
+        if grep -qF "(y/N)" "$home/.out"; then
+            fail "asked to run a command for a distribution it does not know"
+        fi
+        expect_nothing_run
+        expect_home_untouched
+    done
+
+    # From curl the script itself is on standard input; the package manager's own questions must
+    # still come from the terminal.
+    fresh tty-linker-piped
+    rm "$stubs/cc"
+    printf 'ID=arch\n' >"$os_release"
+    extra_env="FAKE_SUDO_GIVES_LINKER=1"
+    piped=1
+    run_tty "y
+y
+y
+" code
+    piped=0
+    expect_status 0
+    expect_logged "sudo pacman -S --needed base-devel"
+    expect_logged "sudo read the terminal"
+    expect_logged "cargo install --locked quvyta-code"
+
+    # --- Apple's Command Line Tools, on the terminal
+
+    fresh_mac tty-mac-tools-yes
+    no_command_line_tools
+    run_tty "y
+" code
+    expect_status 1
+    expect_output "  xcode-select --install"
+    expect_output "Open it now? (y/N)"
+    expect_logged "xcode-select --install"
+    expect_output "Once the tools are installed, run this script again."
+    expect_not_logged "sudo"
+    expect_not_logged "cargo install"
+
+    fresh_mac tty-mac-tools-no
+    no_command_line_tools
+    run_tty "
+" code
+    expect_status 1
+    expect_output "  xcode-select --install"
+    expect_output "run this script again"
+    expect_not_logged "xcode-select --install"
+    expect_not_logged "cargo install"
+    expect_home_untouched
+
+    fresh_mac tty-mac-tools-yes-flag-does-not-answer
+    no_command_line_tools
+    run_tty "y
+y
+" --yes code
+    expect_status 1
+    expect_not_logged "xcode-select --install"
+    expect_not_logged "cargo install"
 else
     echo "skipped the terminal cases: util-linux script is not installed"
 fi

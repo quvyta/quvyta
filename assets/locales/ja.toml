@@ -1,0 +1,265 @@
+# Japanese: checked against en.toml; Japanese has a single plural form.
+
+[meta]
+name = "日本語"
+code = "ja"
+fallback = "en"
+
+[header]
+tagline = "ていねいに作られたターミナルアプリ"
+
+[status]
+released = "公開済み"
+beta = "ベータ"
+soon = "近日公開"
+
+[row]
+missing = "未インストール"
+soon = "近日公開"
+unknown = "バージョン不明"
+this = "{version}  このアプリ"
+this-short = "このアプリ"
+installing = "インストール中"
+installing-share = "インストール中 {percent}%"
+queued = "待機中"
+failed = "失敗"
+update = "{version}  新 {latest}"
+removing = "削除中"
+not-removed = "削除できず"
+
+[detail]
+open = "開く"
+package = "パッケージ"
+command = "コマンド"
+source = "入手先"
+add = "プロジェクトに追加"
+install = "インストール"
+update = "更新"
+remove = "削除"
+new = "新 {version}"
+installed = "インストール済み"
+running = "実行中"
+where = "{version}、{path}"
+unknown = "バージョン不明"
+elsewhere = "cargo 以外で入れたものなので、更新は入れた側の役目です。"
+beta = "ベータです。動きますが、画面もファイルもバージョンごとに変わることがあります。"
+soon = "まだ公開されていません。出るまではインストールするものがありません。"
+
+[nav]
+back = "戻る"
+
+[hints]
+open = "開く"
+choose = "選ぶ"
+details = "詳細"
+back = "戻る"
+install = "入れる"
+update = "更新"
+refresh = "更新を確認"
+apps = "アプリ"
+
+[family.code]
+title = "Quvyta Code"
+summary = "コーディングエージェントを Podman や Docker のコンテナの中で動かします。プロファイルを一度作れば、どのプロジェクトでも開けて、エージェントとシェルをタブのように行き来できます。"
+
+[family.focus]
+title = "Quvyta Focus"
+summary = "ターミナルでの集中時間の記録。取りかかっていることにカウンターを回し、日・週・月・年のグラフで時間の行き先を見ます。"
+
+[family.tools]
+title = "Quvyta Tools"
+summary = "Arch Linux で手作業になりがちな設定を一つのリストから当てます。ミラー、pacman、AUR ヘルパー、ファイアウォール、SSH など。どの項目も何に触れるかを先に示し、バックアップを取り、あとから元に戻せます。"
+
+[family.packages]
+title = "Quvyta Packages"
+summary = "何かが変わる前に、何がどう変わるかをそのまま見せる Arch Linux 向けのパッケージマネージャーです。この最初の版は pacman のパッケージを扱います。AUR、Flatpak、Snap は認識しますが、まだ管理はしません。"
+
+[family.desk]
+title = "Quvyta Desktop"
+summary = "ターミナルの中で動くデスクトップです。ウィンドウ、ドック、ランチャー、ファイルマネージャーがそろい、SSH 越しの作業や非力なマシンのために作られています。サーバーで qdesk と打てば、ショートカットを一つも覚えずにマウスで並べて使えます。"
+
+[family.framework]
+title = "Quvyta Framework"
+summary = "フレームワークのショーケース。この一家のウィジェット、テーマ、アイコン、言語をその場で試せます。"
+library = "フレームワーク自体は Rust のライブラリです。すべての Quvyta アプリが乗っているランタイム、ウィジェット、テーマ・アイコン・言語ファイルが入っています。誰でもこれで自分のターミナルアプリを作れます。"
+
+[family.quvyta]
+title = "Quvyta"
+summary = "このアプリです。一家を一覧にして、入れて、開いて、最新に保ち、削除します。"
+
+[open]
+notice = "{command} を開いています…"
+exited = "{command} はコード {code} で終了しました"
+signal = "{command} はシグナルで止まりました"
+failed = "{command} を開けませんでした"
+
+[launcher]
+problems = "launcher.conf の一部を読み飛ばしました"
+
+[confirm]
+title = "{command} を入れますか？"
+source = "入手先"
+version = "バージョン"
+target = "入れる場所"
+command = "コマンド"
+crates-io = "crates.io、{package}"
+latest = "crates.io にある最新のバージョン"
+built-here = "このマシンでビルドするので、数分かかることがあります。"
+no-sudo = "sudo は要りません。書き込むのは {folder} の中だけです。"
+cancel = "キャンセル"
+install = "インストール"
+update-title = "{command} を {from} から {to} に更新しますか？"
+update = "更新"
+
+[checks]
+no-cargo = "Rust のパッケージツール cargo が入っていません。この一家はそれでビルドします。"
+rustup = "公式インストーラー rustup で Rust を入れます"
+rustup-site = "rustup のページ。ほかの入れ方も載っています"
+install-here = "ここで入れる"
+rustup-here = "この端末で実行します。rustup が自分で質問し、sudo は要りません。"
+old-rust = "入っている Rust は {version} です。この一家には {needed} 以降が要ります。"
+rustup-update = "rustup update stable で新しくできます。"
+update-rust = "Rust を更新"
+update-rust-yourself = "Rust を入れたときと同じ方法で更新してから、もう一度確かめてください。"
+updating-rust = "rustup で Rust を更新しています…"
+rustup-failed = "rustup は Rust を更新できませんでした"
+no-linker = "Rust のビルドには C リンカーが要りますが、cc も gcc も clang も見つかりません。"
+linker-on = "{distro} で入れるには"
+sudo-here = "この端末で実行します。sudo がそこでパスワードを尋ねます。パスワードは sudo に渡り、quvyta が見ることはありません。"
+run-yourself = "お使いのシステムのコマンドをご自分で実行してから、もう一度確かめてください。"
+running = "{command} を実行中"
+fix-failed = "コマンドは正常に終わりませんでした"
+again = "もう一度確かめる"
+
+[install]
+installing = "{command} をインストール中"
+stop = "中止"
+details = "詳細"
+queued-title = "{command} は待機中"
+queued-after = "{command} が終わったら始まります。"
+queued = "まもなく始まります。"
+waiting-other-window = "別の quvyta のウィンドウが終わるのを待っています。"
+dequeue = "待機から外す"
+other-window = "別の quvyta のウィンドウがインストール中です。こちらは終わるまで待ちます。"
+stopped = "中止しました。何も入っていません。"
+failed = "{command} を入れられませんでした"
+not-started = "cargo を起動できませんでした：{reason}"
+nothing-changed = "何も入っていません。マシンには何の変更もありません。"
+last-lines = "最後の数行"
+log-file = "記録の全文は {path} にあります"
+copy-log = "記録をコピー"
+close = "閉じる"
+retry = "もう一度"
+done = "{command} {version} を入れました"
+next-time = "新しいバージョンは次回から動きます。"
+done-unknown = "{command} を入れました"
+
+[install.phase]
+starting = "開始"
+downloading = "ダウンロード"
+compiling = "ビルド"
+placing = "配置"
+
+[install.failure]
+linker = "このマシンには C リンカーがありません。これがないと Rust のプログラムはビルドできません。"
+rust = "入っている Rust より新しいものが要ります。"
+network = "crates.io に届きませんでした。接続を確かめてもう一度お試しください。"
+disk = "ディスクがいっぱいです。ビルドには数ギガバイトの空きが要ります。空けてからもう一度お試しください。"
+not-found = "crates.io に {package} のそのバージョンはありません。"
+build = "ビルドに失敗しました。"
+
+[stop]
+title = "{command} のインストールを中止しますか？"
+message = "何も入らず、マシンにも変更はありません。あとで入れ直せます。"
+queued = "待機中のものも中止する"
+keep = "続ける"
+confirm = "中止"
+
+[quit]
+title = "インストール中です"
+message = "終了すると中止されます。何も入らず、マシンにも変更はありません。"
+confirm = "終了"
+
+[remove]
+title = "{command} を削除しますか？"
+message = "プログラム {program} と、cargo が持っているその記録を消します。"
+settings-kept = "{folder} にある設定は残るので、入れ直せばそのまま戻ります。"
+settings-kept-anywhere = "設定は残るので、入れ直せばそのまま戻ります。"
+confirm = "削除"
+removing = "{command} を削除中"
+done = "{command} を削除しました"
+failed = "{command} を削除できませんでした"
+failed-reason = "cargo が削除できませんでした。理由は最後の数行にあります。"
+
+[updates]
+count = { other = "更新 {n} 件" }
+install-all = "更新を入れる"
+checking = "更新を確認しています…"
+failed = "更新を確認できませんでした"
+
+[path]
+title = "{folder} が PATH にありません"
+why = "ターミナルで {command} と打って開くには、この行をシェルの起動ファイルに足す必要があります。quvyta から開くぶんには関係ありません。"
+why-any = "cargo が入れたプログラムをターミナルで名前を打って開くには、この行をシェルの起動ファイルに足す必要があります。quvyta から開くぶんには関係ありません。"
+unknown = "ターミナルで {command} と打って開くには、この行をシェルの起動ファイルに足してください。quvyta から開くぶんには関係ありません。"
+unknown-any = "cargo が入れたプログラムをターミナルで名前を打って開くには、この行をシェルの起動ファイルに足してください。quvyta から開くぶんには関係ありません。"
+file = "ファイル"
+line = "行"
+not-now = "あとで"
+add = "追加"
+added = "追加しました。これから開くターミナルでは {command} と打てば開きます。"
+added-any = "追加しました。これから開くターミナルでは、cargo が入れたプログラムを名前で開けます。"
+open-terminals = "すでに開いているターミナルはそのままです。"
+ready = "これから開くターミナルでは {command} と打てば開きます。"
+ready-any = "これから開くターミナルでは、cargo が入れたプログラムを名前で開けます。"
+failed = "行を足せませんでした。ご自分で足せます。行をクリックするとコピーされます。"
+not-remembered = "launcher.conf に答えを残せませんでした"
+
+[cli]
+about = "Quvyta 一家のターミナルアプリを入れ、開き、更新します。"
+usage = "使い方"
+name = "名前"
+list = "一家の一覧を開く"
+install = "これらを入れるか、一つずつ確認する"
+show = "この一員のページで開く"
+help = "このヘルプを表示する"
+version = "バージョンを表示する"
+names = "名前には一員の短い名前（code）、コマンド（qcode）、パッケージ名（quvyta-code）のどれでも使えます。"
+unknown-option = "{option} という選択肢はありません"
+unknown-name = "{name} という一員はいません"
+unknown-command = "quvyta に {command} という仕事はありません"
+no-names = "install には名前が少なくとも一つ要ります。たとえば qcode"
+show-no-name = "show には名前が要ります。たとえば qfocus"
+show-many = "show が取る名前は一つだけです"
+unreleased = "{command} はまだ公開されていないので入れられません"
+hint = "quvyta --help で何を受け取るか見られます。"
+already-installed = "すでに入っています：{commands}"
+
+[tabs]
+apps = "アプリ"
+settings = "設定"
+
+[settings]
+title = "quvyta"
+check-updates = "起動時に更新を確認する"
+after-close = "アプリを閉じたら"
+after-close-return = "quvyta に戻る"
+after-close-shell = "シェルに抜ける"
+path = "{folder} は PATH に"
+path-yes = "ある"
+path-new-terminals = "新しいターミナルで"
+path-no = "ない"
+path-add = "追加"
+not-saved = "設定を保存できませんでした"
+
+[wizard]
+step-apps = "アプリ"
+apps-intro = "どれが要りますか？ quvyta は何かを入れる前に必ず確かめます。"
+line-code = "コーディングエージェントを Podman や Docker の中で。"
+line-focus = "何に集中し、時間がどこへ行ったかを記録します。"
+line-tools = "Arch Linux の設定を一覧から、どれも元に戻せます。"
+line-packages = "変わるところを先に見せるパッケージマネージャー。"
+line-desk = "ターミナルの中のデスクトップ。窓もファイルも。"
+line-framework = "全員が乗っているフレームワークのショーケース。"
+arch-only = "{line}  Arch Linux のみ。"
+soon = "{line}  まだ出ていません。"

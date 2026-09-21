@@ -181,15 +181,15 @@ impl Quvyta {
 /// The commands the fixes of `problem` offer to copy.
 fn problem_commands(problem: &Problem) -> Vec<&'static str> {
     match problem {
-        Problem::NoCargo => vec![checks::INSTALL_SCRIPT, checks::RUSTUP_SITE],
+        Problem::NoCargo => problem.fix().into_iter().chain([checks::RUSTUP_SITE]).collect(),
         Problem::OldRust { .. } => Vec::new(),
         Problem::NoLinker(Distro::Other) => Distro::KNOWN.iter().filter_map(|distro| distro.linker_command()).collect(),
         Problem::NoLinker(known) => known.linker_command().into_iter().collect(),
     }
 }
 
-/// What is in the way of an install, each with its fix: copyable commands to run, or a button
-/// when quvyta can run the fix itself. Without `headline` only the fixes are drawn, for a
+/// What is in the way of an install, each with its fix: the command, to copy or to run here with
+/// the button beside it, or only to copy when quvyta cannot be sure the line is right. Without `headline` only the fixes are drawn, for a
 /// failure that has already said what is wrong. `room` is the width of the surface they are
 /// drawn on, which says whether a command fits on one line.
 pub(super) fn problems(found: &[Problem], headline: bool, room: u16, ui: &mut View<'_, Msg>) {
@@ -199,7 +199,10 @@ pub(super) fn problems(found: &[Problem], headline: bool, room: u16, ui: &mut Vi
                 if headline {
                     ui.add(Text::new(t!("checks.no-cargo")).color("warning")).fill_width();
                 }
-                copyable(ui, t!("checks.install-script"), checks::INSTALL_SCRIPT.to_owned(), "install-script", room);
+                if let Some(line) = problem.fix() {
+                    copyable(ui, t!("checks.rustup"), line.to_owned(), "rustup-install", room);
+                    run_here(ui, problem, t!("checks.rustup-here"));
+                }
                 copyable(ui, t!("checks.rustup-site"), checks::RUSTUP_SITE.to_owned(), "rustup-site", room);
             }
             Problem::OldRust { version, rustup } => {
@@ -236,11 +239,27 @@ pub(super) fn problems(found: &[Problem], headline: bool, room: u16, ui: &mut Vi
                         copyable(ui, label, command.to_owned(), &format!("linker-{at}"), room);
                     }
                 }
-                ui.add(Text::new(t!("checks.no-sudo")).role("secondary")).fill_width();
+                if problem.fix().is_some() {
+                    run_here(ui, problem, t!("checks.sudo-here"));
+                } else {
+                    // Which of them is right is not known here, so none is run.
+                    ui.add(Text::new(t!("checks.run-yourself")).role("secondary")).fill_width();
+                }
             }
         })
         .fill_width();
     }
+}
+
+/// The button that runs the fix of `problem` here, with `note` saying what running it involves.
+fn run_here(ui: &mut View<'_, Msg>, problem: &Problem, note: String) {
+    ui.row(|ui| {
+        let run = Msg::Install(InstallMsg::RunFix(problem.clone()));
+        // Both fixes can be on screen at once, so each button has its own id.
+        let id = if matches!(problem, Problem::NoCargo) { "install-rust" } else { "install-linker" };
+        ui.add(Button::new(t!("checks.install-here")).on_press(run)).id(id);
+    });
+    ui.add(Text::new(note).role("secondary")).fill_width();
 }
 
 /// A quiet label, padded to `width` columns, and its value on one line.

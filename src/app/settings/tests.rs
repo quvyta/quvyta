@@ -8,7 +8,8 @@ use qframe::runtime::{HandoffOutcome, Harness};
 use qframe::storage::{Family, Source};
 
 use super::super::tests::{
-    TOAST_IN, env, harness, harness_with_settings, harness_with_settings_at, line_with, machine, machine_off_path,
+    LANGUAGES, TOAST_IN, env, harness, harness_with_settings, harness_with_settings_at, line_with, machine,
+    machine_off_path,
 };
 use super::*;
 use crate::app::{PathMsg, Tab};
@@ -389,7 +390,7 @@ fn a_path_longer_than_a_narrow_screen_keeps_its_start_and_its_file_name() {
 #[test]
 fn narrow_ascii_settings_keep_the_rules() {
     for (width, height) in [(40, 16), (48, 20), (60, 20), (100, 24)] {
-        for locale in ["en", "tr"] {
+        for locale in LANGUAGES {
             let root = tempfile::tempdir().expect("temp");
             let mut machine = machine_off_path(root.path());
             machine.shell = Some("/bin/bash".to_owned());
@@ -397,9 +398,11 @@ fn narrow_ascii_settings_keep_the_rules() {
             h.set_locale(locale).set_glyph_mode(GlyphMode::Ascii);
             let screen = h.screen();
             assert!(screen.contains("quvyta"), "{width}x{height}:\n{screen}");
-            let heading = if locale == "en" { "Appearance" } else { "Görünüm" };
-            assert!(screen.contains(heading), "the shared rows at {width}x{height} {locale}:\n{screen}");
-            for forbidden in ['[', ']', '{', '}', '|', '▌'] {
+            // The heading of the rows the family shares comes from the framework, in this
+            // language, so the test asks it rather than spelling it out nine times.
+            let heading = h.env().i18n().translate("quvyta.appearance.heading", &[]);
+            assert!(screen.contains(&heading), "the shared rows at {width}x{height} {locale}:\n{screen}");
+            for forbidden in ['[', ']', '{', '}', '|', '▌', '⟦'] {
                 assert!(!screen.contains(forbidden), "`{forbidden}` at {width}x{height} {locale}:\n{screen}");
             }
         }
@@ -466,4 +469,56 @@ pub(in crate::app) fn review() -> Vec<String> {
         shot(&h, format!("settings not saved {locale}"));
     }
     fragments
+}
+
+/// Nothing on the Settings tab is cut in any language: this page carries the rows every member
+/// of the family shows, so a word that does not fit here is a word that does not fit anywhere.
+///
+/// All three states of the PATH row are walked, because its value is the one line on this page
+/// that may not wrap: a `yes` that broke over two lines would look like a second setting.
+///
+/// Three lines shorten themselves on purpose and are let through by name: the path of the
+/// settings file, the `PATH` line a shell would be given, and — until the framework's select
+/// stops doing it — the language select, which cuts `Português (Brasil)` at every width.
+#[test]
+fn nothing_on_the_settings_tab_is_cut_in_any_language() {
+    for (width, height) in [(40, 30), (48, 40), (60, 40), (80, 44), (100, 44)] {
+        for locale in LANGUAGES {
+            for reach in ["missing", "new-terminals", "here"] {
+                let root = tempfile::tempdir().expect("temp");
+                let mut machine = machine_off_path(root.path());
+                machine.shell = Some("/bin/bash".to_owned());
+                match reach {
+                    // The folder is on `PATH` right now.
+                    "here" => machine.path.push(machine.cargo_bin()),
+                    // The shell file already carries the line, so it will be on `PATH` in the
+                    // next terminal: the state a person is in after Add, set the way their
+                    // machine would be rather than by pressing a button that a short screen
+                    // does not even show.
+                    "new-terminals" => {
+                        fs::create_dir_all(root.path().join("home")).expect("home");
+                        fs::write(root.path().join("home/.bashrc"), "export PATH=\"$HOME/.cargo/bin:$PATH\"\n")
+                            .expect("bashrc");
+                    }
+                    _ => {}
+                }
+                let mut h = settings_on(machine, width, height);
+                h.set_locale(locale);
+                let language = h.env().i18n().translate("quvyta.appearance.language", &[]);
+                let screen = h.screen();
+                for line in screen.lines() {
+                    if !line.contains('\u{2026}') {
+                        continue;
+                    }
+                    let shortens_itself =
+                        line.ends_with("launcher.conf") || line.contains("export PATH=") || line.contains(&language);
+                    assert!(
+                        shortens_itself,
+                        "`{}` is cut in {locale} at {width}x{height} with PATH {reach}:\n{screen}",
+                        line.trim()
+                    );
+                }
+            }
+        }
+    }
 }

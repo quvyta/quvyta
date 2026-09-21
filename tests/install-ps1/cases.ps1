@@ -3,9 +3,10 @@
 # The installer's functions are loaded by dot-sourcing it, which only defines them. The functions
 # that need Windows itself (the registry, the settings broadcast, the Windows check, the console
 # check and Read-Host) are then replaced by versions that work on what each case sets up; every
-# other function runs as shipped. cargo, rustup, rustc and vswhere are small shell scripts named
-# like the Windows programs, which Linux runs whatever their name; each writes what it was asked
-# into a log, so a case can check that nothing was installed.
+# other function runs as shipped. cargo, rustup, rustc, vswhere and winget are small shell scripts
+# named like the Windows programs, which Linux runs whatever their name; each writes what it was
+# asked into a log, so a case can check that nothing was installed. The container has no winget of
+# its own, and every case that expects winget to run finds the stand-in's own line in the log.
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -67,6 +68,17 @@ function Write-Stub {
     $path = Join-Path $script:Stubs $Name
     Set-Content -LiteralPath $path -Value ("#!/bin/sh`n" + $Body)
     & chmod +x $path
+}
+
+# winget writes each argument it was given between <>, so a case sees how the words were split.
+function Write-WingetStub {
+    param([int]$Code = 0)
+    Write-Stub 'winget.exe' @"
+line=winget
+for word in "`$@"; do line="`$line <`$word>"; done
+echo "`$line" >>"$($script:Log)"
+exit $Code
+"@
 }
 
 function New-Case {
@@ -483,15 +495,94 @@ Assert-NotLogged 'cargo install'
 
 # --- The Visual Studio Build Tools
 
+$wingetShown = '  winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"'
+$wingetRun = 'winget <install> <--id> <Microsoft.VisualStudio.2022.BuildTools> <--exact> <--override> <--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended>'
+
+# -Yes agrees to Rust, the crates and PATH, never to a system component.
 New-Case 'build-tools-missing'
 Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+Write-WingetStub
 Invoke-Case @('-Yes', 'code')
 Assert-Status 1
 Assert-Output 'Rust needs the Visual Studio C++ Build Tools'
-Assert-Output '  winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"'
+Assert-Output $wingetShown
 Assert-NotLogged 'cargo install'
 Assert-NotLogged 'winget'
+Assert-NoOutput '(y/N)'
 Assert-Equal $script:PathWrites 0 'the number of PATH writes'
+
+New-Case 'build-tools-missing-yes-flag-on-a-console'
+Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+Write-WingetStub
+Set-Answers @('y', 'y')
+Invoke-Case @('-Yes', 'code')
+Assert-Status 1
+Assert-Output $wingetShown
+Assert-NoOutput '(y/N)'
+Assert-NotLogged 'winget'
+
+New-Case 'build-tools-missing-no-console'
+Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+Write-WingetStub
+Invoke-Case @('code')
+Assert-Status 1
+Assert-Output $wingetShown
+Assert-NotLogged 'winget'
+Assert-NothingDone
+
+New-Case 'build-tools-installed-with-winget'
+Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+Write-WingetStub
+Set-Answers @('y')
+Invoke-Case @('code')
+Assert-Status 1
+Assert-Output $wingetShown
+Assert-Output 'Windows will ask for your permission in a window of its own.'
+Assert-Output '? Run it now? (y/N)'
+Assert-Logged $wingetRun
+Assert-Equal @(Get-LogLines | Where-Object { $_.StartsWith('winget') }).Count 1 'the number of winget runs'
+Assert-Output 'The Build Tools are installed. Open a new terminal and run this script again.'
+Assert-NotLogged 'cargo install'
+
+New-Case 'build-tools-winget-on-arm64'
+Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+$env:PROCESSOR_ARCHITECTURE = 'ARM64'
+Write-WingetStub
+Set-Answers @('yes')
+Invoke-Case @('code')
+Assert-Logged 'winget <install> <--id> <Microsoft.VisualStudio.2022.BuildTools> <--exact> <--override> <--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.VC.Tools.ARM64>'
+
+New-Case 'build-tools-winget-fails'
+Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+Write-WingetStub -Code 1
+Set-Answers @('y')
+Invoke-Case @('code')
+Assert-Status 1
+Assert-Logged $wingetRun
+Assert-Output 'winget did not finish the install'
+Assert-Output 'https://visualstudio.microsoft.com/visual-cpp-build-tools/'
+
+foreach ($answer in @('n', '')) {
+    New-Case "build-tools-declined-with-'$answer'"
+    Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+    Write-WingetStub
+    Set-Answers @($answer)
+    Invoke-Case @('code')
+    Assert-Status 1
+    Assert-Output '? Run it now? (y/N)'
+    Assert-Output 'Nothing was run.'
+    Assert-NotLogged 'winget'
+    Assert-NothingDone
+}
+
+New-Case 'build-tools-no-winget-no-question'
+Remove-Item -Recurse (Join-Path $script:Root 'pf86')
+Set-Answers @('y')
+Invoke-Case @('code')
+Assert-Status 1
+Assert-Output $wingetShown
+Assert-NoOutput '(y/N)'
+Assert-NothingDone
 
 New-Case 'build-tools-missing-vswhere-finds-nothing'
 Write-Stub 'vswhere-empty' ''
@@ -521,6 +612,59 @@ Write-Stub 'rustc.exe' "printf 'rustc 1.95.0\nhost: x86_64-pc-windows-msvc\n'"
 Invoke-Case @('-Yes', 'code')
 Assert-Status 1
 Assert-Output 'Visual Studio C++ Build Tools'
+
+# --- PowerShell on Linux or macOS, where install.sh does the work
+
+# sh and curl write down their arguments and run nothing.
+function Write-UnixStubs {
+    Write-Stub 'sh' @"
+line=sh
+for word in "`$@"; do line="`$line <`$word>"; done
+echo "`$line" >>"$($script:Log)"
+exit 0
+"@
+    Write-Stub 'curl' "echo `"curl `$*`" >>`"$($script:Log)`""
+}
+
+$unixRun = 'sh <-c> <curl -fsSL $0 | sh -s -- $@> <https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh>'
+function Test-QuvytaWindows { $false }
+
+New-Case 'not-windows-runs-install-sh'
+Write-UnixStubs
+Set-Answers @('y')
+Invoke-Case @('code', '-Yes', 'focus', '--yes')
+Assert-Status 0
+Assert-Output '  curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- code --yes focus'
+Assert-Logged "$unixRun <code> <--yes> <focus>"
+# Only sh ran: it is the one that fetches and runs install.sh.
+Assert-Equal @(Get-LogLines).Count 1 'the number of programs run'
+Assert-NotLogged 'cargo'
+
+New-Case 'not-windows-asks-first'
+Write-UnixStubs
+Set-Answers @('')
+Invoke-Case @()
+Assert-Status 0
+Assert-Output '  curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh'
+Assert-Output '? Run it now? (Y/n)'
+Assert-Logged $unixRun
+
+New-Case 'not-windows-declined'
+Write-UnixStubs
+Set-Answers @('n')
+Invoke-Case @('code')
+Assert-Status 1
+Assert-Output 'Nothing was run.'
+Assert-NotLogged 'sh '
+
+New-Case 'not-windows-no-console'
+Write-UnixStubs
+Invoke-Case @('code')
+Assert-Status 1
+Assert-Output '| sh -s -- code'
+Assert-NotLogged 'sh '
+
+function Test-QuvytaWindows { $true }
 
 # --- PATH
 

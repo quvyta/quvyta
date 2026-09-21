@@ -9,8 +9,9 @@ use crate::machine::Machine;
 /// The oldest Rust the family builds with, as in `install.sh`.
 pub const MIN_RUST: (u32, u32) = (1, 95);
 
-/// The line that installs Rust and quvyta together, as the README gives it.
-pub const INSTALL_SCRIPT: &str = "curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh";
+/// The line rustup's own page gives to install Rust. Not the family's install script: that one
+/// would build quvyta again, and quvyta is already here.
+pub const RUSTUP_INSTALL: &str = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh";
 
 /// Where rustup, the official Rust installer, lives.
 pub const RUSTUP_SITE: &str = "https://rustup.rs";
@@ -83,13 +84,27 @@ impl Distro {
         }
     }
 
-    /// The command that installs a C linker there. quvyta only shows it: it never runs sudo.
+    /// The command that installs a C linker there. It needs sudo, so quvyta runs it only when the
+    /// person presses the button beside it, on the terminal where sudo asks for the password.
     pub fn linker_command(self) -> Option<&'static str> {
         match self {
             Self::Arch => Some("sudo pacman -S --needed base-devel"),
             Self::Debian => Some("sudo apt install build-essential"),
             Self::Fedora => Some("sudo dnf install gcc"),
             Self::Other => None,
+        }
+    }
+}
+
+impl Problem {
+    /// The one line quvyta can run to put this right, shown to the person before they choose to
+    /// run it; `None` when there is no single line it can be sure of. rustup's line is a shell
+    /// pipe, which only a Unix shell runs.
+    pub fn fix(&self) -> Option<&'static str> {
+        match self {
+            Self::NoCargo => cfg!(unix).then_some(RUSTUP_INSTALL),
+            Self::OldRust { .. } => None,
+            Self::NoLinker(distro) => distro.linker_command(),
         }
     }
 }
@@ -228,6 +243,14 @@ mod tests {
         assert_eq!(run(&machine), [Problem::NoLinker(Distro::Other)]);
         assert_eq!(Distro::Other.linker_command(), None);
         assert!(Distro::KNOWN.iter().all(|distro| distro.linker_command().is_some_and(|c| c.starts_with("sudo "))));
+    }
+
+    #[test]
+    fn only_a_known_distribution_gets_a_linker_fix_to_run() {
+        assert_eq!(Problem::NoLinker(Distro::Arch).fix(), Some("sudo pacman -S --needed base-devel"));
+        assert_eq!(Problem::NoLinker(Distro::Other).fix(), None);
+        assert_eq!(Problem::OldRust { version: "1.80.1".to_owned(), rustup: None }.fix(), None);
+        assert_eq!(Problem::NoCargo.fix(), cfg!(unix).then_some(RUSTUP_INSTALL));
     }
 
     #[test]

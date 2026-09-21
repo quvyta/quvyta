@@ -54,6 +54,11 @@ pub enum InstallMsg {
     UpdateRust(PathBuf),
     /// rustup is done.
     RustUpdated(HandoffOutcome),
+    /// Hands the terminal to the line that puts this problem right, which the person has read
+    /// beside the button they pressed.
+    RunFix(Problem),
+    /// That line has ended.
+    FixRan(HandoffOutcome),
     /// A line cargo wrote while installing the member at this index.
     Line(usize, String),
     /// A frame of cargo's progress line, which it redraws in place, while installing the member
@@ -354,6 +359,28 @@ impl Quvyta {
                         Command::toast(Toast::danger(t!("checks.rustup-failed")).body(reason))
                     }
                 };
+                return Command::batch([report, self.install_update(InstallMsg::Recheck)]);
+            }
+            InstallMsg::RunFix(problem) => {
+                let Some(line) = problem.fix() else { return Command::none() };
+                // The very line shown, run by the shell: nothing is added to it. Whatever it asks,
+                // sudo's password included, it asks on the terminal quvyta has stepped away from.
+                let handoff = Handoff::new("sh", |outcome| Msg::Install(InstallMsg::FixRan(outcome)))
+                    .args(["-c", line])
+                    .dir(self.machine.home.clone())
+                    .notice(t!("checks.running", command = line))
+                    .pause(true);
+                return Command::handoff(handoff);
+            }
+            InstallMsg::FixRan(outcome) => {
+                let report = match outcome {
+                    HandoffOutcome::Finished { code: Some(0) } => Command::none(),
+                    HandoffOutcome::Finished { .. } => Command::toast(Toast::warning(t!("checks.fix-failed"))),
+                    HandoffOutcome::Failed(reason) => {
+                        Command::toast(Toast::danger(t!("checks.fix-failed")).body(reason))
+                    }
+                };
+                // Whether it worked is for the checks to say, not the exit code: they look again.
                 return Command::batch([report, self.install_update(InstallMsg::Recheck)]);
             }
             InstallMsg::Line(index, line) => {

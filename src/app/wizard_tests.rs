@@ -13,7 +13,7 @@ use qframe::widgets::{AppearanceChange, SetupMsg};
 
 use super::WizardMsg;
 use crate::app::install_tests::{DIALOG_IN, calls, click_beside, has, settle};
-use crate::app::tests::{env, index};
+use crate::app::tests::{LANGUAGES, env, index};
 use crate::app::{Msg, Quvyta, Tab};
 use crate::install::tests::{packages, scenario};
 use crate::inventory::tests::{machine_with_cargo, write_program};
@@ -255,7 +255,7 @@ fn turkish_reads_naturally() {
 
 #[test]
 fn a_narrow_screen_and_ascii_keep_the_rules() {
-    for locale in ["en", "tr"] {
+    for locale in LANGUAGES {
         let root = tempfile::tempdir().expect("temp");
         let mut h = start(root.path(), "ID=debian\n", 48, 26);
         h.set_locale(locale).set_glyph_mode(GlyphMode::Ascii);

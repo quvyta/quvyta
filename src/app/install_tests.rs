@@ -14,7 +14,9 @@ use qframe::storage::AppLock;
 use tempfile::TempDir;
 
 use super::installs::InstallMsg;
-use super::tests::{TOAST_IN, env, harness, harness_with_settings, index, line_with, machine};
+use super::tests::{
+    LANGUAGES, LONGEST_LANGUAGES, TOAST_IN, env, harness, harness_with_settings, index, line_with, machine,
+};
 use super::*;
 use crate::cargo::Failure;
 use crate::checks::Problem;
@@ -209,28 +211,53 @@ fn quvyta_never_offers_to_install_itself() {
     assert!(!has(&h, "Install"), "{}", h.screen());
 }
 
-#[test]
-fn without_cargo_the_dialog_shows_the_install_script_and_rustup() {
+/// The dialog for qtools on a machine with a C linker and no cargo at all.
+fn without_cargo() -> (TempDir, Harness<Quvyta>) {
     let root = tempfile::tempdir().expect("temp");
     write_program(&root.path().join("bin/cc"), "#!/bin/sh\nexit 0\n");
     super::tests::set_up(root.path());
     let mut h = run(Quvyta::new(Machine::in_root(root.path())), 100, 34);
     h.send(Msg::Select(index("tools"))).press("enter");
+    (root, h)
+}
+
+#[test]
+fn without_cargo_the_dialog_shows_rustup_and_offers_to_run_it() {
+    let (_root, mut h) = without_cargo();
     let screen = h.screen();
     for text in [
         "cargo, Rust's package tool, is not installed",
-        // Too long for one line here, so it is shown whole, wrapped, above its copyable value.
-        crate::checks::INSTALL_SCRIPT,
+        crate::checks::RUSTUP_INSTALL,
         "https://rustup.rs",
+        "Install here",
+        "rustup asks its own questions and needs no sudo",
         "Check again",
     ] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
     assert!(!screen.contains("install --locked"), "there is no cargo to show a command for:\n{screen}");
-    click_beside(&mut h, "curl -fsSL", "copy");
-    assert_eq!(h.copied(), [crate::checks::INSTALL_SCRIPT]);
+    assert!(!screen.contains("install.sh"), "the family's script would build quvyta again:\n{screen}");
+    click_beside(&mut h, "curl --proto", "copy");
+    assert_eq!(h.copied(), [crate::checks::RUSTUP_INSTALL]);
     h.send(install(InstallMsg::Confirm));
     assert!(h.app().installs.running.is_none(), "a dialog with problems installs nothing");
+    assert!(h.handoffs().is_empty(), "nothing runs before the button is pressed");
+}
+
+#[test]
+fn install_here_runs_rustup_in_the_terminal_and_checks_again() {
+    let (_root, mut h) = without_cargo();
+    // rustup does its work: cargo is in its folder afterwards.
+    write_program(&h.app().machine.cargo_bin().join("cargo"), "#!/bin/sh\nexit 0\n");
+    h.set_handoff_outcome(HandoffOutcome::Finished { code: Some(0) }).click_text("Install here");
+    let [request] = h.handoffs() else { panic!("one handoff: {:?}", h.handoffs()) };
+    assert_eq!(request.program, "sh");
+    assert_eq!(request.args, ["-c", crate::checks::RUSTUP_INSTALL], "the very line shown");
+    assert!(request.pause, "what it printed stays to be read");
+    assert_eq!(request.notice.as_deref(), Some(format!("Running {}", crate::checks::RUSTUP_INSTALL).as_str()));
+    settle(&mut h);
+    assert_eq!(h.app().installs.dialog.as_ref().and_then(|dialog| dialog.problems.clone()), Some(Vec::new()));
+    assert!(!has(&h, "cargo, Rust's package tool"), "checked again:\n{}", h.screen());
 }
 
 /// The application with a `rustc` that reports `version`, and `rustup` when `rustup`.
@@ -275,6 +302,19 @@ fn an_old_rust_without_rustup_only_says_what_to_do() {
     assert!(h.handoffs().is_empty());
 }
 
+/// The dialog for qtools on a machine whose `os-release` says `os_release` and that has no C
+/// linker.
+fn without_linker(os_release: &str) -> (TempDir, Harness<Quvyta>) {
+    let root = tempfile::tempdir().expect("temp");
+    let app = Quvyta::new(machine(root.path()));
+    std::fs::remove_file(root.path().join("bin/cc")).expect("no linker");
+    std::fs::create_dir_all(root.path().join("etc")).expect("folder");
+    std::fs::write(root.path().join("etc/os-release"), os_release).expect("os-release");
+    let mut h = run(app, 100, 40);
+    h.send(Msg::Select(index("tools"))).press("enter");
+    (root, h)
+}
+
 #[test]
 fn a_missing_linker_shows_the_command_of_the_distribution() {
     for (os_release, command, others) in [
@@ -283,19 +323,79 @@ fn a_missing_linker_shows_the_command_of_the_distribution() {
         ("ID=fedora\n", "sudo dnf install gcc", false),
         ("ID=alpine\n", "sudo pacman -S --needed base-devel", true),
     ] {
-        let root = tempfile::tempdir().expect("temp");
-        let app = Quvyta::new(machine(root.path()));
-        std::fs::remove_file(root.path().join("bin/cc")).expect("no linker");
-        std::fs::create_dir_all(root.path().join("etc")).expect("folder");
-        std::fs::write(root.path().join("etc/os-release"), os_release).expect("os-release");
-        let mut h = run(app, 100, 40);
-        h.send(Msg::Select(index("tools"))).press("enter");
+        let (_root, h) = without_linker(os_release);
         let screen = h.screen();
         assert!(screen.contains("Rust needs a C linker"), "{screen}");
         assert!(screen.contains(command), "{os_release}:\n{screen}");
         assert_eq!(screen.contains("sudo dnf install gcc") && screen.contains("sudo apt"), others, "{screen}");
-        assert!(screen.contains("quvyta never runs sudo"), "{screen}");
-        assert!(h.handoffs().is_empty(), "sudo is never run");
+        // Only the one right command is offered to run; of several, none is.
+        assert_eq!(screen.contains("Install here"), !others, "{screen}");
+        assert_eq!(screen.contains("sudo asks for your password there"), !others, "{screen}");
+        assert_eq!(screen.contains("Run the command for your system yourself"), others, "{screen}");
+        assert!(h.handoffs().is_empty(), "sudo is not run until the button is pressed");
+    }
+}
+
+#[test]
+fn install_here_hands_the_terminal_to_the_linker_command_and_checks_again() {
+    for (os_release, command) in [
+        ("ID=arch\n", "sudo pacman -S --needed base-devel"),
+        ("ID=ubuntu\nID_LIKE=debian\n", "sudo apt install build-essential"),
+        ("ID=fedora\n", "sudo dnf install gcc"),
+    ] {
+        let (root, mut h) = without_linker(os_release);
+        // The package manager does its work: a linker is there afterwards.
+        write_program(&root.path().join("bin/cc"), "#!/bin/sh\nexit 0\n");
+        h.set_handoff_outcome(HandoffOutcome::Finished { code: Some(0) }).click_text("Install here");
+        let [request] = h.handoffs() else { panic!("one handoff: {:?}", h.handoffs()) };
+        assert_eq!(request.program, "sh");
+        assert_eq!(request.args, ["-c", command], "the very line shown");
+        assert!(request.pause);
+        settle(&mut h);
+        assert_eq!(h.app().installs.dialog.as_ref().and_then(|dialog| dialog.problems.clone()), Some(Vec::new()));
+        assert!(!has(&h, "Rust needs a C linker"), "checked again:\n{}", h.screen());
+        let screen = h.screen();
+        assert!(line_with(&screen, "Cancel").contains("Install") && !screen.contains("Check again"), "{screen}");
+    }
+}
+
+#[test]
+fn install_here_is_offered_in_every_language_in_its_own_words() {
+    let own_words = [
+        ("en", "Install here"),
+        ("tr", "Burada kur"),
+        ("de", "Hier installieren"),
+        ("es", "Instalar aquí"),
+        ("fr", "Installer ici"),
+        ("pt-BR", "Instalar aqui"),
+        ("ru", "Установить здесь"),
+        ("zh-Hans", "在这里安装"),
+        ("ja", "ここで入れる"),
+    ];
+    assert_eq!(own_words.len(), LANGUAGES.len(), "every language quvyta speaks is asked");
+    for (locale, button) in own_words {
+        for width in [60, 100] {
+            let (_root, mut h) = without_linker("ID=arch\n");
+            h.set_locale(locale).resize(width, 40);
+            let screen = h.screen();
+            assert!(screen.contains(button), "`{locale}` at {width} should say `{button}`:\n{screen}");
+            assert!(screen.contains("sudo"), "`{locale}` at {width} says sudo asks:\n{screen}");
+            h.click_text(button);
+            assert_eq!(h.handoffs().len(), 1, "`{locale}` at {width}: the button runs the line");
+        }
+    }
+}
+
+#[test]
+fn a_fix_that_fails_says_so_and_leaves_the_problem_on_screen() {
+    for outcome in [HandoffOutcome::Finished { code: Some(1) }, HandoffOutcome::Failed("no terminal".to_owned())] {
+        let (_root, mut h) = without_linker("ID=arch\n");
+        h.set_handoff_outcome(outcome.clone()).click_text("Install here");
+        settle(&mut h);
+        let screen = h.advance(TOAST_IN).screen();
+        assert!(screen.contains("The command did not finish successfully"), "{outcome:?}:\n{screen}");
+        assert!(screen.contains("Rust needs a C linker"), "still in the way:\n{screen}");
+        assert!(!screen.contains("  Install  "), "{screen}");
     }
 }
 
@@ -664,6 +764,15 @@ fn every_failure_is_told_plainly_with_what_to_do() {
 }
 
 #[test]
+fn a_failed_build_offers_to_install_the_missing_linker_here() {
+    let (_root, mut h) = failed("error: linker `cc` not found\n");
+    assert!(has(&h, "There is no C linker on this machine"), "{}", h.screen());
+    h.set_handoff_outcome(HandoffOutcome::Finished { code: Some(0) }).click_text("Install here");
+    let [request] = h.handoffs() else { panic!("one handoff: {:?}", h.handoffs()) };
+    assert_eq!(request.args, ["-c", "sudo pacman -S --needed base-devel"]);
+}
+
+#[test]
 fn a_failure_shows_only_its_last_five_lines_and_copies_them_all() {
     let out: String = (1..=8).map(|n| format!("line {n}\n")).collect();
     let (_root, mut h) = failed(&out);
@@ -758,31 +867,171 @@ fn reduced_motion_keeps_the_unknown_progress_still() {
 
 #[test]
 fn install_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
-    for (width, height) in [(40, 30), (60, 30), (100, 30)] {
-        let (_root, mut h) = installing();
-        h.resize(width, height).set_glyph_mode(GlyphMode::Ascii);
-        h.send(Msg::ShowDetail(index("tools")));
-        let mut screens = vec![h.screen()];
-        h.send(install(InstallMsg::Line(index("tools"), "   Compiling serde v1.0.219".to_owned())));
-        h.send(install(InstallMsg::ToggleDetails));
-        screens.push(h.screen());
-        h.send(install(InstallMsg::AskStop));
-        screens.push(h.screen());
-        h.send(install(InstallMsg::KeepRunning)).send(install(InstallMsg::Finished {
-            index: index("tools"),
-            outcome: Outcome::Failed(Failure::NoLinker),
-            problems: vec![Problem::NoLinker(crate::checks::Distro::Other)],
-        }));
-        h.send(Msg::ShowDetail(index("tools")));
-        screens.push(h.screen());
-        let (_other, mut dialog) = harness(width, height);
-        dialog.set_glyph_mode(GlyphMode::Ascii).send(install(InstallMsg::Ask(index("tools"))));
-        screens.push(dialog.screen());
-        for screen in screens {
-            for forbidden in ['[', ']', '{', '}', '|', '▌'] {
-                assert!(!screen.contains(forbidden), "`{forbidden}` at {width}x{height}:\n{screen}");
+    for (width, height) in [(40, 30), (48, 30), (60, 30), (100, 30)] {
+        for locale in LONGEST_LANGUAGES {
+            let (_root, mut h) = installing();
+            h.resize(width, height).set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
+            h.send(Msg::ShowDetail(index("tools")));
+            let mut screens = vec![h.screen()];
+            h.send(install(InstallMsg::Line(index("tools"), "   Compiling serde v1.0.219".to_owned())));
+            h.send(install(InstallMsg::ToggleDetails));
+            screens.push(h.screen());
+            h.send(install(InstallMsg::AskStop));
+            screens.push(h.screen());
+            h.send(install(InstallMsg::KeepRunning)).send(install(InstallMsg::Finished {
+                index: index("tools"),
+                outcome: Outcome::Failed(Failure::NoLinker),
+                problems: vec![Problem::NoLinker(crate::checks::Distro::Other)],
+            }));
+            h.send(Msg::ShowDetail(index("tools")));
+            screens.push(h.screen());
+            let (_other, mut dialog) = harness(width, height);
+            dialog.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
+            dialog.send(install(InstallMsg::Ask(index("tools"))));
+            screens.push(dialog.screen());
+            for screen in screens {
+                for forbidden in ['[', ']', '{', '}', '|', '▌'] {
+                    assert!(!screen.contains(forbidden), "`{forbidden}` in {locale} at {width}x{height}:\n{screen}");
+                }
+                assert!(!screen.contains('⟦'), "a key is missing in {locale}:\n{screen}");
             }
-            assert!(!screen.contains('⟦'), "a key is missing:\n{screen}");
+        }
+    }
+}
+
+/// qcode being removed, with the task made but never run, as [`installing`] does for an install.
+fn removing() -> (TempDir, Harness<Quvyta>) {
+    let root = tempfile::tempdir().expect("temp");
+    let mut app = app_in(root.path());
+    let at = index("code");
+    let _ = app.update(install(InstallMsg::AskRemove(at)));
+    let _ = app.update(install(InstallMsg::ConfirmRemove));
+    app.selected = at;
+    let h = run(app, 100, 30);
+    (root, h)
+}
+
+/// What `key` says in `locale`, read from the language files themselves: a sweep over nine
+/// languages cannot keep a copy of their words by hand without the copy going stale.
+fn says(locale: &str, key: &str, command: &str) -> String {
+    let mut i18n = qframe::i18n::I18n::builtin();
+    for (file, text) in crate::LOCALES {
+        assert!(i18n.add_source(file, text), "`{file}` is readable");
+    }
+    assert!(i18n.set_active(locale), "`{locale}` is a language quvyta speaks");
+    i18n.translate(key, &[("command", qframe::i18n::Arg::from(command))])
+}
+
+/// The same text without any spacing, so a label that wrapped over two lines still reads as
+/// one: what matters is that every character of it reached the screen.
+fn squeezed(text: &str) -> String {
+    text.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+/// The screen rows of the details alone. On a wide screen the list shares the row and what the
+/// list cuts belongs to the list's own sweep.
+fn detail_rows(h: &Harness<Quvyta>, screen: &str, slack: u16) -> Vec<String> {
+    // A few cells short of the list's column, since the panel's own margin lives inside it:
+    // taking a little of the list with the details costs nothing, because the list says an
+    // install is running in words of its own, never in the title looked for here.
+    let skip = if h.app().wide() { usize::from(h.app().list_column().saturating_sub(slack)) } else { 0 };
+    screen
+        .lines()
+        .map(|line| {
+            let mut cells = 0;
+            line.chars()
+                .filter(|ch| {
+                    cells += usize::from(qframe::text::width(&ch.to_string()));
+                    // A character straddling the edge belongs to the details: what is asked of
+                    // them here is that their words are whole, so a spare cell costs nothing.
+                    cells > skip
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Every one of `labels` is on the screen whole, and when `whole_lines`, nothing of the
+/// details is cut either. A failure is read for its labels alone: it quotes cargo, whose lines
+/// stay as cargo wrote them, and the advice about a missing linker is the install dialog's own
+/// text, shown here as well.
+fn reads_fully(h: &Harness<Quvyta>, scene: &str, locale: &str, width: u16, labels: &[String], whole_lines: bool) {
+    let screen = h.screen();
+    let where_ = format!("{scene} in `{locale}` at {width} columns");
+    // A copyable value shortens itself on purpose; the whole of it is what the click copies.
+    let copy = says(locale, "quvyta.copy-value.copy", "");
+    // The details' own column exactly: what the list cuts is the list's business.
+    if whole_lines {
+        for row in detail_rows(h, &screen, 0).iter().filter(|row| !row.trim_end().ends_with(&copy)) {
+            assert!(!row.contains('…'), "{where_} is cut:\n{screen}");
+        }
+    }
+    // A handful of the list's last cells allowed in, so a word of the details starting on the
+    // edge is never lost: far too few to reach a member's name, which is what the list would
+    // otherwise lend to a title looked for here.
+    let flat = squeezed(&detail_rows(h, &screen, 8).concat());
+    for label in labels {
+        assert!(flat.contains(&squeezed(label)), "`{label}` is not whole, {where_}:\n{screen}");
+    }
+}
+
+/// The narrowest screen on which the details sit beside the list in `locale`: the split is at
+/// its tightest there, so that is where a row of buttons is likeliest to lose its end. The
+/// screen answers it, since a member's page shows the rest of the family only beside it.
+fn splits_at(locale: &str) -> u16 {
+    let (_root, mut h) = harness(40, 30);
+    h.set_locale(locale).send(Msg::ShowDetail(index("tools")));
+    (40..=120)
+        .find(|width| {
+            h.resize(*width, 30);
+            h.screen().contains("qfocus")
+        })
+        .expect("the details sit beside the list on some screen")
+}
+
+#[test]
+fn the_install_details_read_fully_in_every_language_at_every_width() {
+    let (tools, packages, code) = (index("tools"), index("packages"), index("code"));
+    for locale in LANGUAGES {
+        let (_running, mut running) = installing();
+        running.set_locale(locale).send(Msg::ShowDetail(tools));
+        // A short crate name: what that line names is cargo's own word, not quvyta's.
+        running.send(install(InstallMsg::Line(tools, "   Compiling ratatui v0.29.0".to_owned())));
+        // With a count beside the phase too: the phase is the word the person needs, so it is
+        // the count that gives way when the line does not fit.
+        running.send(install(InstallMsg::Line(tools, "    Building [=>  ] 142/231: ratatui".to_owned())));
+
+        let (_removal, mut removal) = removing();
+        removal.set_locale(locale);
+
+        // The longest row of them all: four buttons under a failure.
+        let (_failure, mut failure) = failed("error: linker `cc` not found\n");
+        failure.set_locale(locale);
+
+        for width in [40, 48, 56, 60, splits_at(locale), 100] {
+            running.resize(width, 40).send(Msg::ShowDetail(tools));
+            let labels = [says(locale, "install.installing", "qtools"), says(locale, "install.phase.compiling", "")];
+            reads_fully(&running, "an install under way", locale, width, &labels, true);
+
+            running.send(Msg::ShowDetail(packages));
+            let labels = [says(locale, "install.queued-title", "qpac"), says(locale, "install.dequeue", "")];
+            reads_fully(&running, "a queued install", locale, width, &labels, true);
+            running.send(Msg::ShowDetail(tools));
+
+            removal.resize(width, 40).send(Msg::ShowDetail(code));
+            let removed = [says(locale, "remove.removing", "qcode")];
+            reads_fully(&removal, "a removal", locale, width, &removed, true);
+
+            // Tall enough that the buttons under a long failure are on the screen at all.
+            failure.resize(width, 70).send(Msg::ShowDetail(tools));
+            let labels = [
+                says(locale, "install.failed", "qtools"),
+                says(locale, "install.details", ""),
+                says(locale, "install.copy-log", ""),
+                says(locale, "install.close", ""),
+                says(locale, "install.retry", ""),
+            ];
+            reads_fully(&failure, "a failed install", locale, width, &labels, false);
         }
     }
 }

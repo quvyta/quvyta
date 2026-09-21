@@ -1,0 +1,265 @@
+# Simplified Chinese: checked against en.toml; Chinese has a single plural form.
+
+[meta]
+name = "简体中文"
+code = "zh-Hans"
+fallback = "en"
+
+[header]
+tagline = "用心打造的终端应用"
+
+[status]
+released = "已发布"
+beta = "测试版"
+soon = "即将推出"
+
+[row]
+missing = "未安装"
+soon = "即将推出"
+unknown = "版本未知"
+this = "{version}  本应用"
+this-short = "本应用"
+installing = "正在安装"
+installing-share = "正在安装 {percent}%"
+queued = "排队中"
+failed = "安装失败"
+update = "{version}  新版 {latest}"
+removing = "正在卸载"
+not-removed = "未卸载"
+
+[detail]
+open = "打开"
+package = "软件包"
+command = "命令"
+source = "来源"
+add = "添加到项目"
+install = "安装"
+update = "更新"
+remove = "卸载"
+new = "新版 {version}"
+installed = "已安装"
+running = "运行中"
+where = "{version}，{path}"
+unknown = "版本未知"
+elsewhere = "不是用 cargo 装的，所以由装它的那一方负责更新。"
+beta = "测试版：可以用，但界面和文件在版本之间还可能改动。"
+soon = "尚未发布：在它出来之前没有可装的东西。"
+
+[nav]
+back = "返回"
+
+[hints]
+open = "打开"
+choose = "选择"
+details = "详情"
+back = "返回"
+install = "安装"
+update = "更新"
+refresh = "检查更新"
+apps = "应用"
+
+[family.code]
+title = "Quvyta Code"
+summary = "在 Podman 或 Docker 容器里运行编程助手。配置一次，就能在任何项目里打开它，在各个助手和 shell 之间像切换标签页一样来回走。"
+
+[family.focus]
+title = "Quvyta Focus"
+summary = "终端里的专注记录。为手头的事开一个计时器，再用日、周、月、年的图看时间都花到哪儿去了。"
+
+[family.tools]
+title = "Quvyta Tools"
+summary = "把 Arch Linux 用户平时手动做的设置集中到一张清单里：镜像源、pacman、AUR 助手、防火墙、SSH 等等。每一项都会先说明它要改什么，留好备份，并且可以撤销。"
+
+[family.packages]
+title = "Quvyta Packages"
+summary = "为 Arch Linux 写的包管理器，在动手之前把要改的东西原原本本摆出来。第一个版本管理 pacman 的软件包；AUR、Flatpak 和 Snap 能认出来，但还不归它管。"
+
+[family.desk]
+title = "Quvyta Desktop"
+summary = "跑在终端里的桌面：窗口、程序坞、启动器和文件管理器，为通过 SSH 工作和小机器而做。在服务器上敲 qdesk，就能用鼠标把程序并排打开，一个快捷键也不用记。"
+
+[family.framework]
+title = "Quvyta Framework"
+summary = "框架的展示厅：这一家子的所有组件、主题、图标集和语言，都能现场试。"
+library = "框架本身是一个 Rust 库：运行时、组件，以及每个 Quvyta 应用所依托的主题、图标和语言文件。谁都可以用它写自己的终端应用。"
+
+[family.quvyta]
+title = "Quvyta"
+summary = "就是这个应用：列出这一家子，安装它们、打开它们、保持更新，也可以卸载。"
+
+[open]
+notice = "正在打开 {command}…"
+exited = "{command} 以代码 {code} 结束"
+signal = "{command} 被信号中止"
+failed = "{command} 打不开"
+
+[launcher]
+problems = "launcher.conf 有一部分被略过"
+
+[confirm]
+title = "安装 {command} 吗？"
+source = "来源"
+version = "版本"
+target = "目标"
+command = "命令"
+crates-io = "crates.io，{package}"
+latest = "crates.io 上最新的版本"
+built-here = "它在本机编译，可能要花上几分钟。"
+no-sudo = "不需要 sudo；只往 {folder} 里写。"
+cancel = "取消"
+install = "安装"
+update-title = "把 {command} 从 {from} 更新到 {to} 吗？"
+update = "更新"
+
+[checks]
+no-cargo = "Rust 的包工具 cargo 没有安装，而这一家子都是用它编译的。"
+rustup = "用官方安装器 rustup 安装 Rust"
+rustup-site = "rustup 自己的页面，上面有其他安装方式"
+install-here = "在这里安装"
+rustup-here = "它在这个终端里运行；rustup 会问它自己的问题，不需要 sudo。"
+old-rust = "本机的 Rust 是 {version}；这一家子需要 {needed} 或更新的版本。"
+rustup-update = "rustup 可以用 rustup update stable 把它更新上来。"
+update-rust = "更新 Rust"
+update-rust-yourself = "用当初安装 Rust 的那个工具更新它，然后再检查一次。"
+updating-rust = "正在用 rustup 更新 Rust…"
+rustup-failed = "rustup 没能更新 Rust"
+no-linker = "Rust 编译程序需要一个 C 链接器，但一个也没找到：cc、gcc 或 clang。"
+linker-on = "在 {distro} 上安装一个"
+sudo-here = "它在这个终端里运行。sudo 会在那里询问你的密码；密码交给 sudo，quvyta 看不到。"
+run-yourself = "请自己执行适合你系统的命令，然后再检查一次。"
+running = "正在运行 {command}"
+fix-failed = "命令没有成功完成"
+again = "再检查一次"
+
+[install]
+installing = "正在安装 {command}"
+stop = "停止"
+details = "详情"
+queued-title = "{command} 在排队"
+queued-after = "等 {command} 装完就开始。"
+queued = "马上就开始。"
+waiting-other-window = "正在等另一个 quvyta 窗口装完。"
+dequeue = "移出队列"
+other-window = "另一个 quvyta 窗口正在安装；这个窗口会等它装完。"
+stopped = "已停止，什么也没装上。"
+failed = "{command} 装不上"
+not-started = "cargo 启动不了：{reason}"
+nothing-changed = "什么也没装上；本机没有任何改动。"
+last-lines = "最后几行"
+log-file = "完整日志在 {path}"
+copy-log = "复制日志"
+close = "关闭"
+retry = "重试"
+done = "{command} {version} 已安装"
+next-time = "新版本下次打开时生效。"
+done-unknown = "{command} 已安装"
+
+[install.phase]
+starting = "正在开始"
+downloading = "正在下载"
+compiling = "正在编译"
+placing = "正在安装"
+
+[install.failure]
+linker = "本机没有 C 链接器，没有它就编译不了 Rust 程序。"
+rust = "它需要比本机更新的 Rust。"
+network = "连不上 crates.io。请检查网络后重试。"
+disk = "磁盘满了。编译需要几 GB 空闲空间；腾出空间后重试。"
+not-found = "crates.io 上没有 {package} 的这个版本。"
+build = "编译失败。"
+
+[stop]
+title = "停止安装 {command} 吗？"
+message = "什么也不会装上，本机也不会有改动；以后还可以再装。"
+queued = "排队中的也一起停下"
+keep = "继续安装"
+confirm = "停止"
+
+[quit]
+title = "安装正在进行"
+message = "退出会把它停下；什么也不会装上，本机也不会有改动。"
+confirm = "退出"
+
+[remove]
+title = "卸载 {command} 吗？"
+message = "程序 {program} 会被删掉，cargo 里关于它的记录也一并删掉。"
+settings-kept = "它在 {folder} 里的设置会留着，再装回来时还在。"
+settings-kept-anywhere = "它的设置会留着，再装回来时还在。"
+confirm = "卸载"
+removing = "正在卸载 {command}"
+done = "{command} 已卸载"
+failed = "{command} 卸载不了"
+failed-reason = "cargo 没能卸载它；最后几行写着原因。"
+
+[updates]
+count = { other = "{n} 个更新" }
+install-all = "安装更新"
+checking = "正在检查更新…"
+failed = "检查更新失败"
+
+[path]
+title = "{folder} 不在 PATH 里"
+why = "要在终端里敲 {command} 就能打开它，得把这一行加进你 shell 的启动文件。从 quvyta 里打开不受影响。"
+why-any = "要在终端里敲名字就能打开 cargo 装的那些程序，得把这一行加进你 shell 的启动文件。从 quvyta 里打开不受影响。"
+unknown = "要在终端里敲 {command} 就能打开它，请把这一行加进你 shell 的启动文件。从 quvyta 里打开不受影响。"
+unknown-any = "要在终端里敲名字就能打开 cargo 装的那些程序，请把这一行加进你 shell 的启动文件。从 quvyta 里打开不受影响。"
+file = "文件"
+line = "行"
+not-now = "暂不"
+add = "添加"
+added = "已添加。从现在起新开的终端里，敲 {command} 就能打开它。"
+added-any = "已添加。从现在起新开的终端里，敲名字就能打开 cargo 装的那些程序。"
+open-terminals = "已经开着的终端不受影响。"
+ready = "从现在起新开的终端里，敲 {command} 就能打开它。"
+ready-any = "从现在起新开的终端里，敲名字就能打开 cargo 装的那些程序。"
+failed = "这一行加不进去。你可以自己加：点一下这一行就复制了。"
+not-remembered = "launcher.conf 没能记住这个回答"
+
+[cli]
+about = "安装、打开并更新 Quvyta 这一家子的终端应用。"
+usage = "用法"
+name = "名字"
+list = "打开家族列表"
+install = "逐个询问是否安装这些成员"
+show = "直接打开这个成员的页面"
+help = "显示这份帮助"
+version = "显示版本"
+names = "名字可以是成员的简称（code）、命令（qcode）或软件包名（quvyta-code）。"
+unknown-option = "没有 {option} 这个选项"
+unknown-name = "这一家子里没有叫 {name} 的成员"
+unknown-command = "quvyta 不做 {command} 这件事"
+no-names = "install 至少要一个名字，比如 qcode"
+show-no-name = "show 要一个名字，比如 qfocus"
+show-many = "show 只收一个名字"
+unreleased = "{command} 还没发布，所以装不了"
+hint = "运行 quvyta --help 看看它收什么。"
+already-installed = "已经装了：{commands}"
+
+[tabs]
+apps = "应用"
+settings = "设置"
+
+[settings]
+title = "quvyta"
+check-updates = "启动时检查更新"
+after-close = "应用关闭后"
+after-close-return = "回到 quvyta"
+after-close-shell = "退出到 shell"
+path = "{folder} 在 PATH 里"
+path-yes = "在"
+path-new-terminals = "新开的终端里在"
+path-no = "不在"
+path-add = "添加"
+not-saved = "设置没能保存"
+
+[wizard]
+step-apps = "应用"
+apps-intro = "你想要哪几个？quvyta 在安装任何东西之前都会先问。"
+line-code = "在 Podman 或 Docker 容器里运行编程助手。"
+line-focus = "记下你在专注什么，时间都花到哪儿去了。"
+line-tools = "Arch Linux 的设置集中一张清单，每一项都能撤销。"
+line-packages = "先把每一处改动摆出来的包管理器。"
+line-desk = "终端里的桌面：窗口和文件管理器。"
+line-framework = "它们共同依托的那个框架的展示厅。"
+arch-only = "{line}  仅限 Arch Linux。"
+soon = "{line}  还没出。"

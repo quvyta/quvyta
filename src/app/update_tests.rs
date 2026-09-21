@@ -9,7 +9,7 @@ use tempfile::TempDir;
 
 use super::install_tests::{DIALOG_IN, calls, click_beside, has, run, settle};
 use super::installs::Action;
-use super::tests::{LIST, TOAST_IN, harness_with_settings, index, line_with, machine};
+use super::tests::{LANGUAGES, LIST, TOAST_IN, harness_with_settings, index, line_with, machine};
 use super::*;
 use crate::install::tests::packages;
 use crate::inventory::tests::installed_command;
@@ -340,8 +340,8 @@ fn turkish_update_screens_read_naturally() {
 
 #[test]
 fn update_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
-    for (width, height) in [(40, 30), (60, 30), (100, 30)] {
-        for locale in ["en", "tr"] {
+    for (width, height) in [(40, 30), (48, 30), (60, 30), (100, 30)] {
+        for locale in LANGUAGES {
             let root = tempfile::tempdir().expect("temp");
             let mut h = start_with(root.path(), &search(), 0, width, height);
             h.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
