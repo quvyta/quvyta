@@ -5,11 +5,12 @@
 use std::path::Path;
 
 use qframe::icons::GlyphMode;
+use qframe::storage::Family;
 use tempfile::TempDir;
 
 use super::install_tests::{DIALOG_IN, calls, click_beside, has, run, settle};
 use super::installs::Action;
-use super::tests::{LANGUAGES, LIST, TOAST_IN, harness_with_settings, index, line_with, machine};
+use super::tests::{LANGUAGES, LIST, TOAST_IN, index, line_with, machine};
 use super::*;
 use crate::install::tests::packages;
 use crate::inventory::tests::installed_command;
@@ -119,10 +120,10 @@ fn a_failed_check_says_so_faintly_and_keeps_the_last_answer() {
     let (qx, qy) = h.find("qtools").expect("a row");
     assert_ne!(faint, h.fg(u16::try_from(qx).expect("x"), u16::try_from(qy).expect("y")), "faint, not like a row");
 
-    // An answer from yesterday stands in when crates.io cannot be reached.
+    // An answer from two days ago stands in when crates.io cannot be reached.
     let root = tempfile::tempdir().expect("temp");
-    let yesterday = crate::updates::Latest::from_search(&search(), crate::updates::now() - 24 * 60 * 60);
-    yesterday.write(&root.path().join("data/latest.toml")).expect("kept");
+    let stale = crate::updates::Latest::from_search(&search(), crate::updates::now() - 2 * 24 * 60 * 60);
+    stale.write(&root.path().join("data/latest.toml")).expect("kept");
     let h = start_with(root.path(), "", 101, 100, 30);
     let screen = h.screen();
     assert!(screen.contains("Could not check for updates"), "{screen}");
@@ -135,7 +136,7 @@ fn a_fresh_answer_is_not_asked_again_at_start() {
     let fresh = crate::updates::Latest::from_search(&search(), crate::updates::now());
     fresh.write(&root.path().join("data/latest.toml")).expect("kept");
     let h = start_with(root.path(), "", 101, 100, 30);
-    assert_eq!(searches(root.path()), 0, "younger than six hours");
+    assert_eq!(searches(root.path()), 0, "younger than a day");
     assert!(row(&h.screen(), "qcode").contains("new 0.1.2"), "{}", h.screen());
     assert!(!has(&h, "Could not check"), "{}", h.screen());
 }
@@ -159,17 +160,56 @@ fn r_and_a_click_on_the_count_ask_again_at_once() {
     assert!(row(&screen, "qcode").contains("new 0.1.2"), "the answer before stands:\n{screen}");
 }
 
+/// quvyta on a machine whose family folder holds `shared` as the shared file and `own` as
+/// `launcher.conf`, crates.io answering as [`search`] does.
+fn start_with_files(root: &Path, shared: &str, own: &str) -> Harness<Quvyta> {
+    std::fs::create_dir_all(root.join("config")).expect("folder");
+    std::fs::write(root.join("config/quvyta.conf"), shared).expect("shared file");
+    std::fs::write(root.join("config/launcher.conf"), own).expect("launcher.conf");
+    start_with(root, &search(), 0, 100, 44)
+}
+
 #[test]
-fn with_check_updates_off_nothing_is_asked_until_r() {
-    let (root, mut h) = harness_with_settings("check_updates = false\n");
-    search_scenario(root.path(), &search(), 0);
-    settle(&mut h);
+fn with_the_family_s_update_notice_off_nothing_is_asked_until_r() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = start_with_files(root.path(), "update-notice = false\n", "after_close = \"return\"\n");
     assert_eq!(searches(root.path()), 0, "not at start");
     assert!(!has(&h, "new 0.1.2"), "{}", h.screen());
     h.press("r");
     settle(&mut h);
     assert_eq!(searches(root.path()), 1, "r is someone asking");
     assert!(row(&h.screen(), "qcode").contains("new 0.1.2"), "{}", h.screen());
+}
+
+#[test]
+fn the_switch_on_the_settings_tab_decides_whether_the_next_start_asks() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = start_with_files(root.path(), "update-notice = false\n", "after_close = \"return\"\n");
+    h.click_text("Settings").render();
+    h.click_text("Say when an update is out");
+    h.press("space").render();
+    let shared = std::fs::read_to_string(root.path().join("config/quvyta.conf")).expect("the family's file");
+    assert!(shared.contains("update-notice = true"), "turned on for the family:\n{shared}\n{}", h.screen());
+    let asked = searches(root.path());
+
+    let mut again = start_with(root.path(), &search(), 0, 100, 44);
+    assert_eq!(searches(root.path()), asked + 1, "the next start asks");
+    again.click_text("Settings").render();
+    again.click_text("Say when an update is out");
+    again.press("space").render();
+    assert!(!Family::QUVYTA.update_notice_in(&root.path().join("config")), "and off again:\n{}", again.screen());
+    let _quiet = start_with(root.path(), &search(), 0, 100, 44);
+    assert_eq!(searches(root.path()), asked + 1, "a start with it off asks nothing");
+}
+
+#[test]
+fn quvyta_s_old_switch_turned_off_keeps_the_start_quiet_and_moves_to_the_family() {
+    let root = tempfile::tempdir().expect("temp");
+    let h = start_with_files(root.path(), "", "after_close = \"return\"\ncheck_updates = false\n");
+    assert_eq!(searches(root.path()), 0, "turned off before 0.2.9, still off:\n{}", h.screen());
+    assert!(!Family::QUVYTA.update_notice_in(&root.path().join("config")), "now the family's switch says it");
+    let own = std::fs::read_to_string(root.path().join("config/launcher.conf")).expect("launcher.conf");
+    assert_eq!(own, "after_close = \"return\"\n", "the old line is gone, the rest stays");
 }
 
 #[test]

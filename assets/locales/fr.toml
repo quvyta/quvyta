@@ -241,7 +241,6 @@ settings = "Réglages"
 
 [settings]
 title = "quvyta"
-check-updates = "Chercher les mises à jour au démarrage"
 after-close = "Quand une appli se ferme"
 after-close-return = "revenir à quvyta"
 after-close-shell = "quitter vers le shell"
@@ -251,6 +250,15 @@ path-new-terminals = "dans les nouveaux terminaux"
 path-no = "non"
 path-add = "Ajouter"
 not-saved = "Le réglage n’a pas pu être enregistré"
+follow-title = "Les applications suivent-elles les réglages partagés"
+follow-shared = "partagé"
+follow-not-opened = "pas encore ouverte"
+follow-unreadable = "illisible"
+follow-all-shared = "tout partagé"
+follow-own = "{key} : {value}"
+follow-none = "Aucune autre application Quvyta n’est installée."
+follow-next-start = "Les applications ouvertes verront le changement au prochain démarrage."
+follow-unreadable-told = "Impossible de lire les réglages d’une application"
 
 [wizard]
 step-apps = "Applications"

@@ -241,7 +241,6 @@ settings = "Настройки"
 
 [settings]
 title = "quvyta"
-check-updates = "Проверять обновления при запуске"
 after-close = "Когда программа закрывается"
 after-close-return = "вернуться в quvyta"
 after-close-shell = "выйти в оболочку"
@@ -251,6 +250,15 @@ path-new-terminals = "в новых терминалах"
 path-no = "нет"
 path-add = "Добавить"
 not-saved = "Настройку не удалось сохранить"
+follow-title = "Следуют ли приложения общим настройкам?"
+follow-shared = "общие"
+follow-not-opened = "ещё не открывались"
+follow-unreadable = "не читается"
+follow-all-shared = "все общие"
+follow-own = "{key}: {value}"
+follow-none = "Другие приложения Quvyta не установлены."
+follow-next-start = "Запущенные приложения увидят изменения при следующем запуске."
+follow-unreadable-told = "Не удалось прочитать настройки приложения"
 
 [wizard]
 step-apps = "Приложения"

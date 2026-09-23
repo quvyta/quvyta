@@ -7,9 +7,11 @@
 //! # Whether quvyta offers to put cargo's folder on PATH: "ask", or "dismissed" once the user
 //! # said not now.
 //! path_prompt = "ask"
-//! # Whether quvyta asks crates.io for newer versions when it starts. `r` asks at any time.
-//! check_updates = true
 //! ```
+//!
+//! Whether quvyta asks crates.io for newer versions when it starts is not kept here: it is the
+//! family's update notice, one switch in the shared file for every Quvyta application. An older
+//! `check_updates` line is handed over to it once, by [`hand_over_check_updates`].
 //!
 //! The appearance of quvyta itself is not read here: `language`, `theme` and `icons` are the
 //! family's shared keys, resolved for every member alike by the framework, and the Settings tab
@@ -26,7 +28,8 @@ use qframe::storage::{Family, Schema, Setting, Settings};
 const AFTER_CLOSE: &str = "after_close";
 /// The key saying whether quvyta offers to put cargo's folder on `PATH`.
 const PATH_PROMPT: &str = "path_prompt";
-/// The key saying whether quvyta looks for updates when it starts.
+/// The key that said whether quvyta looked for updates when it started, before the family had
+/// one switch for that; still known, so a file holding it is not a broken file.
 const CHECK_UPDATES: &str = "check_updates";
 
 /// What happens when a member opened from quvyta closes.
@@ -50,27 +53,14 @@ pub enum PathPrompt {
 }
 
 /// The settings of `launcher.conf`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Launcher {
     /// What happens when a member closes.
     pub after_close: AfterClose,
     /// Whether the PATH offer is made.
     pub path_prompt: PathPrompt,
-    /// Whether crates.io is asked for newer versions at start.
-    pub check_updates: bool,
     /// What was wrong in the file, with the line and column; the defaults stand in for it.
     pub diagnostics: Vec<Diagnostic>,
-}
-
-impl Default for Launcher {
-    fn default() -> Self {
-        Self {
-            after_close: AfterClose::default(),
-            path_prompt: PathPrompt::default(),
-            check_updates: true,
-            diagnostics: Vec::new(),
-        }
-    }
 }
 
 impl Launcher {
@@ -89,8 +79,7 @@ impl Launcher {
             Some("dismissed") => PathPrompt::Dismissed,
             _ => PathPrompt::Ask,
         };
-        let check_updates = settings.get::<bool>(CHECK_UPDATES).unwrap_or(true);
-        Self { after_close, path_prompt, check_updates, diagnostics: settings.diagnostics().to_vec() }
+        Self { after_close, path_prompt, diagnostics: settings.diagnostics().to_vec() }
     }
 
     /// Writes `path_prompt = "dismissed"` to `path`, keeping every other setting as the file has
@@ -104,16 +93,6 @@ impl Launcher {
         write(path, PATH_PROMPT, "dismissed".to_owned())
     }
 
-    /// Writes `check_updates` to `path` the way [`Launcher::dismiss_path_prompt`] writes its
-    /// key: every other setting stays as the file has it now.
-    ///
-    /// # Errors
-    ///
-    /// Returns the I/O error when the file or its folder cannot be written.
-    pub fn save_check_updates(path: &Path, on: bool) -> io::Result<()> {
-        write(path, CHECK_UPDATES, on)
-    }
-
     /// Puts quvyta's own defaults into `settings`, for the first start: the setup wizard has just
     /// made `launcher.conf` with the family's shared keys, and these are the keys that are
     /// quvyta's own. `path_prompt` is left out: not having answered is its default, and the offer
@@ -121,7 +100,6 @@ impl Launcher {
     pub(crate) fn write_defaults(settings: &mut Settings) {
         let defaults = Self::default();
         settings.set(AFTER_CLOSE, after_close_value(defaults.after_close).to_owned());
-        settings.set(CHECK_UPDATES, defaults.check_updates);
     }
 
     /// Writes `after_close` to `path`, keeping every other setting as the file has it now.
@@ -163,6 +141,35 @@ pub(crate) fn open(path: Option<&Path>) -> Settings {
         None => Settings::in_memory(),
     };
     settings.member_of(&Family::QUVYTA).schema(schema())
+}
+
+/// Hands a `check_updates` line of `launcher.conf` at `path` over to the family's update notice
+/// in `family_folder`, and takes the line out.
+///
+/// Until 0.2.9 quvyta had a switch of its own for asking crates.io at start; now every Quvyta
+/// application reads the family's one switch. Someone who turned quvyta's off asked for no
+/// question at start, so `false` turns the family's off too: the quieter choice is kept, and it
+/// can be turned back on in any member's settings. `true` was the default and says nothing, so
+/// the family's switch is left as it is. A broken file is left alone, as quvyta never rewrites a
+/// file it could not read whole; so is a file without the line.
+///
+/// # Errors
+///
+/// Returns the I/O error when either file cannot be written; the line then stays for the next
+/// start to try again.
+pub(crate) fn hand_over_check_updates(path: &Path, family_folder: &Path) -> io::Result<()> {
+    if !path.is_file() {
+        return Ok(());
+    }
+    let mut settings = Settings::open(path).member_of(&Family::QUVYTA).schema(schema());
+    if !settings.diagnostics().is_empty() || !settings.keys().any(|key| key == CHECK_UPDATES) {
+        return Ok(());
+    }
+    if settings.get::<bool>(CHECK_UPDATES) == Some(false) {
+        Family::QUVYTA.set_update_notice_in(family_folder, false)?;
+    }
+    settings.remove(CHECK_UPDATES);
+    settings.save()
 }
 
 /// Sets `key` in the file at `path` and writes it back. The file is read again rather than taken
@@ -243,23 +250,52 @@ mod tests {
     }
 
     #[test]
-    fn updates_are_checked_unless_turned_off() {
-        assert!(Launcher::default().check_updates);
-        assert!(load("after_close = \"shell\"\n").check_updates);
-        let off = load("check_updates = false\n");
-        assert_eq!((off.check_updates, off.diagnostics.as_slice()), (false, &[][..]));
-        let broken = load("check_updates = \"no\"\n");
-        assert!(broken.check_updates, "a value that is not true or false falls back to checking");
-        assert!(broken.diagnostics[0].to_string().starts_with("launcher.conf:1:"), "{:?}", broken.diagnostics);
+    fn an_old_check_updates_line_is_still_a_known_setting() {
+        let old = load("check_updates = false\nafter_close = \"shell\"\n");
+        assert_eq!((old.after_close, old.diagnostics.as_slice()), (AfterClose::Shell, &[][..]));
+    }
+
+    /// A family folder of the test's own with `launcher.conf` holding `text`.
+    fn handed(text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let root = tempfile::tempdir().expect("temp");
+        let path = root.path().join("launcher.conf");
+        std::fs::write(&path, text).expect("settings");
+        (root, path)
     }
 
     #[test]
-    fn dismissing_keeps_updates_turned_off() {
-        let root = tempfile::tempdir().expect("temp");
-        let path = root.path().join("launcher.conf");
-        std::fs::write(&path, "check_updates = false\n").expect("settings");
-        Launcher::dismiss_path_prompt(&path).expect("saved");
-        assert!(!Launcher::load(Some(&path)).check_updates);
+    fn quvyta_s_old_switch_turned_off_turns_the_family_s_notice_off_and_goes() {
+        let (root, path) = handed("path_prompt = \"dismissed\"\ncheck_updates = false\nafter_close = \"shell\"\n");
+        assert!(Family::QUVYTA.update_notice_in(root.path()), "on until someone turns it off");
+        hand_over_check_updates(&path, root.path()).expect("handed over");
+        assert!(!Family::QUVYTA.update_notice_in(root.path()), "the quieter choice is kept");
+        let text = std::fs::read_to_string(&path).expect("written");
+        assert!(!text.contains("check_updates"), "{text}");
+        let launcher = Launcher::load(Some(&path));
+        assert_eq!((launcher.after_close, launcher.path_prompt), (AfterClose::Shell, PathPrompt::Dismissed));
+    }
+
+    #[test]
+    fn quvyta_s_old_switch_left_on_says_nothing_to_the_family_and_goes() {
+        let (root, path) = handed("check_updates = true\n");
+        Family::QUVYTA.set_update_notice_in(root.path(), false).expect("the family chose off elsewhere");
+        hand_over_check_updates(&path, root.path()).expect("handed over");
+        assert!(!Family::QUVYTA.update_notice_in(root.path()), "a default line does not turn it back on");
+        assert!(!std::fs::read_to_string(&path).expect("written").contains("check_updates"));
+    }
+
+    #[test]
+    fn a_file_without_the_line_or_a_broken_one_is_left_as_it_was() {
+        for text in ["after_close = \"shell\"\n# mine\n", "check_updates = false\nafter_close = \"exit\"\n"] {
+            let (root, path) = handed(text);
+            hand_over_check_updates(&path, root.path()).expect("nothing to do");
+            assert_eq!(std::fs::read_to_string(&path).expect("read"), text, "left byte for byte");
+            assert!(Family::QUVYTA.update_notice_in(root.path()));
+            assert!(!root.path().join("quvyta.conf").exists(), "the family's file is not touched");
+        }
+        let missing = tempfile::tempdir().expect("temp");
+        hand_over_check_updates(&missing.path().join("launcher.conf"), missing.path()).expect("no file");
+        assert!(!missing.path().join("launcher.conf").exists());
     }
 
     #[test]
@@ -267,20 +303,14 @@ mod tests {
         let root = tempfile::tempdir().expect("temp");
         let path = root.path().join("launcher.conf");
         std::fs::write(&path, "path_prompt = \"dismissed\"\nafter_close = \"shell\"\n").expect("settings");
-        Launcher::save_check_updates(&path, false).expect("saved");
-        let launcher = Launcher::load(Some(&path));
-        assert!(!launcher.check_updates);
-        assert_eq!((launcher.after_close, launcher.path_prompt), (AfterClose::Shell, PathPrompt::Dismissed));
-
         Launcher::save_after_close(&path, AfterClose::Return).expect("saved");
         let launcher = Launcher::load(Some(&path));
         assert_eq!(launcher.after_close, AfterClose::Return);
-        assert!(!launcher.check_updates, "the earlier change stays");
         assert_eq!((launcher.path_prompt, launcher.diagnostics.as_slice()), (PathPrompt::Dismissed, &[][..]));
 
         Launcher::save_after_close(&path, AfterClose::Shell).expect("saved");
         let text = std::fs::read_to_string(&path).expect("written");
-        assert!(text.contains("after_close = \"shell\"") && text.contains("check_updates = false"), "{text}");
+        assert!(text.contains("after_close = \"shell\"") && text.contains("path_prompt = \"dismissed\""), "{text}");
     }
 
     #[test]
@@ -289,7 +319,7 @@ mod tests {
         // A file where the settings folder should be: nothing can go inside it.
         std::fs::write(root.path().join("quvyta"), "").expect("file");
         let path = root.path().join("quvyta/launcher.conf");
-        assert!(Launcher::save_check_updates(&path, false).is_err());
+        assert!(Launcher::dismiss_path_prompt(&path).is_err());
         assert!(Launcher::save_after_close(&path, AfterClose::Shell).is_err());
     }
 

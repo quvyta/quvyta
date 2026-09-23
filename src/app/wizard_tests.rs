@@ -115,9 +115,8 @@ fn starting_with_the_defaults_writes_both_files_and_never_asks_again() {
     assert!(!h.app().setting_up(), "{}", h.screen());
     assert_eq!(folder(root.path()), ["launcher.conf", "quvyta.conf"]);
     let text = fs::read_to_string(root.path().join("config/launcher.conf")).expect("written");
-    for line in ["after_close = \"return\"", "check_updates = true"] {
-        assert!(text.contains(line), "`{line}` is missing:\n{text}");
-    }
+    assert!(text.contains("after_close = \"return\""), "{text}");
+    assert!(!text.contains("check_updates"), "the update notice is the family's, not quvyta's:\n{text}");
     assert!(h.screen().contains("qcode"), "the family has the screen:\n{}", h.screen());
     assert!(h.app().installs.dialog.is_none(), "nothing was asked to be installed");
     let again = start(root.path(), "ID=debian\n", 80, 30);

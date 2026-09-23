@@ -3,6 +3,7 @@
 
 mod confirm_install;
 mod detail;
+mod follow;
 mod install_view;
 mod installs;
 mod open;
@@ -23,6 +24,7 @@ use crate::family::{FAMILY, Member, Status};
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
 use crate::machine::{LAUNCHER, Machine};
+pub use follow::{Following, MemberFollowing};
 pub use installs::InstallMsg;
 use installs::Installs;
 use open::Opening;
@@ -83,6 +85,14 @@ pub struct Quvyta {
     asked: VecDeque<usize>,
     /// The tab shown.
     tab: Tab,
+    /// How each installed member follows the family's shared settings, in the family's order;
+    /// `None` until it has been read, which waits for what is installed.
+    following: Option<Vec<follow::MemberFollowing>>,
+    /// The row of the follow table the keys are on.
+    following_selected: Option<usize>,
+    /// The reasons members' files could not be read that were already told, so reading them again
+    /// does not tell them twice.
+    unreadable_told: Vec<String>,
     /// The first-run wizard, while quvyta has no settings file of its own; `None` once it is
     /// over, and from the start for someone who has quvyta's file already.
     setup: Option<Setup<Msg>>,
@@ -171,6 +181,11 @@ impl Quvyta {
     /// else what the machine asks for. [`Quvyta::preferences`] and [`Quvyta::settings`] hand it
     /// to the runtime, so quvyta opens the way the family looks.
     pub fn new(machine: Machine) -> Self {
+        // Before anything is read, so the family's switch already says what quvyta's old one did.
+        if let (Some(path), Some(folder)) = (machine.launcher_conf.as_deref(), machine.settings_dir.as_deref()) {
+            // A file that cannot be written keeps its line, and the next start tries again.
+            let _ = crate::launcher::hand_over_check_updates(path, folder);
+        }
         let settings = crate::launcher::open(machine.launcher_conf.as_deref());
         let i18n = crate::cli::i18n(|name| std::env::var(name).ok());
         let setup = setup(&machine, &i18n);
@@ -202,6 +217,9 @@ impl Quvyta {
             updates: Updates::default(),
             asked: VecDeque::new(),
             tab: Tab::default(),
+            following: None,
+            following_selected: None,
+            unreadable_told: Vec::new(),
         }
     }
 
@@ -370,8 +388,9 @@ impl App for Quvyta {
 
     fn init(&mut self) -> Command<Msg> {
         self.launcher = Launcher::from_settings(&self.settings);
-        // Turned off, nothing asks crates.io unasked; `r` still does, since that is asking.
-        let updates = if self.launcher.check_updates { self.check_updates(false) } else { Command::none() };
+        // The family's update notice: turned off in any member, nothing asks crates.io unasked;
+        // `r` still does, since that is someone asking.
+        let updates = if self.preferences().update_notice() { self.check_updates(false) } else { Command::none() };
         // On the first start the wizard has the screen, so the appearance rows take the keys.
         let first = if self.setting_up() { "setup-appearance" } else { "family" };
         Command::batch([
@@ -443,9 +462,12 @@ impl App for Quvyta {
             }
             Msg::Inventory(inventory) => {
                 let first = self.inventory.replace(inventory).is_none();
+                // What is installed decides which members the follow table lists.
+                let following = self.read_following();
                 if first {
-                    return Command::batch([self.check_path_at_start(), self.ask_next()]);
+                    return Command::batch([self.check_path_at_start(), self.ask_next(), following]);
                 }
+                return following;
             }
             // On a narrow list the details come first; the button is on their page.
             Msg::Primary if !self.wide() && !self.detail_page => return self.update(Msg::ShowDetail(self.selected)),
@@ -486,7 +508,13 @@ impl App for Quvyta {
             Msg::Path(msg) => return self.update_path(msg),
             Msg::Updates(msg) => return self.update_update(msg),
             // The header's keys and a click leave the keys on the tabs, where they were.
-            Msg::Tab(tab) => self.tab = tab,
+            Msg::Tab(tab) => {
+                self.tab = tab;
+                // A member opened since the last look may have written its file.
+                if tab == Tab::Settings {
+                    return self.read_following();
+                }
+            }
             Msg::Setting(msg) => return self.update_setting(msg),
             // The framework owns its step: it applies the change, writes the two files when the
             // wizard finishes, and answers with `Msg::SetUp`.

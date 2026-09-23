@@ -151,9 +151,9 @@ build fails, quvyta says why in a plain sentence, shows cargo's last lines and k
 log. If `~/.cargo/bin` is not on your PATH, it shows the line for your shell's start-up file and
 adds it if you agree.
 
-When quvyta starts it asks crates.io, through `cargo search`, for the newest versions, at most
-once every six hours. A member with a newer version says so in the list, and **Install updates**
-updates them all. Members installed some other way than cargo are left to whatever installed
+When quvyta starts it asks crates.io for the newest versions of the family, at most once a day
+(see [What quvyta sends over the network](#what-quvyta-sends-over-the-network)). A member with a
+newer version says so in the list, and **Install updates** updates them all. Members installed some other way than cargo are left to whatever installed
 them. quvyta can update itself; the new version runs the next time you start it.
 
 **Remove** deletes a member's program with `cargo uninstall`. Its settings stay where they are, so
@@ -167,15 +167,23 @@ in quvyta's settings file, `~/.config/quvyta/launcher.conf` on Linux:
 after_close = "shell"
 ```
 
-To stop quvyta from asking crates.io for updates when it starts (`r` still asks), turn it off on the Settings tab or add:
-
-```toml
-check_updates = false
-```
-
 quvyta learns what is installed from `cargo install --list`, cargo's own record. A member's command
 found elsewhere on your PATH counts as installed too, with an unknown version; quvyta only looks at
 the file and never runs a member to find out.
+
+## What quvyta sends over the network
+
+quvyta itself makes one kind of request: when it starts, at most once a day, it runs `cargo search quvyta`, which asks crates.io for the newest versions of the packages whose name starts with `quvyta`. Only that word goes into the question; nothing about you, your machine or what you have installed. The answer is kept in quvyta's data folder (`latest.toml`), so the other starts that day ask nothing. Without a network the question fails quietly and the last answer stands.
+
+This is the family's update notice, and it is on by default. One switch turns it off for every Quvyta application at once: **Say when an update is out** on the Settings tab, or this line in the family's shared file, `~/.config/quvyta/quvyta.conf` on Linux:
+
+```toml
+update-notice = false
+```
+
+With it off, quvyta asks nothing when it starts; pressing `r` still asks, since that is you asking. If you turned off quvyta's own `check_updates` in an earlier version, that choice is kept: the first start of this version turns the family's switch off and takes the old line out of `launcher.conf`.
+
+Everything else that reaches the network is a command you asked for and saw first: `cargo install`, which downloads a member from crates.io, and **Install here**, which runs the line shown in the question.
 
 ## Building from source
 

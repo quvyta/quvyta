@@ -33,6 +33,11 @@ pub struct Member {
     pub arch_only: bool,
     /// How settled it is.
     pub status: Status,
+    /// The id its settings file goes under in the family's folder, `<id>.conf`: the id the
+    /// member itself asks the framework for, which is not always its key. The showcase's file is
+    /// `showcase.conf` although the member is the framework, and quvyta's is `launcher.conf`,
+    /// since `quvyta.conf` is the file the whole family shares.
+    pub settings_id: &'static str,
 }
 
 impl Member {
@@ -60,6 +65,7 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/code",
         library: None,
         arch_only: false,
+        settings_id: "code",
         status: Status::Beta,
     },
     Member {
@@ -70,6 +76,7 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/focus",
         library: None,
         arch_only: false,
+        settings_id: "focus",
         status: Status::Beta,
     },
     Member {
@@ -80,6 +87,7 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/tools",
         library: None,
         arch_only: true,
+        settings_id: "tools",
         status: Status::Beta,
     },
     Member {
@@ -90,6 +98,7 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/packages",
         library: None,
         arch_only: true,
+        settings_id: "packages",
         status: Status::Beta,
     },
     Member {
@@ -102,6 +111,7 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/desktop",
         library: None,
         arch_only: false,
+        settings_id: "desk",
         status: Status::Soon,
     },
     Member {
@@ -112,6 +122,7 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/framework",
         library: Some("cargo add quvyta-framework"),
         arch_only: false,
+        settings_id: "showcase",
         status: Status::Released,
     },
     Member {
@@ -122,6 +133,23 @@ pub const FAMILY: [Member; 7] = [
         repository: "https://github.com/quvyta/quvyta",
         library: None,
         arch_only: false,
+        settings_id: "launcher",
         status: Status::Beta,
     },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::FAMILY;
+
+    #[test]
+    fn every_member_has_a_settings_file_of_its_own_and_quvyta_s_is_launcher_conf() {
+        let ids: Vec<&str> = FAMILY.iter().map(|member| member.settings_id).collect();
+        for (index, id) in ids.iter().enumerate() {
+            assert!(!ids[..index].contains(id), "`{id}` is the settings id of two members");
+            assert_ne!(*id, "quvyta", "`quvyta.conf` is the file the whole family shares");
+        }
+        let quvyta = FAMILY.iter().find(|member| member.is_self()).expect("quvyta is listed");
+        assert_eq!(quvyta.settings_id, crate::machine::LAUNCHER);
+    }
+}

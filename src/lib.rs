@@ -19,7 +19,7 @@ mod machine;
 mod shell_path;
 pub mod updates;
 
-pub use app::{Change, InstallMsg, Msg, PathMsg, Quvyta, SettingMsg, Tab, UpdateMsg};
+pub use app::{Change, Following, InstallMsg, MemberFollowing, Msg, PathMsg, Quvyta, SettingMsg, Tab, UpdateMsg};
 pub use cargo::Installed;
 pub use family::{FAMILY, Member, Status};
 pub use install::Outcome;

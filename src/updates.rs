@@ -2,8 +2,9 @@
 //!
 //! One `cargo search quvyta` brings the whole family at once, with no network library of our
 //! own: cargo already knows how to reach crates.io. The answer is kept in `latest.toml` in the
-//! data folder with the time it was asked, and asked again only after six hours, so starting
-//! quvyta does not wait on the network every time. A file that cannot be read is only a cache
+//! data folder with the time it was asked, and asked again only after a day, so starting
+//! quvyta does not wait on the network every time. Once a day is what the family's update notice
+//! promises for every Quvyta application; `r` asks at any time, since that is someone asking. A file that cannot be read is only a cache
 //! gone missing: it is ignored and asked again.
 
 use std::cmp::Ordering;
@@ -21,8 +22,9 @@ use crate::machine::Machine;
 
 /// The file in the data folder that keeps the last answer.
 const FILE: &str = "latest.toml";
-/// How long an answer is used before crates.io is asked again.
-pub(crate) const FRESH: Duration = Duration::from_secs(6 * 60 * 60);
+/// How long an answer is used before crates.io is asked again: a day, as the family's update
+/// notice says of every member.
+pub(crate) const FRESH: Duration = Duration::from_secs(24 * 60 * 60);
 /// The key of the time the answer came, in seconds since 1970.
 const CHECKED: &str = "checked";
 /// The table of the versions, by package.
@@ -116,7 +118,7 @@ pub fn now() -> u64 {
 /// What a check found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Check {
-    /// The newest versions: from crates.io, or kept from an answer younger than six hours.
+    /// The newest versions: from crates.io, or kept from an answer younger than a day.
     Known(Latest),
     /// crates.io could not be asked; the last answer, when there is one, still stands.
     Failed(Option<Latest>),
@@ -281,11 +283,12 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn an_answer_is_fresh_for_six_hours() {
+    fn an_answer_is_fresh_for_a_day() {
         let latest = Latest { checked: NOW, ..Latest::default() };
         assert!(latest.fresh(NOW));
-        assert!(latest.fresh(NOW + 6 * HOUR - 1));
-        assert!(!latest.fresh(NOW + 6 * HOUR));
+        assert!(latest.fresh(NOW + 7 * HOUR), "the family's notice asks once a day, not every few hours");
+        assert!(latest.fresh(NOW + 24 * HOUR - 1));
+        assert!(!latest.fresh(NOW + 24 * HOUR));
         assert!(!latest.fresh(NOW - 1), "an answer from the future is not trusted");
     }
 
@@ -336,8 +339,8 @@ pub(crate) mod tests {
         assert_eq!(searches(root.path()), 1);
         let Check::Known(again) = check(&machine, true, NOW + 5 * HOUR) else { panic!("asked") };
         assert_eq!((again.version("quvyta-tools"), searches(root.path())), (Some("0.1.3"), 2), "asked when told to");
-        let Check::Known(later) = check(&machine, false, NOW + 12 * HOUR) else { panic!("asked") };
-        assert_eq!((later.checked, searches(root.path())), (NOW + 12 * HOUR, 3), "stale: asked");
+        let Check::Known(later) = check(&machine, false, NOW + 30 * HOUR) else { panic!("asked") };
+        assert_eq!((later.checked, searches(root.path())), (NOW + 30 * HOUR, 3), "stale: asked");
     }
 
     #[test]
@@ -348,7 +351,7 @@ pub(crate) mod tests {
         assert_eq!(check(&machine, false, NOW), Check::Failed(None));
         let kept = Latest::from_search(SEARCH_OUT, NOW);
         kept.write(&cache_path(&machine).expect("data")).expect("written");
-        assert_eq!(check(&machine, false, NOW + 7 * HOUR), Check::Failed(Some(kept.clone())));
+        assert_eq!(check(&machine, false, NOW + 25 * HOUR), Check::Failed(Some(kept.clone())));
         assert_eq!(Latest::read(&cache_path(&machine).expect("data")), Some(kept), "a failure overwrites nothing");
     }
 

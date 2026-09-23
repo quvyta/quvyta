@@ -241,7 +241,6 @@ settings = "Ajustes"
 
 [settings]
 title = "quvyta"
-check-updates = "Ver se há novidades ao abrir"
 after-close = "Quando um app fecha"
 after-close-return = "voltar ao quvyta"
 after-close-shell = "sair para o shell"
@@ -251,6 +250,15 @@ path-new-terminals = "em terminais novos"
 path-no = "não"
 path-add = "Adicionar"
 not-saved = "Não deu para salvar o ajuste"
+follow-title = "Os aplicativos seguem os ajustes compartilhados"
+follow-shared = "compartilhado"
+follow-not-opened = "ainda não aberto"
+follow-unreadable = "ilegível"
+follow-all-shared = "tudo compartilhado"
+follow-own = "{key}: {value}"
+follow-none = "Nenhum outro aplicativo Quvyta está instalado."
+follow-next-start = "Os aplicativos abertos veem a mudança na próxima vez que iniciarem."
+follow-unreadable-told = "Não deu para ler os ajustes de um aplicativo"
 
 [wizard]
 step-apps = "Aplicativos"

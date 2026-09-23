@@ -11,11 +11,18 @@
 //! why, so the screen never shows a setting the next start would not have.
 
 use qframe::prelude::*;
+use qframe::storage::Shared;
 use qframe::widget::NodeMut;
-use qframe::widgets::{AppearanceChange, ScrollView, Select, SettingRow, SettingsList, Switch, Toast};
+use qframe::widgets::{
+    AppearanceChange, Column, ColumnWidth, ScrollView, Select, SettingRow, SettingsList, Table, TableCell, TableRow,
+    Toast,
+};
 
+use super::follow::{self, Following, MemberFollowing};
 use super::path_notice::PathReach;
 use super::{Msg, Quvyta};
+use crate::family::FAMILY;
+use crate::inventory::State;
 use crate::launcher::{AfterClose, Launcher};
 
 /// The widest the settings grow: beyond it the label and its control drift too far apart to be
@@ -30,8 +37,6 @@ const AFTER_CLOSE: [AfterClose; 2] = [AfterClose::Return, AfterClose::Shell];
 /// A setting and its new value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {
-    /// Whether crates.io is asked for newer versions at start.
-    CheckUpdates(bool),
     /// What happens when a member opened from quvyta closes.
     AfterClose(AfterClose),
 }
@@ -52,6 +57,10 @@ pub enum SettingMsg {
     AddToPath,
     /// A change on the appearance rows the whole family shares.
     Appearance(AppearanceChange),
+    /// How each installed member follows the family, read from their files.
+    Followed(Vec<MemberFollowing>),
+    /// Moves the keys to this row of the follow table.
+    FollowSelect(usize),
 }
 
 impl Quvyta {
@@ -67,7 +76,6 @@ impl Quvyta {
                 let Some(path) = self.machine.launcher_conf.clone() else { return Command::none() };
                 Command::perform(move || {
                     let written = match change {
-                        Change::CheckUpdates(on) => Launcher::save_check_updates(&path, on),
                         Change::AfterClose(after_close) => Launcher::save_after_close(&path, after_close),
                     };
                     Msg::Setting(SettingMsg::Saved { undo, result: written.map_err(|error| error.to_string()) })
@@ -85,15 +93,54 @@ impl Quvyta {
             // The framework's rows write their own files, key by key, and keep the settings
             // quvyta holds in step, so nothing more is saved here.
             SettingMsg::Appearance(change) => self.appearance.update(change, &mut self.settings),
+            SettingMsg::Followed(following) => self.followed(following),
+            SettingMsg::FollowSelect(row) => {
+                self.following_selected = Some(row);
+                Command::none()
+            }
         }
     }
 
+    /// Reads, in the background, how each installed member follows the family. Nothing is read
+    /// before cargo has said what is installed: until then the table would list no one, which
+    /// reads as "nothing is installed".
+    pub(super) fn read_following(&self) -> Command<Msg> {
+        let Some(inventory) = &self.inventory else { return Command::none() };
+        // quvyta's own following is the boxes under the appearance rows.
+        let members: Vec<usize> = (0..FAMILY.len())
+            .filter(|index| matches!(inventory.state(*index), State::Cargo { .. } | State::Elsewhere { .. }))
+            .collect();
+        let machine = self.machine.clone();
+        Command::perform(move || Msg::Setting(SettingMsg::Followed(follow::read(&machine, &members))))
+    }
+
+    /// Keeps what was read and tells, once, why a member's file could not be read.
+    fn followed(&mut self, following: Vec<MemberFollowing>) -> Command<Msg> {
+        let reasons: Vec<String> = following
+            .iter()
+            .filter_map(|member| match &member.following {
+                Following::Unreadable(reasons) => Some(reasons.iter().cloned()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        let new = reasons.iter().any(|reason| !self.unreadable_told.contains(reason));
+        self.following_selected = self.following_selected.filter(|row| *row < following.len());
+        self.following = Some(following);
+        self.unreadable_told = reasons;
+        if !new {
+            return Command::none();
+        }
+        // The reasons name the file only; the folder says where to find it.
+        let folder = self.machine.settings_dir.as_deref().map(|folder| self.machine.show(folder));
+        let lines: Vec<String> = folder.into_iter().chain(self.unreadable_told.iter().cloned()).collect();
+        Command::toast(Toast::warning(t!("settings.follow-unreadable-told")).body(lines.join("\n")))
+    }
+
     /// Makes `change` the running setting and returns the change that would restore the one
-    /// before. Turning updates off changes what the next start does, as the file does; `r` still
-    /// asks when someone wants to know now.
+    /// before.
     fn apply(&mut self, change: Change) -> Change {
         match change {
-            Change::CheckUpdates(on) => Change::CheckUpdates(std::mem::replace(&mut self.launcher.check_updates, on)),
             Change::AfterClose(after_close) => {
                 Change::AfterClose(std::mem::replace(&mut self.launcher.after_close, after_close))
             }
@@ -108,6 +155,7 @@ impl Quvyta {
         let page = |ui: &mut View<'_, Msg>| {
             ui.column(|ui| {
                 self.appearance_settings(ui).width(Length::Cells(width)).id("appearance");
+                self.following_section(width, ui);
                 self.section_title(width, ui);
                 self.own_settings(ui).width(Length::Cells(width)).id("settings");
                 self.show_path_notice_within(width, ui);
@@ -122,12 +170,69 @@ impl Quvyta {
     }
 
     /// The appearance every Quvyta application shows the same way: language, theme and icons with
-    /// their boxes, then reduced motion and the pillar. The rows are the framework's; quvyta adds
-    /// none of its own, so a member's settings and quvyta's read alike.
+    /// their boxes, then reduced motion and the pillar, and the family's update notice. The rows
+    /// are the framework's; quvyta adds none of its own, so a member's settings and quvyta's read
+    /// alike.
     fn appearance_settings<'v>(&self, ui: &'v mut View<'_, Msg>) -> NodeMut<'v, Msg> {
         SettingsList::show(ui, |list| {
-            self.appearance.section(list, |change| Msg::Setting(SettingMsg::Appearance(change)));
+            let message = |change| Msg::Setting(SettingMsg::Appearance(change));
+            self.appearance.section(list, message);
+            // quvyta asks crates.io at start, so it shows the family's switch for that, in the
+            // family's words: the same one every member that asks shows.
+            self.appearance.updates(list, message);
         })
+    }
+
+    /// Whether each installed member follows the family's language, theme and icons: a table on a
+    /// wide screen, one line per member on a narrow one. Nothing is drawn before what is
+    /// installed is known.
+    fn following_section(&self, width: u16, ui: &mut View<'_, Msg>) {
+        let Some(following) = &self.following else { return };
+        let words = Words::of(ui.env());
+        ui.column(|ui| {
+            ui.add(Text::new(t!("settings.follow-title")).role("secondary")).padding(Padding::symmetric(0, 2));
+            if following.is_empty() {
+                ui.add(Text::new(t!("settings.follow-none")).role("faint")).padding(Padding::symmetric(0, 2));
+                return;
+            }
+            if self.size.width >= WIDE {
+                self.following_table(following, &words, width, ui);
+            } else {
+                following_lines(following, &words, width, ui);
+            }
+            ui.add(Text::new(t!("settings.follow-next-start")).role("faint")).padding(Padding::symmetric(0, 2));
+        })
+        .width(Length::Cells(width))
+        .id("following");
+    }
+
+    /// The follow table: a member per row, a shared key per column.
+    fn following_table(&self, following: &[MemberFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
+        let columns = std::iter::once(Column::new(String::new()).width(ColumnWidth::Fit))
+            .chain(words.keys.iter().map(|key| Column::new(key.clone()).width(ColumnWidth::Fit)));
+        let rows: Vec<TableRow> = following
+            .iter()
+            .map(|member| {
+                let command = TableCell::new(FAMILY[member.index].command);
+                let faint = |text: String| TableCell::new(text).color("muted");
+                let cells: [TableCell; 3] = match &member.following {
+                    // One word for the row: it has no values to spread over the columns.
+                    Following::NotOpened => {
+                        [faint(t!("settings.follow-not-opened")), TableCell::new(""), TableCell::new("")]
+                    }
+                    Following::Unreadable(_) => std::array::from_fn(|_| faint(t!("settings.follow-unreadable"))),
+                    Following::Keys(values) => std::array::from_fn(|column| match &values[column] {
+                        Some(value) => TableCell::new(words.value(Shared::ALL[column], value)),
+                        None => faint(t!("settings.follow-shared")),
+                    }),
+                };
+                TableRow::new(std::iter::once(command).chain(cells))
+            })
+            .collect();
+        let select = |row: usize| Msg::Setting(SettingMsg::FollowSelect(row));
+        ui.add(Table::new(columns, rows).selected(self.following_selected).on_select(select))
+            .width(Length::Cells(width))
+            .id("following-table");
     }
 
     /// The faint title of quvyta's own section and, fainter, the file it is kept in: beside the
@@ -164,10 +269,6 @@ impl Quvyta {
     fn own_settings<'v>(&self, ui: &'v mut View<'_, Msg>) -> NodeMut<'v, Msg> {
         let launcher = &self.launcher;
         SettingsList::show(ui, |list| {
-            list.row(SettingRow::new(t!("settings.check-updates")), |ui| {
-                let toggle = |on| Msg::Setting(SettingMsg::Change(Change::CheckUpdates(on)));
-                ui.add(Switch::new(launcher.check_updates).on_toggle(toggle));
-            });
             list.row(SettingRow::new(t!("settings.after-close")), |ui| {
                 let options = [t!("settings.after-close-return"), t!("settings.after-close-shell")];
                 let selected = AFTER_CLOSE.iter().position(|choice| *choice == launcher.after_close);
@@ -205,6 +306,88 @@ impl Quvyta {
         if self.path_notice.is_some() {
             ui.column(|ui| self.show_path_notice(ui)).width(Length::Cells(width));
         }
+    }
+}
+
+/// One line per member for a narrow screen: its command, then only the keys it does not share
+/// with the family, or that it shares them all. When a member's own keys do not fit on one line
+/// in `width` cells, each takes a line of its own under the first, so a line never breaks inside
+/// a value.
+fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
+    let name_width =
+        following.iter().map(|member| qframe::text::width(FAMILY[member.index].command)).max().unwrap_or(0) + 2;
+    // The section's sides and the name column leave this much for the keys.
+    let room = width.saturating_sub(4 + name_width);
+    for member in following {
+        let (text, own) = match &member.following {
+            Following::NotOpened => (t!("settings.follow-not-opened"), false),
+            Following::Unreadable(_) => (t!("settings.follow-unreadable"), false),
+            Following::Keys(values) => {
+                let own: Vec<String> = Shared::ALL
+                    .iter()
+                    .zip(values)
+                    .filter_map(|(key, value)| {
+                        let value = words.value(*key, value.as_deref()?);
+                        Some(t!("settings.follow-own", key = words.key(*key), value = value))
+                    })
+                    .collect();
+                let line = own.join("  ");
+                if own.is_empty() {
+                    (t!("settings.follow-all-shared"), false)
+                } else if qframe::text::width(&line) <= room {
+                    (line, true)
+                } else {
+                    (own.join("\n"), true)
+                }
+            }
+        };
+        ui.row(|ui| {
+            ui.add(Text::new(FAMILY[member.index].command).no_wrap()).width(Length::Cells(name_width));
+            // A long language name wraps under itself rather than being cut.
+            let text = Text::new(text);
+            ui.add(if own { text } else { text.role("faint") }).fill_width();
+        })
+        .padding(Padding::symmetric(0, 2));
+    }
+}
+
+/// The words the follow table shows for keys and values, in the language on screen.
+struct Words {
+    /// The name of each shared key, in the order of [`Shared::ALL`], as the appearance rows name
+    /// it.
+    keys: [String; 3],
+    /// Each language code with its name in that language.
+    languages: Vec<(String, String)>,
+    /// Each theme id with its name.
+    themes: Vec<(String, String)>,
+}
+
+impl Words {
+    fn of(env: &qframe::env::Env) -> Self {
+        Self {
+            keys: [t!("quvyta.appearance.language"), t!("quvyta.appearance.theme"), t!("quvyta.appearance.icons")],
+            languages: env.i18n().list(),
+            themes: env.themes(),
+        }
+    }
+
+    fn key(&self, key: Shared) -> &str {
+        let index = Shared::ALL.iter().position(|shared| *shared == key).unwrap_or(0);
+        &self.keys[index]
+    }
+
+    /// `value` of `key` as the appearance rows would name it: a language in its own name, a
+    /// theme's name, an icon set's name. A value this quvyta does not know, such as a theme a
+    /// newer member brought, is shown as it is written.
+    fn value(&self, key: Shared, value: &str) -> String {
+        let named = |names: &[(String, String)]| names.iter().find(|(id, _)| id == value).map(|(_, name)| name.clone());
+        match key {
+            Shared::Language => named(&self.languages),
+            Shared::Theme => named(&self.themes),
+            Shared::Icons => qframe::icons::IconMode::from_name(value)
+                .map(|mode| t!(&format!("quvyta.appearance.icons-{}", mode.name()))),
+        }
+        .unwrap_or_else(|| value.to_owned())
     }
 }
 

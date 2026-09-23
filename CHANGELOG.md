@@ -2,6 +2,14 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.2.9 (2026-09-23)
+
+- quvyta follows the family's update notice, the one switch every Quvyta application shares. The Settings tab shows it under the appearance rows as **Say when an update is out**, in the same words as every other member, and turning it off there turns it off for the whole family; quvyta's own **Check for updates at start** is gone. quvyta now asks crates.io at most once a day, as the notice promises, instead of every six hours; `r` still asks at any time. If you had turned quvyta's own switch off, your choice is kept: the first start turns the family's switch off and removes `check_updates` from `launcher.conf`. The README has a new section on exactly what quvyta sends over the network.
+- The Settings tab now shows whether each installed member of the family follows the shared language, theme and icons. Between the shared appearance and quvyta's own settings, a table lists every member you have installed with, for each of the three, a faint "shared" when it follows the family or its own value when it chose one, named the way the appearance rows name it; on a narrow terminal each member takes one line listing only what it does not share, or "all shared". A member you have never opened says so and counts as following, since it will start on the family's values. When a member's settings file cannot be read, its row says "unreadable", a notice tells you once where and why, and quvyta leaves the file exactly as it is. The files are only read, never written, and they are read again each time you open the tab, so a member you opened in the meantime shows what it 
+- Requires quvyta-framework 0.1.18.
+
+saved.
+
 ## 0.2.8 (2026-09-21)
 
 - No more copying commands into a terminal. When an install cannot start because Rust or a C linker is missing, the question now has **Install here** beside the command that puts it right: quvyta steps aside, runs exactly that line in the terminal you are looking at, waits for a key so you can read what it printed, and checks again. For a linker that is your system's own `sudo pacman`, `sudo apt` or `sudo dnf` line; sudo asks for your password itself, on that terminal, and quvyta never sees it. Nothing runs until you press the button. Without Rust, the line is rustup's official installer, which asks its own questions and needs no sudo. On a system quvyta does not recognise, the commands are shown to copy and none is run, since it cannot tell which one is right. A build that failed for want of a linker has the same button.

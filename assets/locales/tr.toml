@@ -239,7 +239,6 @@ settings = "Ayarlar"
 
 [settings]
 title = "quvyta"
-check-updates = "Açılışta güncellemeleri denetle"
 after-close = "Uygulama kapanınca"
 after-close-return = "quvyta'ya dön"
 after-close-shell = "kabuğa çık"
@@ -249,6 +248,15 @@ path-new-terminals = "yeni terminallerde"
 path-no = "hayır"
 path-add = "Ekle"
 not-saved = "Ayar kaydedilemedi"
+follow-title = "Uygulamalar ortak ayarı izliyor mu"
+follow-shared = "ortak"
+follow-not-opened = "henüz açılmadı"
+follow-unreadable = "okunamadı"
+follow-all-shared = "hepsi ortak"
+follow-own = "{key}: {value}"
+follow-none = "Kurulu başka Quvyta uygulaması yok."
+follow-next-start = "Açık uygulamalar değişikliği bir sonraki açılışta görür."
+follow-unreadable-told = "Bir uygulamanın ayarları okunamadı"
 
 [wizard]
 step-apps = "Uygulamalar"

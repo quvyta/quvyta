@@ -40,6 +40,10 @@ pub struct Machine {
     /// The family's settings folder, which removing a member leaves alone; `None` when the
     /// platform names none.
     pub settings_dir: Option<PathBuf>,
+    /// The folder the members' settings files are read from when it is not the framework's own
+    /// layout: a test root keeps them inside itself, the way it keeps `launcher.conf`. `None`
+    /// leaves the framework to say where each file is.
+    pub member_settings: Option<PathBuf>,
     /// quvyta's data folder, which holds the build folder of installs and their logs; `None`
     /// when the platform names none.
     pub data_dir: Option<PathBuf>,
@@ -84,9 +88,21 @@ impl Machine {
         Self {
             data_dir: Some(root.join("data")),
             settings_dir: Some(root.join("config")),
+            member_settings: Some(root.join("config")),
             os_release: root.join("etc/os-release"),
             font_dirs: Some(vec![root.join("fonts")]),
             ..Self::resolve(lookup, Some(root.join("config/launcher.conf")))
+        }
+    }
+
+    /// The settings file of the member whose settings id is `id`, as the framework lays out the
+    /// family's folder on this platform; `None` when the platform names no settings folder.
+    pub(crate) fn member_conf(&self, id: &str) -> Option<PathBuf> {
+        match &self.member_settings {
+            // A test root mirrors the framework's `<folder>/<id>.conf`, as it does for
+            // `launcher.conf`.
+            Some(folder) => Some(folder.join(format!("{id}.conf"))),
+            None => Family::QUVYTA.app_file(id),
         }
     }
 
@@ -103,6 +119,7 @@ impl Machine {
             cargo: None,
             launcher_conf,
             settings_dir: None,
+            member_settings: None,
             data_dir: None,
             os_release: PathBuf::from("/etc/os-release"),
             font_dirs: None,

@@ -1,6 +1,6 @@
 [package]
 name = "quvyta"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
@@ -14,7 +14,7 @@ categories = ["command-line-utilities"]
 include = ["/src/**", "/assets/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/CHANGELOG.md", "/LICENSE"]
 
 [dependencies]
-quvyta-framework = "0.1.17"
+quvyta-framework = "0.1.18"
 
 [dev-dependencies]
 tempfile = "3"

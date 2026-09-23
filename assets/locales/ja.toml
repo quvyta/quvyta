@@ -241,7 +241,6 @@ settings = "設定"
 
 [settings]
 title = "quvyta"
-check-updates = "起動時に更新を確認する"
 after-close = "アプリを閉じたら"
 after-close-return = "quvyta に戻る"
 after-close-shell = "シェルに抜ける"
@@ -251,6 +250,15 @@ path-new-terminals = "新しいターミナルで"
 path-no = "ない"
 path-add = "追加"
 not-saved = "設定を保存できませんでした"
+follow-title = "アプリは共有設定に従っていますか"
+follow-shared = "共有"
+follow-not-opened = "まだ開いていない"
+follow-unreadable = "読み取れない"
+follow-all-shared = "すべて共有"
+follow-own = "{key}: {value}"
+follow-none = "他の Quvyta アプリはインストールされていません。"
+follow-next-start = "開いているアプリは、次に起動したときに変更を反映します。"
+follow-unreadable-told = "アプリの設定を読み取れませんでした"
 
 [wizard]
 step-apps = "アプリ"

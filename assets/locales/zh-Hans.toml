@@ -241,7 +241,6 @@ settings = "设置"
 
 [settings]
 title = "quvyta"
-check-updates = "启动时检查更新"
 after-close = "应用关闭后"
 after-close-return = "回到 quvyta"
 after-close-shell = "退出到 shell"
@@ -251,6 +250,15 @@ path-new-terminals = "新开的终端里在"
 path-no = "不在"
 path-add = "添加"
 not-saved = "设置没能保存"
+follow-title = "应用是否跟随共享设置"
+follow-shared = "共享"
+follow-not-opened = "尚未打开"
+follow-unreadable = "无法读取"
+follow-all-shared = "全部共享"
+follow-own = "{key}: {value}"
+follow-none = "没有安装其他 Quvyta 应用。"
+follow-next-start = "已打开的应用会在下次启动时看到更改。"
+follow-unreadable-told = "无法读取某个应用的设置"
 
 [wizard]
 step-apps = "应用"

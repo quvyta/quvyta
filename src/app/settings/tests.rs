@@ -13,7 +13,6 @@ use super::super::tests::{
 };
 use super::*;
 use crate::app::{PathMsg, Tab};
-use crate::launcher::PathPrompt;
 use crate::machine::Machine;
 
 /// The application on `machine` at `width` by `height`, with what is installed read and the
@@ -75,9 +74,15 @@ fn the_appearance_the_family_shares_stands_above_quvyta_s_own_settings() {
     }
     assert_eq!(screen.matches("In every Quvyta application").count(), 3, "one box under each shared row:\n{screen}");
     assert!(at(&screen, "Appearance") < at(&screen, "launcher.conf"), "the shared rows come first:\n{screen}");
-    assert!(at(&screen, "Pillar") < at(&screen, "Check for updates at start"), "{screen}");
+    assert!(at(&screen, "Pillar") < at(&screen, "Say when an update is out"), "{screen}");
+    assert!(
+        at(&screen, "Say when an update is out") < at(&screen, "launcher.conf"),
+        "the family's switch is its own:\n{screen}"
+    );
     // quvyta writes no appearance row of its own: the three rows and their boxes are the only ones.
-    assert_eq!(screen.matches("Language").count(), 1, "{screen}");
+    // The follow table below names the same keys over its columns.
+    let appearance = &screen[..at(&screen, "Do the applications follow the shared settings")];
+    assert_eq!(appearance.matches("Language").count(), 1, "{screen}");
     let prefs = h.app().preferences();
     assert_eq!(prefs.theme().source, Source::Family, "quvyta follows the family it shows");
     assert_eq!(prefs.language().value, "en");
@@ -161,18 +166,18 @@ fn the_language_row_speaks_both_languages_and_switching_takes_at_once() {
 
 #[test]
 fn a_click_on_a_tab_shows_it_and_the_list_comes_back_as_it_was() {
-    let (_root, mut h) = harness(100, 24);
+    let (_root, mut h) = harness(100, 40);
     h.press("down");
     h.click_text("Settings");
     let screen = h.screen();
-    for text in ["Check for updates at start", "When an app closes", "back to quvyta", "~/.cargo/bin on PATH"] {
+    for text in ["Say when an update is out", "When an app closes", "back to quvyta", "~/.cargo/bin on PATH"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
     assert!(!screen.contains("qtools") && !screen.contains("Quvyta Focus"), "{screen}");
     h.click_text("Apps");
     let screen = h.screen();
     assert!(line_with(&screen, "qfocus").contains('▌'), "the selection is kept:\n{screen}");
-    assert!(!screen.contains("Check for updates at start"), "{screen}");
+    assert!(!screen.contains("Say when an update is out"), "{screen}");
 }
 
 #[test]
@@ -186,7 +191,7 @@ fn the_keyboard_reaches_the_tabs_with_tab_and_moves_between_them_with_their_keys
     }
     assert!(h.is_focused("tabs"), "shift+tab reaches the tabs");
     h.press("right");
-    assert!(h.screen().contains("Check for updates at start"), "{}", h.screen());
+    assert!(h.screen().contains("Say when an update is out"), "{}", h.screen());
     assert!(h.is_focused("tabs"), "the keys stay on the tabs");
     h.press("left");
     assert!(h.screen().contains("Quvyta Code"), "{}", h.screen());
@@ -195,6 +200,8 @@ fn the_keyboard_reaches_the_tabs_with_tab_and_moves_between_them_with_their_keys
     assert!(h.is_focused("page"), "tab goes on to the page, which scrolls");
     h.press("tab");
     assert!(h.is_focused("appearance"), "and then to the appearance the family shares");
+    h.press("tab");
+    assert!(h.is_focused("following-table"), "and then to the table of who follows the family");
     h.press("tab");
     assert!(h.is_focused("settings"), "and then to quvyta's own settings");
     h.press("esc");
@@ -218,23 +225,25 @@ fn the_settings_hints_leave_out_the_family_s_keys_and_those_keys_do_nothing() {
 }
 
 #[test]
-fn turning_updates_off_writes_it_at_once_and_keeps_the_other_settings() {
-    let (root, mut h) = harness_with_settings("after_close = \"shell\"\npath_prompt = \"dismissed\"\n");
-    h.send(Msg::Tab(Tab::Settings));
-    h.click_text("Check for updates at start");
-    assert!(h.is_focused("settings"), "a click on a label gives the list the keys");
+fn the_update_notice_is_the_family_s_one_switch_written_to_the_shared_file() {
+    let root = tempfile::tempdir().expect("temp");
+    let own = "after_close = \"shell\"\npath_prompt = \"dismissed\"\n";
+    let mut h = settings_on(family_files(root.path(), SHARED, own), 100, 44);
+    let screen = h.screen();
+    assert!(screen.contains("For all Quvyta applications at once"), "in the family's words:\n{screen}");
+    assert!(!screen.contains("Check for updates at start"), "one switch, not quvyta's own beside it:\n{screen}");
+    assert!(at(&screen, "Say when an update is out") < at(&screen, "When an app closes"), "{screen}");
+    h.click_text("Say when an update is out");
+    assert!(h.is_focused("appearance"), "a click on a label gives the list the keys");
     h.press("space").render();
-    assert!(!h.app().launcher.check_updates, "the running quvyta has it at once");
-    let text = launcher_conf(root.path());
-    assert!(text.contains("check_updates = false"), "{text}");
-    assert!(text.contains("after_close = \"shell\"") && text.contains("path_prompt = \"dismissed\""), "{text}");
-    let launcher = Launcher::load(Some(&root.path().join("config/launcher.conf")));
-    assert_eq!((launcher.check_updates, launcher.path_prompt), (false, PathPrompt::Dismissed));
+    assert!(quvyta_conf(root.path()).contains("update-notice = false"), "{}", quvyta_conf(root.path()));
+    assert!(!h.app().preferences().update_notice(), "the running quvyta has it at once");
+    assert_eq!(launcher_conf(root.path()), own, "quvyta's own file is not where it goes");
 }
 
 #[test]
 fn choosing_quit_to_shell_writes_it_and_the_next_close_leaves_with_the_member() {
-    let (root, mut h) = harness(100, 24);
+    let (root, mut h) = harness(100, 40);
     h.send(Msg::Tab(Tab::Settings));
     h.click_text("back to quvyta").advance(TOAST_IN);
     h.click_text("quit to shell");
@@ -252,13 +261,13 @@ fn a_folder_that_cannot_be_written_puts_the_value_back_and_says_where_and_why() 
     let config = root.path().join("config");
     fs::set_permissions(&config, fs::Permissions::from_mode(0o555)).expect("read-only");
     h.send(Msg::Tab(Tab::Settings));
-    h.send(Msg::Setting(SettingMsg::Change(Change::CheckUpdates(false))));
-    h.send(Msg::Setting(SettingMsg::Change(Change::AfterClose(AfterClose::Shell))));
+    // Chosen where a person chooses it: the select, then its other choice.
+    h.click_text("back to quvyta").advance(TOAST_IN);
+    h.click_text("quit to shell");
     h.render().advance(TOAST_IN);
     let screen = h.screen();
     fs::set_permissions(&config, fs::Permissions::from_mode(0o755)).expect("writable again");
-    assert!(h.app().launcher.check_updates, "the switch goes back");
-    assert_eq!(h.app().launcher.after_close, AfterClose::Return, "and so does the choice");
+    assert_eq!(h.app().launcher.after_close, AfterClose::Return, "the choice goes back");
     assert!(screen.contains("back to quvyta"), "{screen}");
     assert!(screen.contains("The setting could not be saved"), "{screen}");
     assert!(screen.contains(&config.display().to_string()), "the notice names the folder:\n{screen}");
@@ -277,7 +286,7 @@ fn a_broken_file_still_shows_the_settings_with_their_defaults() {
 #[test]
 fn the_path_row_says_yes_when_cargo_s_folder_is_on_path() {
     let root = tempfile::tempdir().expect("temp");
-    let h = settings_on(machine(root.path()), 100, 24);
+    let h = settings_on(machine(root.path()), 100, 40);
     let row = line_with(&h.screen(), "~/.cargo/bin on PATH").to_owned();
     assert!(row.trim_end().ends_with("yes") && !row.contains("Add"), "{row}");
 }
@@ -318,8 +327,8 @@ fn enter_on_the_path_row_opens_the_notice_too() {
     // At start quvyta offered the notice by itself; Not now puts it away.
     h.click_text("Not now");
     assert!(!h.screen().contains("is not on PATH"), "{}", h.screen());
-    h.click_text("Check for updates at start");
-    h.press("down").press("down").press("enter").render();
+    h.click_text("When an app closes");
+    h.press("down").press("enter").render();
     assert!(h.screen().contains("File  ~/.zshrc"), "{}", h.screen());
 }
 
@@ -334,7 +343,7 @@ fn turkish_reads_naturally() {
     for text in [
         "Uygulamalar",
         "Ayarlar",
-        "Açılışta güncellemeleri denetle",
+        "Güncelleme çıkınca haber ver",
         "Uygulama kapanınca",
         "quvyta'ya dön",
         "~/.cargo/bin PATH'te",
@@ -344,7 +353,7 @@ fn turkish_reads_naturally() {
     ] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    let (_root, mut h) = harness(100, 24);
+    let (_root, mut h) = harness(100, 40);
     h.set_locale("tr").send(Msg::Tab(Tab::Settings));
     assert!(line_with(&h.screen(), "PATH'te").trim_end().ends_with("evet"), "{}", h.screen());
     h.click_text("quvyta'ya dön").advance(TOAST_IN);
@@ -358,7 +367,7 @@ fn narrow_screens_cut_nothing_and_put_the_path_under_the_title() {
             let root = tempfile::tempdir().expect("temp");
             let mut machine = machine_off_path(root.path());
             machine.shell = Some("/bin/bash".to_owned());
-            let mut h = settings_on(machine, width, 44);
+            let mut h = settings_on(machine, width, 60);
             h.set_locale(locale);
             h.click_text(if locale == "en" { "Not now" } else { "Şimdi değil" });
             let screen = h.screen();
@@ -368,7 +377,7 @@ fn narrow_screens_cut_nothing_and_put_the_path_under_the_title() {
             assert!(body[title + 1].contains("launcher.conf"), "{locale} at {width}:\n{screen}");
         }
     }
-    let (_root, h) = harness(100, 24);
+    let (_root, h) = harness(100, 40);
     let mut h = h;
     h.send(Msg::Tab(Tab::Settings));
     assert!(line_with(&h.screen(), "launcher.conf").contains("quvyta"), "wide, the path is beside the title");
@@ -460,11 +469,21 @@ pub(in crate::app) fn review() -> Vec<String> {
         h.click_text(if locale == "en" { "English" } else { "Türkçe" }).advance(TOAST_IN);
         shot(&h, format!("settings languages open {locale}"));
 
+        // Who follows the family: an own value, a member never opened and a broken file.
+        for (width, height) in [(100, 60), (48, 60)] {
+            let root = tempfile::tempdir().expect("temp");
+            let mut h = settings_on(member_files(root.path(), &[("code", QCODE), ("showcase", BROKEN)]), width, height);
+            h.set_locale(locale).advance(TOAST_IN);
+            shot(&h, format!("settings following {locale} {width}x{height}"));
+        }
+
         let (root, mut h) = harness_with_settings("after_close = \"return\"\n");
         let config = root.path().join("config");
         fs::set_permissions(&config, fs::Permissions::from_mode(0o555)).expect("read-only");
         h.set_locale(locale).send(Msg::Tab(Tab::Settings));
-        h.send(Msg::Setting(SettingMsg::Change(Change::CheckUpdates(false)))).render().advance(TOAST_IN);
+        h.render();
+        h.click_text(if locale == "en" { "back to quvyta" } else { "quvyta'ya dön" }).advance(TOAST_IN);
+        h.click_text(if locale == "en" { "quit to shell" } else { "kabuğa çık" }).render().advance(TOAST_IN);
         fs::set_permissions(&config, fs::Permissions::from_mode(0o755)).expect("writable again");
         shot(&h, format!("settings not saved {locale}"));
     }
@@ -521,4 +540,172 @@ fn nothing_on_the_settings_tab_is_cut_in_any_language() {
             }
         }
     }
+    // The follow table with the longest language name, every key a member's own, and a broken
+    // file, on a screen tall enough to hold the whole page.
+    let own = "language = \"pt-BR\"\ntheme = \"nordic\"\nicons = \"ascii\"\n";
+    for width in [40, 48, 60, 80, 100, 120] {
+        for locale in LANGUAGES {
+            let root = tempfile::tempdir().expect("temp");
+            let machine =
+                member_files(root.path(), &[("code", own), ("focus", "language = \"ru\"\n"), ("showcase", BROKEN)]);
+            let mut h = settings_on(machine, width, 90);
+            h.set_locale(locale);
+            let i18n = h.env().i18n();
+            let screen = h.screen();
+            // The title's start: a narrow screen wraps the rest, in scripts without spaces too.
+            let title: String = i18n.translate("settings.follow-title", &[]).chars().take(6).collect();
+            assert!(screen.contains(&title), "the follow section is on screen in {locale} at {width}:\n{screen}");
+            let words = [
+                "Português".to_owned(),
+                "Nordic".to_owned(),
+                "Русский".to_owned(),
+                i18n.translate("quvyta.appearance.icons-ascii", &[]),
+                i18n.translate("settings.follow-unreadable", &[]),
+            ];
+            for word in words {
+                assert!(screen.contains(&word), "`{word}` in {locale} at {width}:\n{screen}");
+            }
+            let language = i18n.translate("quvyta.appearance.language", &[]);
+            for line in screen.lines().filter(|line| line.contains('\u{2026}')) {
+                let shortens_itself =
+                    line.ends_with("launcher.conf") || (line.contains(&language) && line.contains('▾'));
+                assert!(shortens_itself, "`{}` is cut in {locale} at {width}:\n{screen}", line.trim());
+            }
+        }
+    }
+}
+
+/// The machine of [`family_files`] with the settings files of members, each an id and its text.
+fn member_files(root: &Path, files: &[(&str, &str)]) -> Machine {
+    let machine = family_files(root, SHARED, "");
+    for (id, text) in files {
+        fs::write(root.join(format!("config/{id}.conf")), text).expect("member file");
+    }
+    machine
+}
+
+/// qcode names its own language and theme and shares its icons, qfocus has never been opened and
+/// the showcase's file is broken: the three members the test machine has installed.
+const QCODE: &str = "language = \"tr\"\ntheme = \"nordic\"\nreduced_motion = true\n";
+const BROKEN: &str = "theme = \"amber\nlanguage = \n";
+
+/// The screen row holding the follow table's row of `command`: after the section's title, so a
+/// word elsewhere on the page is never taken for it.
+fn follow_line(screen: &str, command: &str) -> String {
+    // The title's start, since a narrow screen wraps the rest of it.
+    let title = at(screen, "Do the applications follow");
+    line_with(&screen[title..], &format!("{command} ")).to_owned()
+}
+
+#[test]
+fn the_follow_table_shows_each_installed_member_s_own_values_and_what_it_shares() {
+    let root = tempfile::tempdir().expect("temp");
+    let machine = member_files(root.path(), &[("code", QCODE), ("showcase", BROKEN)]);
+    let h = settings_on(machine, 100, 60);
+    let screen = h.screen();
+    let qcode = follow_line(&screen, "qcode");
+    // A language in its own name and a theme's name, as the appearance rows name them.
+    assert!(qcode.contains("Türkçe") && qcode.contains("Nordic") && qcode.contains("shared"), "{screen}");
+    assert!(at(&qcode, "Türkçe") < at(&qcode, "Nordic") && at(&qcode, "Nordic") < at(&qcode, "shared"), "{qcode}");
+    assert!(follow_line(&screen, "qfocus").contains("not opened yet"), "{screen}");
+    assert_eq!(follow_line(&screen, "qframe").matches("unreadable").count(), 3, "{screen}");
+    // Only what is installed, and quvyta's own following is the boxes above.
+    let note = "Open applications see a change the next time they start.";
+    let section = &screen[at(&screen, "Do the applications follow")..at(&screen, note)];
+    for absent in ["qtools", "qpac", "qdesk", "quvyta"] {
+        assert!(!section.contains(absent), "`{absent}` is listed:\n{section}");
+    }
+    // Shape by tone: the member's own value in the row's own colour, as its name is, and what it
+    // shares faint.
+    let muted = h.env().theme().color("muted");
+    // The colour `text` is drawn in on the follow table's row of `command`.
+    let tone = |command: &str, text: &str| {
+        let row = follow_line(&screen, command);
+        let y = screen.lines().position(|line| line == row).expect("the row is on screen");
+        let x = row.find(text).expect("in the row");
+        let x = qframe::text::width(&row[..x]);
+        h.fg(x, u16::try_from(y).expect("y"))
+    };
+    assert_eq!(tone("qcode", "Nordic"), tone("qcode", "qcode"), "{screen}");
+    assert_ne!(tone("qcode", "Nordic"), muted, "{screen}");
+    for (command, faint) in [("qcode", "shared"), ("qfocus", "not opened yet"), ("qframe", "unreadable")] {
+        assert_eq!(tone(command, faint), muted, "`{faint}`:\n{screen}");
+    }
+    assert!(h.handoffs().is_empty(), "nothing reaches the desktop");
+}
+
+#[test]
+fn a_broken_member_file_is_told_once_and_left_exactly_as_it_was() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = settings_on(member_files(root.path(), &[("showcase", BROKEN)]), 100, 60);
+    h.advance(TOAST_IN);
+    let screen = h.screen();
+    assert!(screen.contains("An application's settings could not be read"), "{screen}");
+    assert!(screen.contains("showcase.conf:1:"), "the reason is located:\n{screen}");
+    // Back and forth between the tabs reads the files again but tells the same reason once.
+    h.press("esc");
+    h.click_text("Settings").advance(TOAST_IN);
+    h.advance(std::time::Duration::from_secs(30));
+    h.press("esc");
+    h.click_text("Settings").advance(TOAST_IN);
+    assert!(!h.screen().contains("could not be read"), "told again:\n{}", h.screen());
+    assert_eq!(fs::read_to_string(root.path().join("config/showcase.conf")).expect("read"), BROKEN);
+    let mut names: Vec<String> = fs::read_dir(root.path().join("config"))
+        .expect("list")
+        .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["launcher.conf", "quvyta.conf", "showcase.conf"], "no backup, nothing new");
+}
+
+#[test]
+fn a_file_a_member_wrote_meanwhile_is_read_again_when_the_settings_tab_opens() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = settings_on(member_files(root.path(), &[]), 100, 60);
+    assert!(follow_line(&h.screen(), "qfocus").contains("not opened yet"), "{}", h.screen());
+    h.press("esc");
+    fs::write(root.path().join("config/focus.conf"), "icons = \"ascii\"\n").expect("qfocus's first start");
+    h.click_text("Settings");
+    let line = follow_line(&h.screen(), "qfocus");
+    assert!(line.contains("ASCII") && line.matches("shared").count() == 2, "{}", h.screen());
+}
+
+#[test]
+fn with_no_other_member_installed_one_line_says_so() {
+    let root = tempfile::tempdir().expect("temp");
+    super::super::tests::set_up(root.path());
+    let machine = crate::inventory::tests::machine_with_cargo(root.path(), "", 0);
+    let h = settings_on(machine, 100, 60);
+    let screen = h.screen();
+    let title = at(&screen, "Do the applications follow the shared settings");
+    let next: Vec<&str> = screen[title..].lines().skip(1).take(2).collect();
+    assert_eq!(next[0].trim(), "No other Quvyta application is installed.", "{screen}");
+    assert_eq!(next[1].trim(), "", "and nothing more:\n{screen}");
+    assert!(!screen.contains("next time they start"), "{screen}");
+}
+
+#[test]
+fn a_narrow_screen_gives_each_member_one_line_with_only_what_it_does_not_share() {
+    let root = tempfile::tempdir().expect("temp");
+    let machine = member_files(root.path(), &[("code", QCODE), ("showcase", "theme = \"quvyta\"\n")]);
+    let mut h = settings_on(machine, 60, 60);
+    let screen = h.screen();
+    assert_eq!(follow_line(&screen, "qcode").trim(), "qcode   Language: Türkçe  Theme: Nordic", "{screen}");
+    assert_eq!(follow_line(&screen, "qfocus").trim(), "qfocus  not opened yet", "{screen}");
+    assert_eq!(follow_line(&screen, "qframe").trim(), "qframe  all shared", "{screen}");
+    h.set_locale("tr");
+    let screen = h.screen();
+    let title = at(&screen, "Uygulamalar ortak ayarı izliyor mu");
+    assert_eq!(line_with(&screen[title..], "qcode").trim(), "qcode   Dil: Türkçe  Renk teması: Nordic", "{screen}");
+    assert_eq!(line_with(&screen[title..], "qframe").trim(), "qframe  hepsi ortak", "{screen}");
+
+    // Keys that do not fit on one line each take a line, rather than a value breaking in two.
+    let root = tempfile::tempdir().expect("temp");
+    let long = "language = \"ru\"\ntheme = \"nordic\"\n";
+    let h = settings_on(member_files(root.path(), &[("code", long)]), 40, 60);
+    let screen = h.screen();
+    let first = follow_line(&screen, "qcode");
+    assert_eq!(first.trim(), "qcode   Language: Русский", "{screen}");
+    let next = screen.lines().skip_while(|line| *line != first).nth(1).expect("a line after");
+    assert_eq!(next.trim(), "Theme: Nordic", "{screen}");
 }

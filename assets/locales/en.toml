@@ -240,7 +240,6 @@ settings = "Settings"
 
 [settings]
 title = "quvyta"
-check-updates = "Check for updates at start"
 after-close = "When an app closes"
 after-close-return = "back to quvyta"
 after-close-shell = "quit to shell"
@@ -250,6 +249,15 @@ path-new-terminals = "in new terminals"
 path-no = "no"
 path-add = "Add"
 not-saved = "The setting could not be saved"
+follow-title = "Do the applications follow the shared settings"
+follow-shared = "shared"
+follow-not-opened = "not opened yet"
+follow-unreadable = "unreadable"
+follow-all-shared = "all shared"
+follow-own = "{key}: {value}"
+follow-none = "No other Quvyta application is installed."
+follow-next-start = "Open applications see a change the next time they start."
+follow-unreadable-told = "An application's settings could not be read"
 
 [wizard]
 step-apps = "Applications"
