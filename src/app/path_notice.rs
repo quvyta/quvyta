@@ -9,7 +9,7 @@ use qframe::prelude::*;
 use qframe::widgets::{CopyValue, Toast};
 
 use super::{Msg, Quvyta};
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::inventory::State;
 use crate::launcher::{Launcher, PathPrompt};
 use crate::machine::Machine;
@@ -20,7 +20,7 @@ use crate::shell_path::{self, PathAction};
 pub enum PathMsg {
     /// What the check of `PATH` after an install, or at start, decided in the background.
     Checked {
-        /// The member just installed, an index of [`FAMILY`]; `None` at start.
+        /// The member just installed, an index of [`APPS`]; `None` at start.
         installed: Option<usize>,
         /// What it takes.
         action: PathAction,
@@ -113,7 +113,7 @@ impl Quvyta {
     /// since only then is there a program the user may want to type by name.
     pub(super) fn check_path_at_start(&self) -> Command<Msg> {
         let cargo_bin = self.machine.cargo_bin();
-        let by_cargo = FAMILY.iter().enumerate().any(|(index, member)| match self.state(index) {
+        let by_cargo = APPS.iter().enumerate().any(|(index, member)| match self.state(index) {
             Some(State::Cargo { .. }) => true,
             // quvyta's own row says it is running, not where from; its file in cargo's folder
             // says cargo put it there.
@@ -139,7 +139,7 @@ impl Quvyta {
                     // an offer, so it still shows.
                     _ if asks && !asked && self.launcher.path_prompt == PathPrompt::Dismissed => None,
                     action => Some(PathNotice {
-                        command: installed.and_then(|index| FAMILY.get(index)).map(|member| member.command),
+                        command: installed.and_then(|index| APPS.get(index)).map(|member| member.command),
                         action,
                         stage: Stage::Offered,
                     }),

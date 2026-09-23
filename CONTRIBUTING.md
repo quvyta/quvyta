@@ -41,7 +41,7 @@ This writes `target/quvyta-review.html`, which you can open in a browser.
 sh tests/install-ps1/run.sh
 ```
 
-When a member is added or renamed, both scripts, `src/family.rs`, the language files and the README's family table change together; a test fails if the two scripts disagree.
+When a member is added or renamed, both scripts, `src/ecosystem.rs`, the language files and the README's table of apps change together; a test fails if the two scripts disagree.
 
 ## Writing code
 

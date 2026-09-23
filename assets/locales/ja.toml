@@ -58,34 +58,34 @@ update = "更新"
 refresh = "更新を確認"
 apps = "アプリ"
 
-[family.code]
+[apps.code]
 title = "Quvyta Code"
 summary = "コーディングエージェントを Podman や Docker のコンテナの中で動かします。プロファイルを一度作れば、どのプロジェクトでも開けて、エージェントとシェルをタブのように行き来できます。"
 
-[family.focus]
+[apps.focus]
 title = "Quvyta Focus"
 summary = "ターミナルでの集中時間の記録。取りかかっていることにカウンターを回し、日・週・月・年のグラフで時間の行き先を見ます。"
 
-[family.tools]
+[apps.tools]
 title = "Quvyta Tools"
 summary = "Arch Linux で手作業になりがちな設定を一つのリストから当てます。ミラー、pacman、AUR ヘルパー、ファイアウォール、SSH など。どの項目も何に触れるかを先に示し、バックアップを取り、あとから元に戻せます。"
 
-[family.packages]
+[apps.packages]
 title = "Quvyta Packages"
 summary = "何かが変わる前に、何がどう変わるかをそのまま見せる Arch Linux 向けのパッケージマネージャーです。この最初の版は pacman のパッケージを扱います。AUR、Flatpak、Snap は認識しますが、まだ管理はしません。"
 
-[family.desk]
+[apps.desk]
 title = "Quvyta Desktop"
 summary = "ターミナルの中で動くデスクトップです。ウィンドウ、ドック、ランチャー、ファイルマネージャーがそろい、SSH 越しの作業や非力なマシンのために作られています。サーバーで qdesk と打てば、ショートカットを一つも覚えずにマウスで並べて使えます。"
 
-[family.framework]
+[apps.framework]
 title = "Quvyta Framework"
-summary = "フレームワークのショーケース。この一家のウィジェット、テーマ、アイコン、言語をその場で試せます。"
+summary = "フレームワークのショーケース。Quvyta アプリのウィジェット、テーマ、アイコン、言語をその場で試せます。"
 library = "フレームワーク自体は Rust のライブラリです。すべての Quvyta アプリが乗っているランタイム、ウィジェット、テーマ・アイコン・言語ファイルが入っています。誰でもこれで自分のターミナルアプリを作れます。"
 
-[family.quvyta]
+[apps.quvyta]
 title = "Quvyta"
-summary = "このアプリです。一家を一覧にして、入れて、開いて、最新に保ち、削除します。"
+summary = "このアプリです。Quvyta アプリを一覧にして、入れて、開いて、最新に保ち、削除します。"
 
 [open]
 notice = "{command} を開いています…"
@@ -112,12 +112,12 @@ update-title = "{command} を {from} から {to} に更新しますか？"
 update = "更新"
 
 [checks]
-no-cargo = "Rust のパッケージツール cargo が入っていません。この一家はそれでビルドします。"
+no-cargo = "Rust のパッケージツール cargo が入っていません。Quvyta アプリはそれでビルドします。"
 rustup = "公式インストーラー rustup で Rust を入れます"
 rustup-site = "rustup のページ。ほかの入れ方も載っています"
 install-here = "ここで入れる"
 rustup-here = "この端末で実行します。rustup が自分で質問し、sudo は要りません。"
-old-rust = "入っている Rust は {version} です。この一家には {needed} 以降が要ります。"
+old-rust = "入っている Rust は {version} です。Quvyta アプリには {needed} 以降が要ります。"
 rustup-update = "rustup update stable で新しくできます。"
 update-rust = "Rust を更新"
 update-rust-yourself = "Rust を入れたときと同じ方法で更新してから、もう一度確かめてください。"
@@ -216,17 +216,17 @@ failed = "行を足せませんでした。ご自分で足せます。行をク�
 not-remembered = "launcher.conf に答えを残せませんでした"
 
 [cli]
-about = "Quvyta 一家のターミナルアプリを入れ、開き、更新します。"
+about = "Quvyta エコシステムのターミナルアプリを入れ、開き、更新します。"
 usage = "使い方"
 name = "名前"
-list = "一家の一覧を開く"
+list = "Quvyta アプリの一覧を開く"
 install = "これらを入れるか、一つずつ確認する"
 show = "この一員のページで開く"
 help = "このヘルプを表示する"
 version = "バージョンを表示する"
 names = "名前には一員の短い名前（code）、コマンド（qcode）、パッケージ名（quvyta-code）のどれでも使えます。"
 unknown-option = "{option} という選択肢はありません"
-unknown-name = "{name} という一員はいません"
+unknown-name = "{name} という Quvyta アプリはありません"
 unknown-command = "quvyta に {command} という仕事はありません"
 no-names = "install には名前が少なくとも一つ要ります。たとえば qcode"
 show-no-name = "show には名前が要ります。たとえば qfocus"

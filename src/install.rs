@@ -19,7 +19,7 @@ use qframe::runtime::{Line, Process, ProcessOutcome};
 use qframe::storage::{AppLock, atomic_write};
 
 use crate::cargo::{self, Failure};
-use crate::family::Member;
+use crate::ecosystem::Member;
 use crate::machine::Machine;
 
 /// The folder under the data folder that builds go to.
@@ -302,11 +302,11 @@ pub(crate) mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::*;
-    use crate::family::FAMILY;
+    use crate::ecosystem::APPS;
     use crate::inventory::tests::machine_with_cargo;
 
     pub(crate) fn member(key: &str) -> &'static Member {
-        FAMILY.iter().find(|member| member.key == key).expect("a member")
+        APPS.iter().find(|member| member.key == key).expect("a member")
     }
 
     /// Makes the stand-in cargo in `root` answer `install` with `out` and `code`.
@@ -318,7 +318,7 @@ pub(crate) mod tests {
     /// Tells the stand-in cargo which command each package installs, and at which version.
     pub(crate) fn packages(root: &Path) {
         let lines: String =
-            FAMILY.iter().map(|member| format!("{} {} 0.1.2\n", member.package, member.command)).collect();
+            APPS.iter().map(|member| format!("{} {} 0.1.2\n", member.package, member.command)).collect();
         std::fs::write(root.join("bin/packages"), lines).expect("scenario");
     }
 
@@ -587,7 +587,7 @@ pub(crate) mod tests {
     #[ignore = "installs from crates.io; run in a disposable container"]
     fn a_real_install_from_crates_io() {
         let package = std::env::var("QUVYTA_E2E_PACKAGE").unwrap_or_else(|_| "quvyta-tools".to_owned());
-        let member = FAMILY.iter().find(|member| member.package == package).expect("a member");
+        let member = APPS.iter().find(|member| member.package == package).expect("a member");
         let root = tempfile::tempdir().expect("temp");
         let home = root.path().join("home");
         std::fs::create_dir_all(&home).expect("home");

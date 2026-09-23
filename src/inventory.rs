@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 
 use crate::cargo::{Installed, parse_install_list};
-use crate::family::{FAMILY, Member};
+use crate::ecosystem::{APPS, Member};
 use crate::machine::Machine;
 
 /// How one member is installed.
@@ -57,7 +57,7 @@ impl State {
     }
 }
 
-/// The state of every member, in the order of [`FAMILY`].
+/// The state of every member, in the order of [`APPS`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inventory {
     states: Vec<State>,
@@ -78,10 +78,10 @@ impl Inventory {
 
     /// The states given cargo's list of installed packages.
     pub fn from_list(machine: &Machine, listed: &[Installed]) -> Self {
-        Self { states: FAMILY.iter().map(|member| state(machine, listed, member)).collect() }
+        Self { states: APPS.iter().map(|member| state(machine, listed, member)).collect() }
     }
 
-    /// The state of the member at `index` of [`FAMILY`].
+    /// The state of the member at `index` of [`APPS`].
     pub(crate) fn state(&self, index: usize) -> &State {
         self.states.get(index).unwrap_or(&State::Missing)
     }
@@ -165,7 +165,7 @@ pub(crate) mod tests {
     }
 
     fn index(key: &str) -> usize {
-        FAMILY.iter().position(|member| member.key == key).expect("a member")
+        APPS.iter().position(|member| member.key == key).expect("a member")
     }
 
     const LIST: &str = "\

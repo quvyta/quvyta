@@ -1,31 +1,31 @@
 # quvyta
 
-One terminal app to find, install, open and update every member of the Quvyta family.
+One terminal app to find, install, open and update everything in the Quvyta ecosystem.
 
 [![crates.io](https://img.shields.io/crates/v/quvyta.svg)](https://crates.io/crates/quvyta)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![A visit in quvyta: choosing qtools in the family list, agreeing to the install after seeing the exact command, cargo building it, and Open on it at the end](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/quvyta.gif)
+![A visit in quvyta: choosing qtools in the list, agreeing to the install after seeing the exact command, cargo building it, and Open on it at the end](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/quvyta.gif)
 
-![The family in quvyta: what is installed, which version, and one update waiting](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/family.png)
+![The Quvyta apps in quvyta: what is installed, which version, and one update waiting](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/apps.png)
 
-**quvyta** installs the Quvyta family of terminal applications, opens the ones on your machine,
-and keeps them up to date. It lists every member with what it does, which version you have and
+**quvyta** installs the terminal applications of the Quvyta ecosystem, opens the ones on your
+machine, and keeps them up to date. It lists every app with what it does, which version you have and
 whether a newer one is out; it installs, updates and removes members with cargo, after showing
 exactly what it will run, and offers to put cargo's folder on your PATH when a new terminal could
 not find them. Every member is built on [quvyta-framework](https://github.com/quvyta/framework), so
 they look and behave alike: the same themes, icons, languages, keys and mouse behaviour. quvyta is
 open source under the MIT licence.
 
-> **Beta.** quvyta is new, and so is the family it introduces. The interface may still change
+> **Beta.** quvyta is new, and so is the ecosystem it introduces. The interface may still change
 > between releases. Please report anything
 > that looks wrong at <https://github.com/quvyta/quvyta/issues>.
 
-The first start asks what the whole family should look like — the language, the colour theme and the icons, with **Start with the defaults** for anyone who would rather not choose — and then which of its members you would like. Nothing is written until you finish it, and nothing is ticked for you.
+The first start asks what every Quvyta app should look like — the language, the colour theme and the icons, with **Start with the defaults** for anyone who would rather not choose — and then which of the apps you would like. Nothing is written until you finish it, and nothing is ticked for you.
 
 <p>
-<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard.png" alt="The first start: the language, theme and icons the whole family shares, each with a box saying where the choice holds, and Start with the defaults" width="49%">
-<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard-family.png" alt="The first start asking which members of the family you would like, with a box beside each and nothing chosen" width="49%">
+<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard.png" alt="The first start: the language, theme and icons every Quvyta app shares, each with a box saying where the choice holds, and Start with the defaults" width="49%">
+<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/wizard-apps.png" alt="The first start asking which Quvyta apps you would like, with a box beside each and nothing chosen" width="49%">
 </p>
 
 <p>
@@ -34,12 +34,12 @@ The first start asks what the whole family should look like — the language, th
 </p>
 <p>
 <img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/path-notice.png" alt="After an install: the offer to put cargo's folder on PATH" width="49%">
-<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/family-tr.png" alt="The same list in Turkish, in the Nordic theme" width="49%">
+<img src="https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/apps-tr.png" alt="The same list in Turkish, in the Nordic theme" width="49%">
 </p>
 
-## The family
+## The apps
 
-| Member | Crate | Program | Install | Status |
+| App | Crate | Program | Install | Status |
 |---|---|---|---|---|
 | [Code](https://github.com/quvyta/code) | `quvyta-code` | `qcode` | `cargo install quvyta-code` | Beta |
 | [Focus](https://github.com/quvyta/focus) | `quvyta-focus` | `qfocus` | `cargo install quvyta-focus` | Beta |
@@ -65,7 +65,7 @@ Each application is also installed under its long name (`quvyta-code`, `quvyta-f
 
 ## Install
 
-One line installs any member of the family. Without a name it lists the family and lets you choose:
+One line installs any Quvyta app. Without a name it lists them all and lets you choose:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh
@@ -123,20 +123,20 @@ included). `↑` `↓` move through the list, `enter` opens the selected member 
 you do not have, `u` updates it, `r` looks for updates again, `tab` moves between controls and
 `ctrl+q` quits. On a narrow terminal the first `enter` shows a member's details and `esc` goes
 back to the list. The header has two tabs, Apps and Settings: click one, or reach them with `tab`
-and move with `←` `→`. Settings opens with the appearance the whole family
+and move with `←` `→`. Settings opens with the appearance every Quvyta app
 shares: the language, the colour theme and the icon set, each with a box saying whether the
 choice holds in every Quvyta application or in quvyta alone, and under them Reduce motion and
 the pillar. Below them are quvyta's own choices (checking for updates at start, what happens
 when a program closes, and whether `~/.cargo/bin` is on your PATH). `↑` `↓` pick a row, `enter`
 or `space` changes it, every change is saved at once and takes effect straight away, and `esc`
-goes back to Apps. A member that follows the family opens with what you chose here.
+goes back to Apps. An app that follows the shared settings opens with what you chose here.
 
 `quvyta show NAME` opens straight on one member's page, for example `quvyta show qfocus`; on a
 narrow terminal `esc` goes back to the list. `quvyta install NAME...` opens on the question
 before installing each member named, one after another. A name is a member's short name, its
 command or its package, and `quvyta --help` lists every form.
 
-![The Settings tab: the language, theme and icons the whole family shares, each with the box for changing it everywhere, and under them checking for updates at start, what happens when an app closes, and whether cargo's folder is on PATH](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/settings.png)
+![The Settings tab: the language, theme and icons every Quvyta app shares, each with the box for changing it everywhere, and under them checking for updates at start, what happens when an app closes, and whether cargo's folder is on PATH](https://raw.githubusercontent.com/quvyta/quvyta/main/docs/screenshots/settings.png)
 
 ## Installing, updating and removing
 
@@ -151,7 +151,7 @@ build fails, quvyta says why in a plain sentence, shows cargo's last lines and k
 log. If `~/.cargo/bin` is not on your PATH, it shows the line for your shell's start-up file and
 adds it if you agree.
 
-When quvyta starts it asks crates.io for the newest versions of the family, at most once a day
+When quvyta starts it asks crates.io for the newest versions of the Quvyta apps, at most once a day
 (see [What quvyta sends over the network](#what-quvyta-sends-over-the-network)). A member with a
 newer version says so in the list, and **Install updates** updates them all. Members installed some other way than cargo are left to whatever installed
 them. quvyta can update itself; the new version runs the next time you start it.
@@ -175,13 +175,13 @@ the file and never runs a member to find out.
 
 quvyta itself makes one kind of request: when it starts, at most once a day, it runs `cargo search quvyta`, which asks crates.io for the newest versions of the packages whose name starts with `quvyta`. Only that word goes into the question; nothing about you, your machine or what you have installed. The answer is kept in quvyta's data folder (`latest.toml`), so the other starts that day ask nothing. Without a network the question fails quietly and the last answer stands.
 
-This is the family's update notice, and it is on by default. One switch turns it off for every Quvyta application at once: **Say when an update is out** on the Settings tab, or this line in the family's shared file, `~/.config/quvyta/quvyta.conf` on Linux:
+This is the shared update notice of the Quvyta ecosystem, and it is on by default. One switch turns it off for every Quvyta application at once: **Say when an update is out** on the Settings tab, or this line in the shared file, `~/.config/quvyta/quvyta.conf` on Linux:
 
 ```toml
 update-notice = false
 ```
 
-With it off, quvyta asks nothing when it starts; pressing `r` still asks, since that is you asking. If you turned off quvyta's own `check_updates` in an earlier version, that choice is kept: the first start of this version turns the family's switch off and takes the old line out of `launcher.conf`.
+With it off, quvyta asks nothing when it starts; pressing `r` still asks, since that is you asking. If you turned off quvyta's own `check_updates` in an earlier version, that choice is kept: the first start of this version turns the shared switch off and takes the old line out of `launcher.conf`.
 
 Everything else that reaches the network is a command you asked for and saw first: `cargo install`, which downloads a member from crates.io, and **Install here**, which runs the line shown in the question.
 

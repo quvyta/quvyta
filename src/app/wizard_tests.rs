@@ -19,7 +19,7 @@ use crate::install::tests::{packages, scenario};
 use crate::inventory::tests::{machine_with_cargo, write_program};
 use crate::machine::Machine;
 
-/// A machine in `root` with cargo and a C linker, where nothing of the family is installed and
+/// A machine in `root` with cargo and a C linker, where no Quvyta app is installed and
 /// quvyta has no settings file: the machine of a first start. `distro` is what
 /// `/etc/os-release` says, which decides whether the members that run on Arch Linux only can be
 /// chosen.
@@ -57,7 +57,7 @@ fn folder(root: &Path) -> Vec<String> {
 }
 
 /// Goes to quvyta's own step of the wizard.
-fn to_family_step(h: &mut Harness<Quvyta>) {
+fn to_apps_step(h: &mut Harness<Quvyta>) {
     h.send(Msg::Setup(SetupMsg::Next));
 }
 
@@ -77,7 +77,7 @@ fn it_opens_while_quvyta_has_no_settings_file_of_its_own() {
     for text in ["quvyta", "Appearance", "Applications", "In every Quvyta application", "Start with the defaults"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    assert!(!screen.contains("not installed"), "the family list waits its turn:\n{screen}");
+    assert!(!screen.contains("not installed"), "the app list waits its turn:\n{screen}");
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn someone_who_has_used_quvyta_before_is_not_asked() {
     fs::write(root.path().join("config/launcher.conf"), "after_close = \"shell\"\n").expect("settings");
     let h = start(root.path(), "ID=debian\n", 80, 30);
     assert!(!h.app().setting_up(), "{}", h.screen());
-    assert!(h.screen().contains("qcode"), "the family is there at once:\n{}", h.screen());
+    assert!(h.screen().contains("qcode"), "the app list is there at once:\n{}", h.screen());
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn closing_it_half_way_writes_nothing_at_all() {
     let mut h = wizard(root.path());
     assert_eq!(folder(root.path()), Vec::<String>::new(), "nothing is written before it is asked");
     h.send(Msg::Setup(SetupMsg::Appearance(AppearanceChange::Theme("nordic".to_owned()))));
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     h.send(Msg::Wizard(WizardMsg::Pick(index("code"), true)));
     assert_eq!(folder(root.path()), Vec::<String>::new(), "half-way through, the folder is as it was");
     // Next start: the wizard is there again, with nothing remembered.
@@ -116,18 +116,18 @@ fn starting_with_the_defaults_writes_both_files_and_never_asks_again() {
     assert_eq!(folder(root.path()), ["launcher.conf", "quvyta.conf"]);
     let text = fs::read_to_string(root.path().join("config/launcher.conf")).expect("written");
     assert!(text.contains("after_close = \"return\""), "{text}");
-    assert!(!text.contains("check_updates"), "the update notice is the family's, not quvyta's:\n{text}");
-    assert!(h.screen().contains("qcode"), "the family has the screen:\n{}", h.screen());
+    assert!(!text.contains("check_updates"), "the update notice is the shared one, not quvyta's:\n{text}");
+    assert!(h.screen().contains("qcode"), "the app list has the screen:\n{}", h.screen());
     assert!(h.app().installs.dialog.is_none(), "nothing was asked to be installed");
     let again = start(root.path(), "ID=debian\n", 80, 30);
     assert!(!again.app().setting_up(), "{}", again.screen());
 }
 
 #[test]
-fn the_family_step_says_what_each_member_is_and_checks_nothing_by_itself() {
+fn the_apps_step_says_what_each_member_is_and_checks_nothing_by_itself() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     let screen = h.screen();
     assert!(screen.contains("Which of them would you like?"), "{screen}");
     for (command, line) in [
@@ -147,7 +147,7 @@ fn the_family_step_says_what_each_member_is_and_checks_nothing_by_itself() {
 fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     let screen = h.screen();
     for command in ["qtools", "qpac"] {
         assert!(screen.contains(command), "`{command}` is still listed:\n{screen}");
@@ -161,7 +161,7 @@ fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
 
     let arch = tempfile::tempdir().expect("temp");
     let mut h = start(arch.path(), "ID=arch\n", 80, 30);
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     assert!(!h.screen().contains("Arch Linux only"), "on Arch there is nothing to say:\n{}", h.screen());
     h.send(Msg::Wizard(WizardMsg::Pick(index("tools"), true)));
     assert!(h.app().picked[index("tools")], "on Arch qtools can be chosen");
@@ -172,7 +172,7 @@ fn a_member_that_is_not_out_yet_cannot_be_checked_at_all() {
     for distro in ["ID=debian\n", "ID=arch\n"] {
         let root = tempfile::tempdir().expect("temp");
         let mut h = start(root.path(), distro, 80, 30);
-        to_family_step(&mut h);
+        to_apps_step(&mut h);
         let screen = h.screen();
         assert!(screen.contains("qdesk") && screen.contains("Not out yet"), "{distro}:\n{screen}");
         assert!(!h.app().choosable(index("desk")), "{distro}");
@@ -187,7 +187,7 @@ fn finishing_with_two_members_checked_asks_for_each_in_turn_and_queues_them() {
     let mut h = wizard(root.path());
     packages(root.path());
     scenario(root.path(), "  Installing /x/.cargo/bin/qcode\n", 0);
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     h.send(Msg::Wizard(WizardMsg::Pick(index("code"), true)));
     h.send(Msg::Wizard(WizardMsg::Pick(index("framework"), true)));
     finish(&mut h);
@@ -210,17 +210,17 @@ fn finishing_with_two_members_checked_asks_for_each_in_turn_and_queues_them() {
 }
 
 #[test]
-fn finishing_with_nothing_checked_lands_on_the_family_list() {
+fn finishing_with_nothing_checked_lands_on_the_app_list() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     finish(&mut h);
     assert!(!h.app().setting_up());
     assert!(h.app().installs.dialog.is_none() && h.app().installs.queue.is_empty(), "nothing was asked for");
     let screen = h.screen();
     assert_eq!(h.app().tab, Tab::Apps);
     assert!(screen.contains("qcode") && screen.contains("not installed"), "{screen}");
-    assert!(h.is_focused("family"), "the list has the keys:\n{screen}");
+    assert!(h.is_focused("apps"), "the list has the keys:\n{screen}");
 }
 
 #[test]
@@ -229,12 +229,12 @@ fn the_appearance_chosen_in_the_wizard_is_what_the_application_draws() {
     let mut h = wizard(root.path());
     h.send(Msg::Setup(SetupMsg::Appearance(AppearanceChange::Language("tr".to_owned()))));
     assert!(h.screen().contains("Uygulamalar"), "the wizard turns Turkish at once:\n{}", h.screen());
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     finish(&mut h);
     let screen = h.screen();
     assert!(screen.contains("Uygulamalar") && screen.contains("kurulu değil"), "and stays Turkish:\n{screen}");
     let shared = fs::read_to_string(root.path().join("config/quvyta.conf")).expect("written");
-    assert!(shared.contains("language = \"tr\""), "the family keeps it:\n{shared}");
+    assert!(shared.contains("language = \"tr\""), "the shared file keeps it:\n{shared}");
     // The Settings tab carries on from what was chosen, rather than from what was detected.
     h.send(Msg::Tab(Tab::Settings));
     assert!(h.screen().contains("Türkçe"), "{}", h.screen());
@@ -245,7 +245,7 @@ fn turkish_reads_naturally() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     h.set_locale("tr");
-    to_family_step(&mut h);
+    to_apps_step(&mut h);
     let screen = h.screen();
     for text in ["Hangilerini istersin?", "Yalnızca Arch Linux", "Henüz çıkmadı", "Kodlama ajanlarını"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
@@ -260,7 +260,7 @@ fn a_narrow_screen_and_ascii_keep_the_rules() {
         h.set_locale(locale).set_glyph_mode(GlyphMode::Ascii);
         for step in 0..2 {
             if step == 1 {
-                to_family_step(&mut h);
+                to_apps_step(&mut h);
             }
             let screen = h.screen();
             assert!(screen.contains("quvyta"), "{locale} step {step}:\n{screen}");
@@ -291,7 +291,7 @@ pub(in crate::app) fn review() -> Vec<String> {
             h.set_locale(locale);
             for (step, name) in ["appearance", "applications"].iter().enumerate() {
                 if step == 1 {
-                    to_family_step(&mut h);
+                    to_apps_step(&mut h);
                 }
                 let title = format!("setup {name} {locale} {width}x{height}");
                 fragments.push(h.html(&title));

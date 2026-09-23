@@ -2,6 +2,10 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.3.0 (2026-09-23)
+
+- The Quvyta apps are now called the Quvyta ecosystem everywhere quvyta speaks of them, instead of a family: in the descriptions on the list, the command-line help and messages, the notes about Rust and cargo before an install, the one-line installers, the README and the package description, in all nine languages. Nothing else changes: the same apps, the same settings files and the same shared switch.
+
 ## 0.2.10 (2026-09-23)
 
 - A member can be put back on the family's settings from quvyta. On the Settings tab, press enter on or click a member in the follow table that chose a language, theme or icon set of its own: a small menu offers to follow the shared one again, one choice for each setting it does not share. Only that setting changes in the member's own file; the family's shared settings and the member's other settings stay as they are. On a narrow terminal the same choices are buttons under the member. A member that shares everything, has never been opened, or has a file quvyta cannot read offers nothing, and quvyta never writes to a file it could not read.

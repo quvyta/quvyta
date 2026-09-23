@@ -56,34 +56,34 @@ update = "güncelle"
 refresh = "güncellemeleri denetle"
 apps = "uygulamalar"
 
-[family.code]
+[apps.code]
 title = "Quvyta Code"
 summary = "Kodlama ajanlarını Podman ya da Docker kapsayıcılarında çalıştırır. Bir profili bir kez kurarsın, sonra onu istediğin projede açar, ajanlar ve kabuklar arasında sekme gibi geçersin."
 
-[family.focus]
+[apps.focus]
 title = "Quvyta Focus"
 summary = "Terminalde odak takibi. Üzerinde çalıştığın şeye bir sayaç başlatırsın, zamanının nereye gittiğini gün, hafta, ay ve yıl grafikleriyle görürsün."
 
-[family.tools]
+[apps.tools]
 title = "Quvyta Tools"
 summary = "Arch Linux kullanıcılarının genelde elle yaptığı ayarları tek bir listeden uygular: yansılar, pacman, bir AUR yardımcısı, güvenlik duvarı, SSH ve fazlası. Her madde neye dokunacağını gösterir, yedek alır ve geri alınabilir."
 
-[family.packages]
+[apps.packages]
 title = "Quvyta Packages"
 summary = "Arch Linux için, bir şey değişmeden önce neyin değişeceğini tam olarak gösteren bir paket yöneticisi. Bu ilk sürüm pacman paketlerini yönetir; AUR, Flatpak ve Snap tanınır ama henüz yönetilmez."
 
-[family.desk]
+[apps.desk]
 title = "Quvyta Desktop"
 summary = "Terminalin içinde çalışan bir masaüstü: pencereler, bir dock, bir başlatıcı ve bir dosya yöneticisi; SSH üzerinden çalışmak ve küçük makineler için yapıldı. Bir sunucuda qdesk yazarsın, programları tek bir kısayol ezberlemeden fareyle yan yana açarsın."
 
-[family.framework]
+[apps.framework]
 title = "Quvyta Framework"
-summary = "Framework'ün vitrini: ailenin bütün bileşenleri, temaları, ikon setleri ve dilleri, canlı olarak denemek için."
+summary = "Framework'ün vitrini: Quvyta uygulamalarının bütün bileşenleri, temaları, ikon setleri ve dilleri, canlı olarak denemek için."
 library = "Framework'ün kendisi bir Rust kütüphanesi: bütün Quvyta uygulamalarının üzerinde durduğu çalışma zamanı, bileşenler, tema, ikon ve dil dosyaları. Herkes kendi terminal uygulamasını onunla yazabilir."
 
-[family.quvyta]
+[apps.quvyta]
 title = "Quvyta"
-summary = "Bu uygulama: aileyi listeler, üyelerini kurar, açar, güncel tutar ve kaldırır."
+summary = "Bu uygulama: Quvyta uygulamalarını listeler, kurar, açar, güncel tutar ve kaldırır."
 
 [open]
 notice = "{command} açılıyor…"
@@ -110,12 +110,12 @@ update-title = "{command} {from} sürümünden {to} sürümüne güncellensin mi
 update = "Güncelle"
 
 [checks]
-no-cargo = "Rust'ın paket aracı cargo kurulu değil; aile onunla derleniyor."
+no-cargo = "Rust'ın paket aracı cargo kurulu değil; Quvyta uygulamaları onunla derleniyor."
 rustup = "Rust'ı resmî kurucusu rustup ile kur"
 rustup-site = "rustup'ın kendi sayfası, öteki kurma yollarıyla"
 install-here = "Burada kur"
 rustup-here = "Bu terminalde çalışır; rustup kendi sorularını sorar, sudo gerekmez."
-old-rust = "Kurulu Rust {version}; aile {needed} ya da daha yenisini istiyor."
+old-rust = "Kurulu Rust {version}; Quvyta uygulamaları {needed} ya da daha yenisini istiyor."
 rustup-update = "rustup onu rustup update stable ile güncelleyebilir."
 update-rust = "Rust'ı güncelle"
 update-rust-yourself = "Rust'ı hangi araçla kurduysan onunla güncelle, sonra yeniden denetle."
@@ -214,17 +214,17 @@ failed = "Satır eklenemedi. Kendin ekleyebilirsin: satıra tıklayınca kopyala
 not-remembered = "Cevap launcher.conf'a yazılamadı"
 
 [cli]
-about = "Quvyta ailesinin terminal uygulamalarını kurar, açar ve günceller."
+about = "Quvyta ekosisteminin terminal uygulamalarını kurar, açar ve günceller."
 usage = "Kullanım"
 name = "AD"
-list = "aile listesini açar"
+list = "Quvyta uygulamalarının listesini açar"
 install = "bu üyeleri kurmak için sırayla onay ister"
 show = "bu üyenin sayfasını açar"
 help = "bu yardımı gösterir"
 version = "sürümü gösterir"
 names = "Ad olarak üyenin kısa adı (code), komutu (qcode) ya da paketi (quvyta-code) yazılabilir."
 unknown-option = "{option} diye bir seçenek yok"
-unknown-name = "ailede {name} adında bir üye yok"
+unknown-name = "{name} adında bir Quvyta uygulaması yok"
 unknown-command = "quvyta {command} diye bir iş bilmiyor"
 no-names = "install en az bir ad bekliyor, örneğin qcode"
 show-no-name = "show bir ad bekliyor, örneğin qfocus"

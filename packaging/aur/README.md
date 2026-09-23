@@ -1,8 +1,8 @@
 # AUR drafts
 
-These are draft `PKGBUILD` files for putting the Quvyta family on the [AUR](https://aur.archlinux.org), Arch Linux's user repository. **Nothing here is published.** No AUR package exists, no account has been made, and no upload will happen without the owner's explicit approval. Until then this folder is only a prepared answer to "could we ship this on Arch?".
+These are draft `PKGBUILD` files for putting the Quvyta apps on the [AUR](https://aur.archlinux.org), Arch Linux's user repository. **Nothing here is published.** No AUR package exists, no account has been made, and no upload will happen without the owner's explicit approval. Until then this folder is only a prepared answer to "could we ship this on Arch?".
 
-Today the way to install the family on Arch is `cargo install`, or the `quvyta` program itself, which does that for you.
+Today the way to install the Quvyta apps on Arch is `cargo install`, or the `quvyta` program itself, which does that for you.
 
 There is one folder per released member:
 
@@ -15,9 +15,9 @@ There is one folder per released member:
 | `quvyta-tools/` | `qtools`, `quvyta-tools` | <https://github.com/quvyta/tools> |
 | `quvyta-framework-showcase/` | `qframe`, `quvyta-framework-showcase` | <https://github.com/quvyta/framework> |
 
-Two members of the family are deliberately missing:
+Two Quvyta apps are deliberately missing:
 
-- **`quvyta-desktop` (`qdesk`)** is not released. It is listed in the family as coming soon and there is nothing on crates.io to build from, so there is nothing to package. It gets a folder when it is published.
+- **`quvyta-desktop` (`qdesk`)** is not released. It is listed among the Quvyta apps as coming soon and there is nothing on crates.io to build from, so there is nothing to package. It gets a folder when it is published.
 - **`quvyta-framework`** is a Rust library, not a program. Arch does not package Rust libraries; people who build against it get it from crates.io. The showcase, which is a program, stands for it here.
 
 ## What a PKGBUILD here does
@@ -90,4 +90,4 @@ All of it waits for the owner's approval. When that comes:
 4. Only the `PKGBUILD`, the `.SRCINFO` and any files the build needs go in that repository; nothing else.
 5. Every new version repeats it: bump `pkgver`, reset `pkgrel` to `1`, `updpkgsums`, regenerate `.SRCINFO`, build it once in a clean container, then push.
 
-The order the family publishes in is GitHub releases and crates.io first, then the AUR, then Debian.
+The order the Quvyta apps publish in is GitHub releases and crates.io first, then the AUR, then Debian.

@@ -6,7 +6,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use quvyta::{FAMILY, Status};
+use quvyta::{APPS, Status};
 
 #[test]
 fn install_script_cases_pass() {
@@ -21,7 +21,7 @@ fn install_script_cases_pass() {
     );
 }
 
-/// Reads one quoted field such as `Crate = 'quvyta-code'` from a line of `Get-QuvytaFamily`.
+/// Reads one quoted field such as `Crate = 'quvyta-code'` from a line of `Get-QuvytaApps`.
 fn ps1_field(line: &str, field: &str) -> String {
     let start = line.find(&format!("{field} = ")).unwrap_or_else(|| panic!("no {field} in: {line}")) + field.len() + 3;
     let rest = &line[start..];
@@ -56,7 +56,7 @@ fn sh_case(script: &str, function: &str, name: &str) -> Option<String> {
 }
 
 #[test]
-fn both_installers_know_the_same_family() {
+fn both_installers_know_the_same_apps() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let sh = std::fs::read_to_string(root.join("install.sh")).expect("install.sh is readable");
     let ps1 = std::fs::read_to_string(root.join("install.ps1")).expect("install.ps1 is readable");
@@ -76,7 +76,7 @@ fn both_installers_know_the_same_family() {
         .expect("install.sh lists the members that are not released yet")
         .trim_end_matches('"');
     for name in soon.split_whitespace() {
-        assert!(names.iter().any(|known| known == name), "{name} is not a member of the family");
+        assert!(names.iter().any(|known| known == name), "{name} is not a Quvyta app");
     }
     for line in members {
         let name = ps1_field(line, "Name");
@@ -89,7 +89,7 @@ fn both_installers_know_the_same_family() {
         assert_eq!(ps1_field(line, "Soon") == "true", sh_soon, "whether {name} is not released yet");
         // The screen knows the same members the two installers do: the setup wizard offers a
         // member that runs on Arch Linux only nowhere else, as they install it nowhere else.
-        let member = FAMILY.iter().find(|member| member.key == name).expect("the screen knows {name}");
+        let member = APPS.iter().find(|member| member.key == name).expect("the screen knows {name}");
         assert_eq!(member.arch_only, sh_arch, "whether {name} runs on Arch Linux only");
         assert_eq!(member.status == Status::Soon, sh_soon, "whether {name} is out");
     }

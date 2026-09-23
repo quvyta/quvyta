@@ -236,7 +236,7 @@ fn without_cargo_the_dialog_shows_rustup_and_offers_to_run_it() {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
     assert!(!screen.contains("install --locked"), "there is no cargo to show a command for:\n{screen}");
-    assert!(!screen.contains("install.sh"), "the family's script would build quvyta again:\n{screen}");
+    assert!(!screen.contains("install.sh"), "the Quvyta install script would build quvyta again:\n{screen}");
     click_beside(&mut h, "curl --proto", "copy");
     assert_eq!(h.copied(), [crate::checks::RUSTUP_INSTALL]);
     h.send(install(InstallMsg::Confirm));
@@ -279,7 +279,7 @@ fn with_rust(version: &str, rustup: bool) -> (TempDir, Harness<Quvyta>) {
 fn an_old_rust_with_rustup_is_updated_in_the_terminal_and_checked_again() {
     let (root, mut h) = with_rust("1.80.1", true);
     let screen = h.screen();
-    assert!(screen.contains("Rust 1.80.1 is installed; the family needs 1.95 or later."), "{screen}");
+    assert!(screen.contains("Rust 1.80.1 is installed; the Quvyta apps need 1.95 or later."), "{screen}");
     assert!(screen.contains("Update Rust") && !screen.contains("  Install  "), "{screen}");
     // rustup does its work; afterwards rustc answers with the new version.
     write_program(&root.path().join("bin/rustc"), "#!/bin/sh\necho 'rustc 1.95.0 (29483883e 2026-08-07)'\n");
@@ -977,7 +977,7 @@ fn reads_fully(h: &Harness<Quvyta>, scene: &str, locale: &str, width: u16, label
 
 /// The narrowest screen on which the details sit beside the list in `locale`: the split is at
 /// its tightest there, so that is where a row of buttons is likeliest to lose its end. The
-/// screen answers it, since a member's page shows the rest of the family only beside it.
+/// screen answers it, since a member's page shows the rest of the list only beside it.
 fn splits_at(locale: &str) -> u16 {
     let (_root, mut h) = harness(40, 30);
     h.set_locale(locale).send(Msg::ShowDetail(index("tools")));

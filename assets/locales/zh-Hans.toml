@@ -58,34 +58,34 @@ update = "更新"
 refresh = "检查更新"
 apps = "应用"
 
-[family.code]
+[apps.code]
 title = "Quvyta Code"
 summary = "在 Podman 或 Docker 容器里运行编程助手。配置一次，就能在任何项目里打开它，在各个助手和 shell 之间像切换标签页一样来回走。"
 
-[family.focus]
+[apps.focus]
 title = "Quvyta Focus"
 summary = "终端里的专注记录。为手头的事开一个计时器，再用日、周、月、年的图看时间都花到哪儿去了。"
 
-[family.tools]
+[apps.tools]
 title = "Quvyta Tools"
 summary = "把 Arch Linux 用户平时手动做的设置集中到一张清单里：镜像源、pacman、AUR 助手、防火墙、SSH 等等。每一项都会先说明它要改什么，留好备份，并且可以撤销。"
 
-[family.packages]
+[apps.packages]
 title = "Quvyta Packages"
 summary = "为 Arch Linux 写的包管理器，在动手之前把要改的东西原原本本摆出来。第一个版本管理 pacman 的软件包；AUR、Flatpak 和 Snap 能认出来，但还不归它管。"
 
-[family.desk]
+[apps.desk]
 title = "Quvyta Desktop"
 summary = "跑在终端里的桌面：窗口、程序坞、启动器和文件管理器，为通过 SSH 工作和小机器而做。在服务器上敲 qdesk，就能用鼠标把程序并排打开，一个快捷键也不用记。"
 
-[family.framework]
+[apps.framework]
 title = "Quvyta Framework"
-summary = "框架的展示厅：这一家子的所有组件、主题、图标集和语言，都能现场试。"
+summary = "框架的展示厅：Quvyta 应用的所有组件、主题、图标集和语言，都能现场试。"
 library = "框架本身是一个 Rust 库：运行时、组件，以及每个 Quvyta 应用所依托的主题、图标和语言文件。谁都可以用它写自己的终端应用。"
 
-[family.quvyta]
+[apps.quvyta]
 title = "Quvyta"
-summary = "就是这个应用：列出这一家子，安装它们、打开它们、保持更新，也可以卸载。"
+summary = "就是这个应用：列出 Quvyta 应用，安装它们、打开它们、保持更新，也可以卸载。"
 
 [open]
 notice = "正在打开 {command}…"
@@ -112,12 +112,12 @@ update-title = "把 {command} 从 {from} 更新到 {to} 吗？"
 update = "更新"
 
 [checks]
-no-cargo = "Rust 的包工具 cargo 没有安装，而这一家子都是用它编译的。"
+no-cargo = "Rust 的包工具 cargo 没有安装，而 Quvyta 应用都是用它编译的。"
 rustup = "用官方安装器 rustup 安装 Rust"
 rustup-site = "rustup 自己的页面，上面有其他安装方式"
 install-here = "在这里安装"
 rustup-here = "它在这个终端里运行；rustup 会问它自己的问题，不需要 sudo。"
-old-rust = "本机的 Rust 是 {version}；这一家子需要 {needed} 或更新的版本。"
+old-rust = "本机的 Rust 是 {version}；Quvyta 应用需要 {needed} 或更新的版本。"
 rustup-update = "rustup 可以用 rustup update stable 把它更新上来。"
 update-rust = "更新 Rust"
 update-rust-yourself = "用当初安装 Rust 的那个工具更新它，然后再检查一次。"
@@ -216,17 +216,17 @@ failed = "这一行加不进去。你可以自己加：点一下这一行就复�
 not-remembered = "launcher.conf 没能记住这个回答"
 
 [cli]
-about = "安装、打开并更新 Quvyta 这一家子的终端应用。"
+about = "安装、打开并更新 Quvyta 生态中的终端应用。"
 usage = "用法"
 name = "名字"
-list = "打开家族列表"
+list = "打开 Quvyta 应用列表"
 install = "逐个询问是否安装这些成员"
 show = "直接打开这个成员的页面"
 help = "显示这份帮助"
 version = "显示版本"
 names = "名字可以是成员的简称（code）、命令（qcode）或软件包名（quvyta-code）。"
 unknown-option = "没有 {option} 这个选项"
-unknown-name = "这一家子里没有叫 {name} 的成员"
+unknown-name = "没有名为 {name} 的 Quvyta 应用"
 unknown-command = "quvyta 不做 {command} 这件事"
 no-names = "install 至少要一个名字，比如 qcode"
 show-no-name = "show 要一个名字，比如 qfocus"

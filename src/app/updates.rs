@@ -8,7 +8,7 @@ use qframe::prelude::*;
 
 use super::installs::{Action, InstallMsg};
 use super::{Msg, Quvyta};
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::updates::{self, Check, Latest};
 
 /// Everything that happens to updates.
@@ -45,7 +45,7 @@ impl Quvyta {
     /// pins, so the version the dialog shows is the one installed. A member not released yet has
     /// none, whatever crates.io says: a crate under its name is not the member.
     pub(super) fn latest_version(&self, index: usize) -> Option<String> {
-        let member = FAMILY.get(index).filter(|member| member.published())?;
+        let member = APPS.get(index).filter(|member| member.published())?;
         Some(self.updates.latest.as_ref()?.version(member.package)?.to_owned())
     }
 
@@ -64,7 +64,7 @@ impl Quvyta {
 
     /// The members with an update not on its way yet, in the order of the list.
     fn outdated(&self) -> impl Iterator<Item = usize> + '_ {
-        (0..FAMILY.len()).filter(|index| self.updatable(*index))
+        (0..APPS.len()).filter(|index| self.updatable(*index))
     }
 
     pub(super) fn update_update(&mut self, msg: UpdateMsg) -> Command<Msg> {

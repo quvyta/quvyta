@@ -6,7 +6,7 @@
 pkgname=quvyta
 pkgver=0.2.4
 pkgrel=1
-pkgdesc="Installs, opens and updates the Quvyta family of terminal applications (beta)"
+pkgdesc="Installs, opens and updates the terminal applications of the Quvyta ecosystem (beta)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/quvyta/quvyta"
 license=('MIT')

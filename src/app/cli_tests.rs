@@ -119,7 +119,7 @@ fn show_opens_on_the_member_s_details_beside_the_list() {
     assert!(screen.contains("Quvyta Focus") && screen.contains("qtools"), "{screen}");
     assert!(super::tests::line_with(&screen, "qfocus").contains('▌'), "its row is the one selected:\n{screen}");
     assert!(h.app().installs.dialog.is_none() && h.handoffs().is_empty(), "showing starts nothing");
-    assert!(h.is_focused("family"), "the list keeps the keys:\n{screen}");
+    assert!(h.is_focused("apps"), "the list keeps the keys:\n{screen}");
 }
 
 #[test]

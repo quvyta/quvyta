@@ -34,18 +34,18 @@ fn launcher_conf(root: &Path) -> String {
     fs::read_to_string(root.join("config/launcher.conf")).expect("written")
 }
 
-/// What the family's shared file holds now.
+/// What the shared file holds now.
 fn quvyta_conf(root: &Path) -> String {
     fs::read_to_string(root.join("config/quvyta.conf")).expect("written")
 }
 
-/// The appearance the family shares, as the shared file holds it before a test starts. Written by
+/// The appearance every Quvyta app shares, as the shared file holds it before a test starts. Written by
 /// hand rather than detected, so the rows start from the same values on every machine.
 const SHARED: &str = "language = \"en\"\ntheme = \"monochrome\"\nicons = \"unicode\"\n";
 
-/// The machine of [`machine`] whose family folder already holds the shared file `shared` and, when
+/// The machine of [`machine`] whose shared folder already holds the shared file `shared` and, when
 /// `own` is not empty, quvyta's own `launcher.conf`.
-fn family_files(root: &Path, shared: &str, own: &str) -> Machine {
+fn shared_files(root: &Path, shared: &str, own: &str) -> Machine {
     fs::create_dir_all(root.join("config")).expect("folder");
     fs::write(root.join("config/quvyta.conf"), shared).expect("shared file");
     if !own.is_empty() {
@@ -56,7 +56,7 @@ fn family_files(root: &Path, shared: &str, own: &str) -> Machine {
 
 /// The Settings tab on a screen tall enough for both sections, with the shared file in place.
 fn shared_settings(root: &Path) -> Harness<Quvyta> {
-    settings_on(family_files(root, SHARED, ""), 100, 44)
+    settings_on(shared_files(root, SHARED, ""), 100, 44)
 }
 
 /// Where `text` starts on `screen`.
@@ -65,7 +65,7 @@ fn at(screen: &str, text: &str) -> usize {
 }
 
 #[test]
-fn the_appearance_the_family_shares_stands_above_quvyta_s_own_settings() {
+fn the_appearance_every_app_shares_stands_above_quvyta_s_own_settings() {
     let root = tempfile::tempdir().expect("temp");
     let h = shared_settings(root.path());
     let screen = h.screen();
@@ -77,14 +77,14 @@ fn the_appearance_the_family_shares_stands_above_quvyta_s_own_settings() {
     assert!(at(&screen, "Pillar") < at(&screen, "Say when an update is out"), "{screen}");
     assert!(
         at(&screen, "Say when an update is out") < at(&screen, "launcher.conf"),
-        "the family's switch is its own:\n{screen}"
+        "the shared switch is its own:\n{screen}"
     );
     // quvyta writes no appearance row of its own: the three rows and their boxes are the only ones.
     // The follow table below names the same keys over its columns.
     let appearance = &screen[..at(&screen, "Do the applications follow the shared settings")];
     assert_eq!(appearance.matches("Language").count(), 1, "{screen}");
     let prefs = h.app().preferences();
-    assert_eq!(prefs.theme().source, Source::Family, "quvyta follows the family it shows");
+    assert_eq!(prefs.theme().source, Source::Family, "quvyta follows the shared values it shows");
     assert_eq!(prefs.language().value, "en");
 }
 
@@ -98,16 +98,16 @@ fn a_theme_chosen_here_goes_to_the_shared_file_and_every_member_follows() {
     assert!(quvyta_conf(root.path()).contains("theme = \"nordic\""), "{}", quvyta_conf(root.path()));
     assert!(quvyta_conf(root.path()).contains("language = \"en\""), "the other shared keys stay");
     assert_eq!(launcher_conf(root.path()), "theme = \"quvyta\"\n", "quvyta's own file says it follows");
-    // Another member of the family reads the same theme from the shared file.
+    // Another Quvyta app reads the same theme from the shared file.
     let folder = root.path().join("config");
     let code = Family::QUVYTA.preferences_in(&folder, "code", &I18n::builtin());
     assert_eq!(code.theme().value, "nordic");
 }
 
 #[test]
-fn clearing_the_box_keeps_the_choice_to_quvyta_and_leaves_the_family_alone() {
+fn clearing_the_box_keeps_the_choice_to_quvyta_and_leaves_the_shared_file_alone() {
     let root = tempfile::tempdir().expect("temp");
-    let mut h = settings_on(family_files(root.path(), SHARED, "after_close = \"shell\"\n"), 100, 44);
+    let mut h = settings_on(shared_files(root.path(), SHARED, "after_close = \"shell\"\n"), 100, 44);
     // The box under the theme row: the keys reach it from the row above, since all three boxes
     // read the same.
     h.click_text("Theme");
@@ -117,19 +117,19 @@ fn clearing_the_box_keeps_the_choice_to_quvyta_and_leaves_the_family_alone() {
     assert_eq!(h.env().theme().id(), "iris");
     let own = launcher_conf(root.path());
     assert!(own.contains("theme = \"iris\"") && own.contains("after_close = \"shell\""), "{own}");
-    assert!(quvyta_conf(root.path()).contains("theme = \"monochrome\""), "the family keeps its theme");
+    assert!(quvyta_conf(root.path()).contains("theme = \"monochrome\""), "the shared file keeps its theme");
 
-    // Checking it again hands the value to the family and quvyta follows it once more.
+    // Checking it again hands the value to the shared file and quvyta follows it once more.
     h.send(Msg::Setting(SettingMsg::Appearance(AppearanceChange::Everywhere(qframe::storage::Shared::Theme, true))));
     assert!(quvyta_conf(root.path()).contains("theme = \"iris\""), "{}", quvyta_conf(root.path()));
     assert!(launcher_conf(root.path()).contains("theme = \"quvyta\""), "{}", launcher_conf(root.path()));
 }
 
 #[test]
-fn quvyta_in_its_own_file_follows_the_family_and_its_own_value_does_not() {
+fn quvyta_in_its_own_file_follows_the_shared_value_and_its_own_value_does_not() {
     let root = tempfile::tempdir().expect("temp");
     let shared = "language = \"tr\"\ntheme = \"nordic\"\nicons = \"unicode\"\n";
-    let following = family_files(root.path(), shared, "theme = \"quvyta\"\nafter_close = \"shell\"\n");
+    let following = shared_files(root.path(), shared, "theme = \"quvyta\"\nafter_close = \"shell\"\n");
     let h = settings_on(following, 100, 44);
     let prefs = h.app().preferences();
     assert_eq!((prefs.theme().value.as_str(), prefs.theme().source), ("nordic", Source::Family));
@@ -139,7 +139,7 @@ fn quvyta_in_its_own_file_follows_the_family_and_its_own_value_does_not() {
     let screen = h.screen();
     assert_eq!(screen.matches("In every Quvyta application").count(), 3, "{screen}");
 
-    let own = family_files(root.path(), shared, "theme = \"amber\"\n");
+    let own = shared_files(root.path(), shared, "theme = \"amber\"\n");
     let h = settings_on(own, 100, 44);
     let prefs = h.app().preferences();
     assert_eq!((prefs.theme().value.as_str(), prefs.theme().source), ("amber", Source::App));
@@ -199,18 +199,18 @@ fn the_keyboard_reaches_the_tabs_with_tab_and_moves_between_them_with_their_keys
     h.press("right").press("tab");
     assert!(h.is_focused("page"), "tab goes on to the page, which scrolls");
     h.press("tab");
-    assert!(h.is_focused("appearance"), "and then to the appearance the family shares");
+    assert!(h.is_focused("appearance"), "and then to the appearance every app shares");
     h.press("tab");
-    assert!(h.is_focused("following-table"), "and then to the table of who follows the family");
+    assert!(h.is_focused("following-table"), "and then to the table of who follows the shared values");
     h.press("tab");
     assert!(h.is_focused("settings"), "and then to quvyta's own settings");
     h.press("esc");
-    assert!(h.screen().contains("Quvyta Code"), "esc goes back to the family:\n{}", h.screen());
-    assert!(h.is_focused("family"), "and gives the list the keys");
+    assert!(h.screen().contains("Quvyta Code"), "esc goes back to the app list:\n{}", h.screen());
+    assert!(h.is_focused("apps"), "and gives the list the keys");
 }
 
 #[test]
-fn the_settings_hints_leave_out_the_family_s_keys_and_those_keys_do_nothing() {
+fn the_settings_hints_leave_out_the_app_list_s_keys_and_those_keys_do_nothing() {
     let (_root, mut h) = harness(100, 24);
     let apps = h.screen();
     assert!(footer(&apps).contains("check for updates"), "{apps}");
@@ -225,12 +225,12 @@ fn the_settings_hints_leave_out_the_family_s_keys_and_those_keys_do_nothing() {
 }
 
 #[test]
-fn the_update_notice_is_the_family_s_one_switch_written_to_the_shared_file() {
+fn the_update_notice_is_one_shared_switch_written_to_the_shared_file() {
     let root = tempfile::tempdir().expect("temp");
     let own = "after_close = \"shell\"\npath_prompt = \"dismissed\"\n";
-    let mut h = settings_on(family_files(root.path(), SHARED, own), 100, 44);
+    let mut h = settings_on(shared_files(root.path(), SHARED, own), 100, 44);
     let screen = h.screen();
-    assert!(screen.contains("For all Quvyta applications at once"), "in the family's words:\n{screen}");
+    assert!(screen.contains("For all Quvyta applications at once"), "in the framework's words:\n{screen}");
     assert!(!screen.contains("Check for updates at start"), "one switch, not quvyta's own beside it:\n{screen}");
     assert!(at(&screen, "Say when an update is out") < at(&screen, "When an app closes"), "{screen}");
     h.click_text("Say when an update is out");
@@ -407,7 +407,7 @@ fn narrow_ascii_settings_keep_the_rules() {
             h.set_locale(locale).set_glyph_mode(GlyphMode::Ascii);
             let screen = h.screen();
             assert!(screen.contains("quvyta"), "{width}x{height}:\n{screen}");
-            // The heading of the rows the family shares comes from the framework, in this
+            // The heading of the shared rows comes from the framework, in this
             // language, so the test asks it rather than spelling it out nine times.
             let heading = h.env().i18n().translate("quvyta.appearance.heading", &[]);
             assert!(screen.contains(&heading), "the shared rows at {width}x{height} {locale}:\n{screen}");
@@ -419,7 +419,7 @@ fn narrow_ascii_settings_keep_the_rules() {
 }
 
 /// The Settings tab for the visual review: both languages, wide, narrow and short, the whole page
-/// with the appearance the family shares, a box cleared, an open language list, with cargo's
+/// with the appearance every app shares, a box cleared, an open language list, with cargo's
 /// folder on `PATH` and off it, the notice its Add opens, an open select and a file that
 /// cannot be written.
 pub(in crate::app) fn review() -> Vec<String> {
@@ -448,7 +448,7 @@ pub(in crate::app) fn review() -> Vec<String> {
         h.click_text(if locale == "en" { "back to quvyta" } else { "quvyta'ya dön" }).advance(TOAST_IN);
         shot(&h, format!("settings select open {locale}"));
 
-        // The whole page at once: the rows the family shares with their boxes, then quvyta's own.
+        // The whole page at once: the shared rows with their boxes, then quvyta's own.
         for (width, height) in [(100, 44), (48, 48)] {
             let root = tempfile::tempdir().expect("temp");
             let mut h = shared_settings(root.path());
@@ -469,7 +469,7 @@ pub(in crate::app) fn review() -> Vec<String> {
         h.click_text(if locale == "en" { "English" } else { "Türkçe" }).advance(TOAST_IN);
         shot(&h, format!("settings languages open {locale}"));
 
-        // Who follows the family: an own value, a member never opened and a broken file.
+        // Who follows the shared values: an own value, a member never opened and a broken file.
         for (width, height) in [(100, 60), (48, 60)] {
             let root = tempfile::tempdir().expect("temp");
             let mut h = settings_on(member_files(root.path(), &[("code", QCODE), ("showcase", BROKEN)]), width, height);
@@ -490,8 +490,8 @@ pub(in crate::app) fn review() -> Vec<String> {
     fragments
 }
 
-/// Nothing on the Settings tab is cut in any language: this page carries the rows every member
-/// of the family shows, so a word that does not fit here is a word that does not fit anywhere.
+/// Nothing on the Settings tab is cut in any language: this page carries the rows every Quvyta
+/// app shows, so a word that does not fit here is a word that does not fit anywhere.
 ///
 /// All three states of the PATH row are walked, because its value is the one line on this page
 /// that may not wrap: a `yes` that broke over two lines would look like a second setting.
@@ -570,9 +570,9 @@ fn nothing_on_the_settings_tab_is_cut_in_any_language() {
     }
 }
 
-/// The machine of [`family_files`] with the settings files of members, each an id and its text.
+/// The machine of [`shared_files`] with the settings files of members, each an id and its text.
 fn member_files(root: &Path, files: &[(&str, &str)]) -> Machine {
-    let machine = family_files(root, SHARED, "");
+    let machine = shared_files(root, SHARED, "");
     for (id, text) in files {
         fs::write(root.join(format!("config/{id}.conf")), text).expect("member file");
     }
@@ -731,7 +731,7 @@ fn a_click_on_a_member_offers_its_own_keys_and_following_changes_that_key_alone(
     let own = member_conf(root.path(), "code");
     assert!(own.contains("theme = \"quvyta\""), "{own}");
     assert!(own.contains("language = \"tr\"") && own.contains("reduced_motion = true"), "the rest stays:\n{own}");
-    assert_eq!(quvyta_conf(root.path()), shared_before, "the family's own file is not touched");
+    assert_eq!(quvyta_conf(root.path()), shared_before, "the shared file is not touched");
     let qcode = follow_line(&h.screen(), "qcode");
     assert!(qcode.contains("Türkçe") && !qcode.contains("Nordic"), "the table reads the file again:\n{}", h.screen());
     assert_eq!(qcode.matches("shared").count(), 2, "{qcode}");

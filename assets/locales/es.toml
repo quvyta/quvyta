@@ -58,34 +58,34 @@ update = "actualizar"
 refresh = "buscar actualizaciones"
 apps = "apps"
 
-[family.code]
+[apps.code]
 title = "Quvyta Code"
 summary = "Ejecuta agentes de programación dentro de contenedores de Podman o Docker. Configuras un perfil una vez, lo abres en cualquiera de tus proyectos y te mueves entre agentes y shells como entre pestañas."
 
-[family.focus]
+[apps.focus]
 title = "Quvyta Focus"
 summary = "Seguimiento del tiempo en la terminal. Pon un contador en marcha sobre lo que estás haciendo y mira adónde se fue tu tiempo en gráficas de día, semana, mes y año."
 
-[family.tools]
+[apps.tools]
 title = "Quvyta Tools"
 summary = "Aplica desde una sola lista los ajustes que los usuarios de Arch Linux suelen hacer a mano: réplicas, pacman, un asistente de AUR, un cortafuegos, SSH y más. Cada punto muestra qué va a tocar, guarda una copia y se puede deshacer."
 
-[family.packages]
+[apps.packages]
 title = "Quvyta Packages"
 summary = "Un gestor de paquetes para Arch Linux que muestra exactamente qué va a cambiar antes de que cambie nada. Esta primera versión gestiona los paquetes de pacman; AUR, Flatpak y Snap se reconocen, pero todavía no se gestionan."
 
-[family.desk]
+[apps.desk]
 title = "Quvyta Desktop"
 summary = "Un escritorio que funciona dentro de la terminal: ventanas, un dock, un lanzador y un gestor de archivos, hecho para trabajar por SSH y en máquinas pequeñas. Escribes qdesk en un servidor y abres programas uno al lado del otro con el ratón, sin aprender ni un solo atajo."
 
-[family.framework]
+[apps.framework]
 title = "Quvyta Framework"
-summary = "El escaparate del framework: todos los componentes, temas, juegos de iconos e idiomas de la familia, para probarlos en vivo."
+summary = "El escaparate del framework: todos los componentes, temas, juegos de iconos e idiomas con los que se hacen las aplicaciones de Quvyta, para probarlos en vivo."
 library = "El framework en sí es una biblioteca de Rust: el motor, los componentes y los archivos de tema, iconos e idioma sobre los que se apoya cada aplicación de Quvyta. Cualquiera puede usarla para hacer sus propias aplicaciones de terminal."
 
-[family.quvyta]
+[apps.quvyta]
 title = "Quvyta"
-summary = "Esta aplicación: lista la familia, instala a sus miembros, los abre, los mantiene al día y los elimina."
+summary = "Esta aplicación: lista las aplicaciones de Quvyta, las instala, las abre, las mantiene al día y las elimina."
 
 [open]
 notice = "Abriendo {command}…"
@@ -112,12 +112,12 @@ update-title = "¿Actualizar {command} de {from} a {to}?"
 update = "Actualizar"
 
 [checks]
-no-cargo = "cargo, la herramienta de paquetes de Rust, no está instalada, y la familia se compila con ella."
+no-cargo = "cargo, la herramienta de paquetes de Rust, no está instalada, y todas las aplicaciones de Quvyta se compilan con ella."
 rustup = "Instala Rust con rustup, su instalador oficial"
 rustup-site = "La página de rustup, con las demás formas de instalarlo"
 install-here = "Instalar aquí"
 rustup-here = "Se ejecuta en esta terminal; rustup hace sus propias preguntas y no necesita sudo."
-old-rust = "Está instalado Rust {version}; la familia necesita {needed} o posterior."
+old-rust = "Está instalado Rust {version}; las aplicaciones de Quvyta necesitan {needed} o posterior."
 rustup-update = "rustup puede ponerlo al día con rustup update stable."
 update-rust = "Actualizar Rust"
 update-rust-yourself = "Actualiza Rust con la herramienta con la que lo instalaste y vuelve a comprobarlo."
@@ -216,17 +216,17 @@ failed = "No se pudo añadir la línea. Puedes añadirla tú: haz clic en la lí
 not-remembered = "launcher.conf no pudo recordar la respuesta"
 
 [cli]
-about = "Instala, abre y actualiza las aplicaciones de terminal de la familia Quvyta."
+about = "Instala, abre y actualiza las aplicaciones de terminal del ecosistema Quvyta."
 usage = "Uso"
 name = "NOMBRE"
-list = "abre la lista de la familia"
+list = "abre la lista de aplicaciones de Quvyta"
 install = "pide instalar estos miembros, un diálogo tras otro"
 show = "abre en la página de este miembro"
 help = "muestra esta ayuda"
 version = "muestra la versión"
 names = "Un nombre es el nombre corto de un miembro (code), su comando (qcode) o su paquete (quvyta-code)."
 unknown-option = "no existe la opción {option}"
-unknown-name = "ningún miembro de la familia se llama {name}"
+unknown-name = "ninguna aplicación de Quvyta se llama {name}"
 unknown-command = "{command} no es algo que quvyta haga"
 no-names = "install necesita al menos un nombre, por ejemplo qcode"
 show-no-name = "show necesita un nombre, por ejemplo qfocus"

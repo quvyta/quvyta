@@ -7,7 +7,7 @@ use qframe::runtime::{Handoff, HandoffOutcome};
 use qframe::widgets::Toast;
 
 use super::Msg;
-use crate::family::Member;
+use crate::ecosystem::Member;
 
 /// How a member is started.
 #[derive(Debug, Clone, PartialEq, Eq)]

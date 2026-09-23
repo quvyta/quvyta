@@ -1,5 +1,5 @@
-//! quvyta: lists the Quvyta family of terminal applications, installs them, opens the members
-//! that are installed, and updates and removes them.
+//! quvyta: lists the terminal applications of the Quvyta ecosystem, installs them, opens
+//! the ones that are installed, and updates and removes them.
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -21,7 +21,7 @@ fn main() -> ExitCode {
         Answer::Start(Start::Show(member)) => app.showing(member),
         _ => app,
     };
-    // The family's shared language, theme and icons are in force from the first frame, and
+    // The shared language, theme and icons are in force from the first frame, and
     // quvyta's own file brings reduced motion and the pillar; the Settings tab writes both back.
     let preferences = app.preferences().clone();
     let settings = app.settings().clone();

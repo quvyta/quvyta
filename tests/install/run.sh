@@ -261,7 +261,7 @@ expect_output "qdesk is not released yet, so it cannot be installed"
 expect_logged "cargo install --locked quvyta-code"
 expect_not_logged "quvyta-desktop"
 
-fresh soon-in-the-family-list
+fresh soon-in-the-app-list
 run
 expect_status 1
 expect_output "There is no terminal to choose on"

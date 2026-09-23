@@ -19,7 +19,7 @@ use qframe::widgets::{LogBuffer, LogLevel, LogLine, Toast};
 use super::{Msg, Quvyta};
 use crate::cargo::{self, Step};
 use crate::checks::{self, Problem};
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::install::{self, Claim, Job, Outcome, Removal};
 use crate::inventory::State;
 
@@ -141,7 +141,7 @@ pub(super) struct Installs {
 /// The install dialog of one member.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Dialog {
-    /// The member, an index of [`FAMILY`].
+    /// The member, an index of [`APPS`].
     pub(super) index: usize,
     /// The version to install; `None` for the latest on crates.io.
     pub(super) version: Option<String>,
@@ -164,7 +164,7 @@ pub(super) enum Action {
 /// The install that runs.
 #[derive(Debug)]
 pub(super) struct Running {
-    /// The member, an index of [`FAMILY`].
+    /// The member, an index of [`APPS`].
     pub(super) index: usize,
     /// What is done to it.
     pub(super) action: Action,
@@ -275,7 +275,7 @@ impl Quvyta {
     /// crates.io, it is not quvyta itself, and it is not already on its way.
     pub(super) fn installable(&self, index: usize) -> bool {
         matches!(self.state(index), Some(State::Missing))
-            && FAMILY.get(index).is_some_and(|member| member.published() && !member.is_self())
+            && APPS.get(index).is_some_and(|member| member.published() && !member.is_self())
             && !self.installs.has(index)
     }
 
@@ -283,7 +283,7 @@ impl Quvyta {
     /// remove it, and it is not quvyta, which does not remove itself from under its own feet.
     pub(super) fn removable(&self, index: usize) -> bool {
         matches!(self.state(index), Some(State::Cargo { .. }))
-            && FAMILY.get(index).is_some_and(|member| !member.is_self())
+            && APPS.get(index).is_some_and(|member| !member.is_self())
             && !self.installs.has(index)
     }
 
@@ -529,7 +529,7 @@ impl Quvyta {
         let Some(running) = self.installs.running.take_if(|running| running.index == index) else {
             return Command::none();
         };
-        let Some(member) = FAMILY.get(index) else { return Command::none() };
+        let Some(member) = APPS.get(index) else { return Command::none() };
         let report = match &outcome {
             Outcome::Installed { version } => {
                 let toast = match version {
@@ -581,7 +581,7 @@ impl Quvyta {
             }
         }
         self.installs.queue.pop_front();
-        let member = &FAMILY[index];
+        let member = &APPS[index];
         let task = match &action {
             Action::Install(version) => {
                 Job::new(&self.machine, member, version.clone()).map(|job| self.install_task(index, job))
@@ -608,7 +608,7 @@ impl Quvyta {
     /// The background task of installing the member at `index` with `job`.
     fn install_task(&self, index: usize, job: Job) -> Task<Msg> {
         let machine = self.machine.clone();
-        Task::new(FAMILY[index].command, move |cx| {
+        Task::new(APPS[index].command, move |cx| {
             // cargo redraws its progress line many times a second, and most redraws only move the
             // bar inside it. Only a frame that says something new about the build is worth a frame
             // of the screen's own.
@@ -680,7 +680,7 @@ impl Quvyta {
 
 /// The background task of removing the member at `index` with `removal`.
 fn remove_task(index: usize, removal: Removal) -> Task<Msg> {
-    Task::new(FAMILY[index].command, move |cx| {
+    Task::new(APPS[index].command, move |cx| {
         let outcome =
             removal.run(&|| cx.is_cancelled(), &mut |line| cx.send(Msg::Install(InstallMsg::Line(index, line))));
         Ok(Msg::Install(InstallMsg::Finished { index, outcome, problems: Vec::new() }))

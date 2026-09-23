@@ -1,9 +1,9 @@
 //! Which members have a newer version on crates.io.
 //!
-//! One `cargo search quvyta` brings the whole family at once, with no network library of our
+//! One `cargo search quvyta` brings every Quvyta app at once, with no network library of our
 //! own: cargo already knows how to reach crates.io. The answer is kept in `latest.toml` in the
 //! data folder with the time it was asked, and asked again only after a day, so starting
-//! quvyta does not wait on the network every time. Once a day is what the family's update notice
+//! quvyta does not wait on the network every time. Once a day is what the shared update notice
 //! promises for every Quvyta application; `r` asks at any time, since that is someone asking. A file that cannot be read is only a cache
 //! gone missing: it is ignored and asked again.
 
@@ -17,12 +17,12 @@ use qframe::diagnostics::Severity;
 use qframe::storage::{Settings, atomic_write};
 
 use crate::cargo::parse_search;
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::machine::Machine;
 
 /// The file in the data folder that keeps the last answer.
 const FILE: &str = "latest.toml";
-/// How long an answer is used before crates.io is asked again: a day, as the family's update
+/// How long an answer is used before crates.io is asked again: a day, as the shared update
 /// notice says of every member.
 pub(crate) const FRESH: Duration = Duration::from_secs(24 * 60 * 60);
 /// The key of the time the answer came, in seconds since 1970.
@@ -30,7 +30,7 @@ const CHECKED: &str = "checked";
 /// The table of the versions, by package.
 const VERSIONS: &str = "versions";
 /// What cargo is asked. Every member's package starts with `quvyta`, and twenty is room for the
-/// family and the crates around it that share the name.
+/// Quvyta apps and the crates around them that share the name.
 pub(crate) const SEARCH: [&str; 4] = ["search", "quvyta", "--limit", "20"];
 
 /// The newest version of each member's package on crates.io, and when that was asked.
@@ -43,12 +43,12 @@ pub struct Latest {
 
 impl Latest {
     /// The answer of `cargo search`, `text`, at `checked`, keeping only the packages of the
-    /// family's released members: another crate named like the family, or like a member still
+    /// released Quvyta apps: another crate whose name starts the same way, or a member still
     /// to come, is none of quvyta's business.
     pub fn from_search(text: &str, checked: u64) -> Self {
         let versions = parse_search(text)
             .into_iter()
-            .filter(|found| FAMILY.iter().any(|member| member.published() && member.package == found.package))
+            .filter(|found| APPS.iter().any(|member| member.published() && member.package == found.package))
             .map(|found| (found.package, found.version))
             .collect();
         Self { checked, versions }
@@ -241,7 +241,7 @@ pub(crate) mod tests {
     const HOUR: u64 = 60 * 60;
 
     #[test]
-    fn only_the_family_s_packages_are_kept() {
+    fn only_the_quvyta_apps_packages_are_kept() {
         let latest = Latest::from_search(SEARCH_OUT, NOW);
         assert_eq!(latest.version("quvyta-code"), Some("0.1.1"));
         assert_eq!(latest.version("quvyta-framework-showcase"), Some("0.1.5"));
@@ -286,7 +286,7 @@ pub(crate) mod tests {
     fn an_answer_is_fresh_for_a_day() {
         let latest = Latest { checked: NOW, ..Latest::default() };
         assert!(latest.fresh(NOW));
-        assert!(latest.fresh(NOW + 7 * HOUR), "the family's notice asks once a day, not every few hours");
+        assert!(latest.fresh(NOW + 7 * HOUR), "the shared notice asks once a day, not every few hours");
         assert!(latest.fresh(NOW + 24 * HOUR - 1));
         assert!(!latest.fresh(NOW + 24 * HOUR));
         assert!(!latest.fresh(NOW - 1), "an answer from the future is not trusted");

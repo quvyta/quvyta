@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs members of the Quvyta family with cargo, on Linux and macOS.
+# Installs Quvyta apps with cargo, on Linux and macOS.
 #
 #   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh
 #   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- code
@@ -23,7 +23,7 @@ names="framework code focus packages tools quvyta desk"
 # Members that are not released yet: there is nothing on crates.io to install. Naming one says so
 # and installs nothing for it; they are left out of all and out of the picker's numbers.
 # The day qdesk is published, take desk out of this one line. Two more places change with it:
-# Soon = $false in install.ps1's family, and Status::Soon -> Status::Beta in src/family.rs.
+# Soon = $false in install.ps1's list, and Status::Soon -> Status::Beta in src/ecosystem.rs.
 soon="desk"
 
 crate_of() {
@@ -54,7 +54,7 @@ about() {
         focus) echo "tracks what you focus on and where your time went" ;;
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
         tools) echo "the settings Arch Linux users usually set up by hand, with undo" ;;
-        quvyta) echo "installs, opens, updates and removes the family's programs" ;;
+        quvyta) echo "installs, opens, updates and removes the Quvyta apps" ;;
         desk) echo "a desktop inside the terminal: windows, a dock, a launcher and a file manager" ;;
     esac
 }
@@ -91,7 +91,7 @@ supported() {
 
 usage() {
     cat <<EOF
-Installs members of the Quvyta family with cargo, on Linux and macOS.
+Installs Quvyta apps with cargo, on Linux and macOS.
 
 Usage:
   curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh
@@ -213,7 +213,7 @@ parse_args() {
     return 0
 }
 
-list_family() {
+list_apps() {
     number=1
     for name in $names; do
         text=$(about "$name")
@@ -266,8 +266,8 @@ pick_from() {
 }
 
 pick() {
-    say "The Quvyta family:"
-    list_family
+    say "The Quvyta apps:"
+    list_apps
     if ! have_tty; then
         say ""
         say "There is no terminal to choose on. Name the members instead, for example:"

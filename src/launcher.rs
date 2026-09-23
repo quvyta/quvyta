@@ -10,13 +10,13 @@
 //! ```
 //!
 //! Whether quvyta asks crates.io for newer versions when it starts is not kept here: it is the
-//! family's update notice, one switch in the shared file for every Quvyta application. An older
+//! shared update notice, one switch in the shared file for every Quvyta application. An older
 //! `check_updates` line is handed over to it once, by [`hand_over_check_updates`].
 //!
 //! The appearance of quvyta itself is not read here: `language`, `theme` and `icons` are the
-//! family's shared keys, resolved for every member alike by the framework, and the Settings tab
+//! shared keys, resolved for every member alike by the framework, and the Settings tab
 //! writes them where the box under each row says. Written in this file they hold for quvyta
-//! alone; written as `"quvyta"` they follow the family's shared file.
+//! alone; written as `"quvyta"` they follow the shared file.
 
 use std::io;
 use std::path::Path;
@@ -28,8 +28,8 @@ use qframe::storage::{Family, Schema, Setting, Settings};
 const AFTER_CLOSE: &str = "after_close";
 /// The key saying whether quvyta offers to put cargo's folder on `PATH`.
 const PATH_PROMPT: &str = "path_prompt";
-/// The key that said whether quvyta looked for updates when it started, before the family had
-/// one switch for that; still known, so a file holding it is not a broken file.
+/// The key that said whether quvyta looked for updates when it started, before the Quvyta apps
+/// had one switch for that; still known, so a file holding it is not a broken file.
 const CHECK_UPDATES: &str = "check_updates";
 
 /// What happens when a member opened from quvyta closes.
@@ -68,7 +68,7 @@ impl Launcher {
     /// `launcher.conf`: a missing file, or no settings folder at all, gives the defaults, and a
     /// broken one gives the defaults for what is broken and says what is wrong.
     ///
-    /// The shared keys of the family are not here: they are resolved together with every other
+    /// The shared keys are not here: they are resolved together with every other
     /// member's, from the shared file.
     pub(crate) fn from_settings(settings: &Settings) -> Self {
         let after_close = match settings.get::<String>(AFTER_CLOSE).as_deref() {
@@ -94,7 +94,7 @@ impl Launcher {
     }
 
     /// Puts quvyta's own defaults into `settings`, for the first start: the setup wizard has just
-    /// made `launcher.conf` with the family's shared keys, and these are the keys that are
+    /// made `launcher.conf` with the shared keys, and these are the keys that are
     /// quvyta's own. `path_prompt` is left out: not having answered is its default, and the offer
     /// is still to be made.
     pub(crate) fn write_defaults(settings: &mut Settings) {
@@ -133,8 +133,8 @@ fn after_close_value(after_close: AfterClose) -> &'static str {
 /// quvyta's own settings, read from `launcher.conf` at `path`, or kept in memory when the
 /// platform names no settings folder.
 ///
-/// They are marked a member of the family, so `"quvyta"` under `language`, `theme` or `icons`
-/// means "follow the family's shared value" instead of being an unknown theme or language.
+/// They are marked a member of the ecosystem, so `"quvyta"` under `language`, `theme` or `icons`
+/// means "follow the shared value" instead of being an unknown theme or language.
 pub(crate) fn open(path: Option<&Path>) -> Settings {
     let settings = match path {
         Some(path) => Settings::open(path),
@@ -143,21 +143,21 @@ pub(crate) fn open(path: Option<&Path>) -> Settings {
     settings.member_of(&Family::QUVYTA).schema(schema())
 }
 
-/// Hands a `check_updates` line of `launcher.conf` at `path` over to the family's update notice
-/// in `family_folder`, and takes the line out.
+/// Hands a `check_updates` line of `launcher.conf` at `path` over to the shared update notice
+/// in `shared_folder`, and takes the line out.
 ///
 /// Until 0.2.9 quvyta had a switch of its own for asking crates.io at start; now every Quvyta
-/// application reads the family's one switch. Someone who turned quvyta's off asked for no
-/// question at start, so `false` turns the family's off too: the quieter choice is kept, and it
+/// application reads the one shared switch. Someone who turned quvyta's off asked for no
+/// question at start, so `false` turns the shared one off too: the quieter choice is kept, and it
 /// can be turned back on in any member's settings. `true` was the default and says nothing, so
-/// the family's switch is left as it is. A broken file is left alone, as quvyta never rewrites a
+/// the shared switch is left as it is. A broken file is left alone, as quvyta never rewrites a
 /// file it could not read whole; so is a file without the line.
 ///
 /// # Errors
 ///
 /// Returns the I/O error when either file cannot be written; the line then stays for the next
 /// start to try again.
-pub(crate) fn hand_over_check_updates(path: &Path, family_folder: &Path) -> io::Result<()> {
+pub(crate) fn hand_over_check_updates(path: &Path, shared_folder: &Path) -> io::Result<()> {
     if !path.is_file() {
         return Ok(());
     }
@@ -166,7 +166,7 @@ pub(crate) fn hand_over_check_updates(path: &Path, family_folder: &Path) -> io::
         return Ok(());
     }
     if settings.get::<bool>(CHECK_UPDATES) == Some(false) {
-        Family::QUVYTA.set_update_notice_in(family_folder, false)?;
+        Family::QUVYTA.set_update_notice_in(shared_folder, false)?;
     }
     settings.remove(CHECK_UPDATES);
     settings.save()
@@ -182,7 +182,7 @@ fn write(path: &Path, key: &str, value: impl Setting) -> io::Result<()> {
 }
 
 /// Every key quvyta reads and what it accepts, over the framework's own: the appearance rows of
-/// the Settings tab write the family's shared keys, reduced motion and the pillar into this same
+/// the Settings tab write the shared keys, reduced motion and the pillar into this same
 /// file, so they are known settings here too.
 fn schema() -> Schema {
     Schema::builtin()
@@ -255,7 +255,7 @@ mod tests {
         assert_eq!((old.after_close, old.diagnostics.as_slice()), (AfterClose::Shell, &[][..]));
     }
 
-    /// A family folder of the test's own with `launcher.conf` holding `text`.
+    /// A shared folder of the test's own with `launcher.conf` holding `text`.
     fn handed(text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
         let root = tempfile::tempdir().expect("temp");
         let path = root.path().join("launcher.conf");
@@ -264,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn quvyta_s_old_switch_turned_off_turns_the_family_s_notice_off_and_goes() {
+    fn quvyta_s_old_switch_turned_off_turns_the_shared_notice_off_and_goes() {
         let (root, path) = handed("path_prompt = \"dismissed\"\ncheck_updates = false\nafter_close = \"shell\"\n");
         assert!(Family::QUVYTA.update_notice_in(root.path()), "on until someone turns it off");
         hand_over_check_updates(&path, root.path()).expect("handed over");
@@ -276,9 +276,9 @@ mod tests {
     }
 
     #[test]
-    fn quvyta_s_old_switch_left_on_says_nothing_to_the_family_and_goes() {
+    fn quvyta_s_old_switch_left_on_says_nothing_to_the_shared_switch_and_goes() {
         let (root, path) = handed("check_updates = true\n");
-        Family::QUVYTA.set_update_notice_in(root.path(), false).expect("the family chose off elsewhere");
+        Family::QUVYTA.set_update_notice_in(root.path(), false).expect("off was chosen in another app");
         hand_over_check_updates(&path, root.path()).expect("handed over");
         assert!(!Family::QUVYTA.update_notice_in(root.path()), "a default line does not turn it back on");
         assert!(!std::fs::read_to_string(&path).expect("written").contains("check_updates"));
@@ -291,7 +291,7 @@ mod tests {
             hand_over_check_updates(&path, root.path()).expect("nothing to do");
             assert_eq!(std::fs::read_to_string(&path).expect("read"), text, "left byte for byte");
             assert!(Family::QUVYTA.update_notice_in(root.path()));
-            assert!(!root.path().join("quvyta.conf").exists(), "the family's file is not touched");
+            assert!(!root.path().join("quvyta.conf").exists(), "the shared file is not touched");
         }
         let missing = tempfile::tempdir().expect("temp");
         hand_over_check_updates(&missing.path().join("launcher.conf"), missing.path()).expect("no file");

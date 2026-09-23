@@ -312,7 +312,7 @@ Assert-Output 'qdesk is not released yet, so it cannot be installed'
 Assert-Logged 'cargo install --locked quvyta-code'
 Assert-NotLogged 'quvyta-desktop'
 
-New-Case 'soon-in-the-family-list'
+New-Case 'soon-in-the-app-list'
 Invoke-Case @()
 Assert-Status 1
 Assert-Output 'There is no console to choose on'
@@ -811,7 +811,7 @@ foreach ($text in @($half, $last)) {
     $file = Join-Path $script:Root ('part-' + [guid]::NewGuid().ToString('N') + '.ps1')
     Set-Content -LiteralPath $file -Value $text
     $run = Invoke-Pwsh "Get-Content -Raw '$file' | Invoke-Expression"
-    if ($run.Output.Contains('This installer is for Windows') -or $run.Output.Contains('Quvyta family')) {
+    if ($run.Output.Contains('This installer is for Windows') -or $run.Output.Contains('Quvyta apps')) {
         Fail "a cut-short script ran: $($run.Output)"
     }
 }

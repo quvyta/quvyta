@@ -8,7 +8,7 @@ use qframe::widgets::{Checkbox, CopyValue, Modal};
 use super::installs::{Dialog, InstallMsg};
 use super::{Msg, Quvyta};
 use crate::checks::{self, Distro, Problem};
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::install::{Job, Removal};
 
 /// The dialogs' width, padding included, when what they copy is short; a longer command widens
@@ -45,7 +45,7 @@ impl Quvyta {
     }
 
     fn remove_dialog(&self, index: usize, ui: &mut View<'_, Msg>) {
-        let member = &FAMILY[index];
+        let member = &APPS[index];
         let keep = Msg::Install(InstallMsg::KeepMember);
         let remove = Msg::Install(InstallMsg::ConfirmRemove);
         let removal = Removal::new(&self.machine, member);
@@ -79,7 +79,7 @@ impl Quvyta {
     }
 
     fn confirm_dialog(&self, dialog: &Dialog, ui: &mut View<'_, Msg>) {
-        let member = &FAMILY[dialog.index];
+        let member = &APPS[dialog.index];
         let job = Job::new(&self.machine, member, dialog.version.clone());
         let found = dialog.problems.as_deref();
         let ready = found.is_some_and(<[Problem]>::is_empty);
@@ -155,7 +155,7 @@ impl Quvyta {
 
     fn stop_dialog(&self, all: bool, ui: &mut View<'_, Msg>) {
         let Some(running) = &self.installs.running else { return };
-        let command = FAMILY[running.index].command;
+        let command = APPS[running.index].command;
         let keep = Msg::Install(InstallMsg::KeepRunning);
         let modal = Modal::new()
             .title(t!("stop.title", command = command))

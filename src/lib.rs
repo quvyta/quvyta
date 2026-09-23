@@ -1,5 +1,5 @@
-//! quvyta: lists the Quvyta family of terminal applications, installs them, opens the members
-//! that are installed, and updates and removes them.
+//! quvyta: lists the terminal applications of the Quvyta ecosystem, installs them, opens
+//! the ones that are installed, and updates and removes them.
 //!
 //! The program is a thin start over this library: [`cli`] reads its arguments and [`Quvyta`]
 //! is the screen, run by the framework's runtime with [`LOCALES`] and [`KEYS`]. Everything the
@@ -11,7 +11,7 @@ mod app;
 mod cargo;
 mod checks;
 pub mod cli;
-mod family;
+mod ecosystem;
 mod install;
 mod inventory;
 mod launcher;
@@ -21,7 +21,7 @@ pub mod updates;
 
 pub use app::{Change, Following, InstallMsg, MemberFollowing, Msg, PathMsg, Quvyta, SettingMsg, Tab, UpdateMsg};
 pub use cargo::Installed;
-pub use family::{FAMILY, Member, Status};
+pub use ecosystem::{APPS, Member, Status};
 pub use install::Outcome;
 pub use inventory::Inventory;
 pub use launcher::AfterClose;

@@ -8,7 +8,7 @@ use super::confirm_install::problems;
 use super::installs::{Action, Ended, InstallMsg, Phase, Running};
 use super::{Msg, Quvyta};
 use crate::cargo::Failure;
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::install::{self, Outcome};
 
 /// Rows of cargo's output shown under "Details".
@@ -50,7 +50,7 @@ impl Quvyta {
         if let Some(running) = self.installs.running(index) {
             if running.action == Action::Remove {
                 // Quick enough that a bar would only flash; the title says what happens.
-                let command = FAMILY[index].command;
+                let command = APPS[index].command;
                 ui.add(Text::new(t!("remove.removing", command = command)).role("title"));
                 return;
             }
@@ -102,7 +102,7 @@ impl Quvyta {
     }
 
     fn progress(&self, running: &Running, ui: &mut View<'_, Msg>) {
-        let command = FAMILY[running.index].command;
+        let command = APPS[running.index].command;
         ui.add(Text::new(t!("install.installing", command = command)).role("title"));
         let progress = &running.progress;
         ui.column(|ui| {
@@ -136,11 +136,11 @@ impl Quvyta {
     }
 
     fn queued(&self, index: usize, ui: &mut View<'_, Msg>) {
-        let command = FAMILY[index].command;
+        let command = APPS[index].command;
         ui.add(Text::new(t!("install.queued-title", command = command)).role("title"));
         let first = self.installs.queue.front().is_some_and(|(queued, _)| *queued == index);
         let note = match self.installs.running.as_ref() {
-            Some(running) => t!("install.queued-after", command = FAMILY[running.index].command),
+            Some(running) => t!("install.queued-after", command = APPS[running.index].command),
             None if first && self.installs.other_window => t!("install.waiting-other-window"),
             None => t!("install.queued"),
         };
@@ -160,7 +160,7 @@ impl Quvyta {
         lines: &[&str],
         ui: &mut View<'_, Msg>,
     ) {
-        let member = &FAMILY[index];
+        let member = &APPS[index];
         let removing = *action == Action::Remove;
         let title = if removing {
             t!("remove.failed", command = member.command)

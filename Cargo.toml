@@ -1,10 +1,10 @@
 [package]
 name = "quvyta"
-version = "0.2.10"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT"
-description = "Installs, opens and updates the Quvyta family of terminal applications (beta)"
+description = "Installs, opens and updates the terminal applications of the Quvyta ecosystem (beta)"
 repository = "https://github.com/quvyta/quvyta"
 readme = "README.md"
 keywords = ["tui", "terminal", "quvyta"]

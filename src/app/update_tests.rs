@@ -160,7 +160,7 @@ fn r_and_a_click_on_the_count_ask_again_at_once() {
     assert!(row(&screen, "qcode").contains("new 0.1.2"), "the answer before stands:\n{screen}");
 }
 
-/// quvyta on a machine whose family folder holds `shared` as the shared file and `own` as
+/// quvyta on a machine whose shared folder holds `shared` as the shared file and `own` as
 /// `launcher.conf`, crates.io answering as [`search`] does.
 fn start_with_files(root: &Path, shared: &str, own: &str) -> Harness<Quvyta> {
     std::fs::create_dir_all(root.join("config")).expect("folder");
@@ -170,7 +170,7 @@ fn start_with_files(root: &Path, shared: &str, own: &str) -> Harness<Quvyta> {
 }
 
 #[test]
-fn with_the_family_s_update_notice_off_nothing_is_asked_until_r() {
+fn with_the_shared_update_notice_off_nothing_is_asked_until_r() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = start_with_files(root.path(), "update-notice = false\n", "after_close = \"return\"\n");
     assert_eq!(searches(root.path()), 0, "not at start");
@@ -188,8 +188,8 @@ fn the_switch_on_the_settings_tab_decides_whether_the_next_start_asks() {
     h.click_text("Settings").render();
     h.click_text("Say when an update is out");
     h.press("space").render();
-    let shared = std::fs::read_to_string(root.path().join("config/quvyta.conf")).expect("the family's file");
-    assert!(shared.contains("update-notice = true"), "turned on for the family:\n{shared}\n{}", h.screen());
+    let shared = std::fs::read_to_string(root.path().join("config/quvyta.conf")).expect("the shared file");
+    assert!(shared.contains("update-notice = true"), "turned on for every Quvyta app:\n{shared}\n{}", h.screen());
     let asked = searches(root.path());
 
     let mut again = start_with(root.path(), &search(), 0, 100, 44);
@@ -203,11 +203,11 @@ fn the_switch_on_the_settings_tab_decides_whether_the_next_start_asks() {
 }
 
 #[test]
-fn quvyta_s_old_switch_turned_off_keeps_the_start_quiet_and_moves_to_the_family() {
+fn quvyta_s_old_switch_turned_off_keeps_the_start_quiet_and_moves_to_the_shared_switch() {
     let root = tempfile::tempdir().expect("temp");
     let h = start_with_files(root.path(), "", "after_close = \"return\"\ncheck_updates = false\n");
     assert_eq!(searches(root.path()), 0, "turned off before 0.2.9, still off:\n{}", h.screen());
-    assert!(!Family::QUVYTA.update_notice_in(&root.path().join("config")), "now the family's switch says it");
+    assert!(!Family::QUVYTA.update_notice_in(&root.path().join("config")), "now the shared switch says it");
     let own = std::fs::read_to_string(root.path().join("config/launcher.conf")).expect("launcher.conf");
     assert_eq!(own, "after_close = \"return\"\n", "the old line is gone, the rest stays");
 }

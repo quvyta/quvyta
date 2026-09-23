@@ -57,34 +57,34 @@ update = "update"
 refresh = "check for updates"
 apps = "apps"
 
-[family.code]
+[apps.code]
 title = "Quvyta Code"
 summary = "Runs coding agents inside Podman or Docker containers. Set up a profile once, open it in any of your projects and move between agents and shells like tabs."
 
-[family.focus]
+[apps.focus]
 title = "Quvyta Focus"
 summary = "Focus tracking in the terminal. Start a counter on what you work on and see where your time went in day, week, month and year charts."
 
-[family.tools]
+[apps.tools]
 title = "Quvyta Tools"
 summary = "Applies the settings Arch Linux users usually set up by hand, from one list: mirrors, pacman, an AUR helper, a firewall, SSH and more. Every item shows what it will touch, keeps a backup and can be undone."
 
-[family.packages]
+[apps.packages]
 title = "Quvyta Packages"
 summary = "A package manager for Arch Linux that shows exactly what will change before anything does. This first release manages pacman's packages; the AUR, Flatpak and Snap are recognised but not managed yet."
 
-[family.desk]
+[apps.desk]
 title = "Quvyta Desktop"
 summary = "A desktop that runs inside the terminal: windows, a dock, a launcher and a file manager, made for working over SSH and on small machines. Type qdesk on a server and open programs side by side with the mouse, without learning a single shortcut."
 
-[family.framework]
+[apps.framework]
 title = "Quvyta Framework"
-summary = "The showcase of the framework: every widget, theme, icon set and language of the family, to try out live."
+summary = "The showcase of the framework: every widget, theme, icon set and language the Quvyta apps are built with, to try out live."
 library = "The framework itself is a Rust library: the runtime, the widgets, and theme, icon and language files every Quvyta application is built on. Anyone can use it to build terminal applications of their own."
 
-[family.quvyta]
+[apps.quvyta]
 title = "Quvyta"
-summary = "This application: it lists the family, installs its members, opens them, keeps them up to date and removes them."
+summary = "This application: it lists the Quvyta apps, installs them, opens them, keeps them up to date and removes them."
 
 [open]
 notice = "Opening {command}…"
@@ -111,12 +111,12 @@ update-title = "Update {command} from {from} to {to}?"
 update = "Update"
 
 [checks]
-no-cargo = "cargo, Rust's package tool, is not installed, and the family is built with it."
+no-cargo = "cargo, Rust's package tool, is not installed, and every Quvyta app is built with it."
 rustup = "Install Rust with rustup, the official installer"
 rustup-site = "rustup's own page, with the other ways to install it"
 install-here = "Install here"
 rustup-here = "It runs in this terminal; rustup asks its own questions and needs no sudo."
-old-rust = "Rust {version} is installed; the family needs {needed} or later."
+old-rust = "Rust {version} is installed; the Quvyta apps need {needed} or later."
 rustup-update = "rustup can bring it up to date with rustup update stable."
 update-rust = "Update Rust"
 update-rust-yourself = "Update Rust with the tool you installed it with, then check again."
@@ -215,17 +215,17 @@ failed = "The line could not be added. You can add it yourself: click the line t
 not-remembered = "launcher.conf could not remember the answer"
 
 [cli]
-about = "Installs, opens and updates the Quvyta family of terminal applications."
+about = "Installs, opens and updates the terminal applications of the Quvyta ecosystem."
 usage = "Usage"
 name = "NAME"
-list = "open the family list"
+list = "open the list of Quvyta apps"
 install = "ask to install these members, one dialog after another"
 show = "open on this member's page"
 help = "show this help"
 version = "show the version"
 names = "A name is a member's short name (code), its command (qcode) or its package (quvyta-code)."
 unknown-option = "there is no {option} option"
-unknown-name = "no member of the family is called {name}"
+unknown-name = "there is no Quvyta app called {name}"
 unknown-command = "{command} is not something quvyta does"
 no-names = "install needs at least one name, such as qcode"
 show-no-name = "show needs a name, such as qfocus"

@@ -44,7 +44,7 @@ fn with_cargo_s_folder_on_path_nothing_is_said() {
 fn nothing_is_checked_while_cargo_installed_nothing() {
     let root = tempfile::tempdir().expect("temp");
     let mut machine = machine(root.path(), "/bin/bash");
-    // cargo answers with an empty list and the family's files are gone.
+    // cargo answers with an empty list and the Quvyta apps' files are gone.
     fs::write(root.path().join("bin/list.out"), "").expect("scenario");
     fs::remove_dir_all(machine.cargo_bin()).expect("no programs");
     machine.path.clear();
@@ -139,7 +139,7 @@ fn after_an_install_the_notice_names_the_member() {
     let root = tempfile::tempdir().expect("temp");
     let machine = machine(root.path(), "/usr/bin/fish");
     let action = shell_path::decide(&machine.shell_env(), shell_path::read_file);
-    let tools = FAMILY.iter().position(|member| member.key == "tools").expect("qtools");
+    let tools = APPS.iter().position(|member| member.key == "tools").expect("qtools");
     let mut h = start(machine);
     h.send(Msg::Path(PathMsg::Checked { installed: Some(tools), action, asked: false }));
     assert!(h.screen().contains("For qtools to open when you type its name in a"), "{}", h.screen());

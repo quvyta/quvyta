@@ -1,6 +1,6 @@
 //! The command line: what quvyta was asked to do before its screen opens.
 //!
-//! Without arguments quvyta opens the family list. `install` opens it straight into the install
+//! Without arguments quvyta opens the list of Quvyta apps. `install` opens it straight into the install
 //! dialog of the members named, one after another, so nothing is installed without the same
 //! consent the screen asks for. `show` opens it on one member's page, so another program can
 //! send its user to that member. `--help` and `--version` answer on standard output; anything
@@ -15,7 +15,7 @@ use std::process::ExitCode;
 use qframe::i18n::I18n;
 use qframe::t;
 
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 
 /// What quvyta was asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,11 +33,11 @@ pub enum Parsed {
 /// How the screen starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Start {
-    /// On the family list.
+    /// On the list of Quvyta apps.
     List,
-    /// Asking to install these members, indexes of [`FAMILY`] in the order named.
+    /// Asking to install these members, indexes of [`APPS`] in the order named.
     Install(Vec<usize>),
-    /// On the page of this member, an index of [`FAMILY`].
+    /// On the page of this member, an index of [`APPS`].
     Show(usize),
 }
 
@@ -52,7 +52,7 @@ pub enum Mistake {
     Command(String),
     /// `install` without a name.
     NoNames,
-    /// `install` naming a member that is not released yet, an index of [`FAMILY`].
+    /// `install` naming a member that is not released yet, an index of [`APPS`].
     Unreleased(usize),
     /// `show` without a name.
     NoShowName,
@@ -93,7 +93,7 @@ fn install(names: &[String]) -> Parsed {
         let Some(index) = member(name) else { return Parsed::Wrong(Mistake::Name(name.clone())) };
         // The whole line is refused, as for a wrong name: the ones that can be installed are
         // better asked for again than half of what was typed started.
-        if !FAMILY[index].published() {
+        if !APPS[index].published() {
             return Parsed::Wrong(Mistake::Unreleased(index));
         }
         // Naming a member twice asks once.
@@ -118,7 +118,7 @@ fn show(names: &[String]) -> Parsed {
 
 /// The member that goes by `name`: its short name, its command or its package, in any case.
 pub(crate) fn member(name: &str) -> Option<usize> {
-    FAMILY.iter().position(|member| {
+    APPS.iter().position(|member| {
         [member.key, member.command, member.package].iter().any(|known| known.eq_ignore_ascii_case(name))
     })
 }
@@ -165,7 +165,7 @@ impl Answer {
                     // The help has nothing to add: the name was right, the member is only not
                     // out yet.
                     Mistake::Unreleased(index) => {
-                        let command = FAMILY.get(index).map_or("", |member| member.command);
+                        let command = APPS.get(index).map_or("", |member| member.command);
                         return Self::Refuse(format!("quvyta: {}\n", t!("cli.unreleased", command = command)));
                     }
                 };
@@ -221,7 +221,7 @@ mod tests {
     use super::*;
 
     fn index(key: &str) -> usize {
-        FAMILY.iter().position(|member| member.key == key).expect("a member")
+        APPS.iter().position(|member| member.key == key).expect("a member")
     }
 
     fn parsed(args: &[&str]) -> Parsed {
@@ -289,10 +289,10 @@ mod tests {
         let expected = format!(
             "\
 quvyta {version}
-Installs, opens and updates the Quvyta family of terminal applications.
+Installs, opens and updates the terminal applications of the Quvyta ecosystem.
 
 Usage
-  quvyta                  open the family list
+  quvyta                  open the list of Quvyta apps
   quvyta install NAME...  ask to install these members, one dialog after another
   quvyta show NAME        open on this member's page
   quvyta --help, -h       show this help
@@ -330,7 +330,7 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
         let hint = "Run quvyta --help to see what it takes.";
         let cases = [
             (&["--frobnicate"][..], "quvyta: there is no --frobnicate option"),
-            (&["install", "qcod"], "quvyta: no member of the family is called qcod"),
+            (&["install", "qcod"], "quvyta: there is no Quvyta app called qcod"),
             (&["open"], "quvyta: open is not something quvyta does"),
             (&["install"], "quvyta: install needs at least one name, such as qcode"),
         ];
@@ -340,7 +340,10 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
             assert_eq!(refused.code(), Some(ExitCode::from(2)));
         }
         let Answer::Refuse(text) = answer("tr", &["install", "qcod"]) else { panic!("refused") };
-        assert_eq!(text, "quvyta: ailede qcod adında bir üye yok\nNeler yazılabileceğini görmek için: quvyta --help\n");
+        assert_eq!(
+            text,
+            "quvyta: qcod adında bir Quvyta uygulaması yok\nNeler yazılabileceğini görmek için: quvyta --help\n"
+        );
     }
 
     #[test]
@@ -369,7 +372,7 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
         for (args, line) in [
             (&["show"][..], "quvyta: show needs a name, such as qfocus"),
             (&["show", "qcode", "qfocus"], "quvyta: show takes only one name"),
-            (&["show", "qcod"], "quvyta: no member of the family is called qcod"),
+            (&["show", "qcod"], "quvyta: there is no Quvyta app called qcod"),
         ] {
             let refused = answer("en", args);
             assert_eq!(refused, Answer::Refuse(format!("{line}\n{hint}\n")), "{args:?}");

@@ -1,4 +1,4 @@
-//! The members of the Quvyta family this program lists, opens and will install.
+//! The Quvyta apps this program lists, opens and will install.
 
 /// How settled a member is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7,13 +7,12 @@ pub enum Status {
     Released,
     /// Released as a beta: usable, but its interface and files may still change.
     Beta,
-    /// Not released yet: listed so the family is known whole, but there is nothing on crates.io
+    /// Not released yet: listed so the list is whole, but there is nothing on crates.io
     /// to install or update it from.
     Soon,
 }
 
-/// A program of the family. Names and descriptions live in the language files under
-/// `family.<key>`.
+/// A Quvyta app. Names and descriptions live in the language files under `apps.<key>`.
 #[derive(Debug)]
 pub struct Member {
     /// The segment of its language keys.
@@ -33,10 +32,10 @@ pub struct Member {
     pub arch_only: bool,
     /// How settled it is.
     pub status: Status,
-    /// The id its settings file goes under in the family's folder, `<id>.conf`: the id the
+    /// The id its settings file goes under in the shared settings folder, `<id>.conf`: the id the
     /// member itself asks the framework for, which is not always its key. The showcase's file is
     /// `showcase.conf` although the member is the framework, and quvyta's is `launcher.conf`,
-    /// since `quvyta.conf` is the file the whole family shares.
+    /// since `quvyta.conf` is the file every Quvyta app shares.
     pub settings_id: &'static str,
 }
 
@@ -54,9 +53,9 @@ impl Member {
 
 /// Every member, in the order they are listed: the applications, the ones still to come after
 /// the ones that can be installed, then the framework and quvyta itself, which are about the
-/// family rather than members to work in. The framework library is not a program, so its
+/// ecosystem rather than apps to work in. The framework library is not a program, so its
 /// showcase stands for it and carries its `cargo add` line.
-pub const FAMILY: [Member; 7] = [
+pub const APPS: [Member; 7] = [
     Member {
         key: "code",
         package: "quvyta-code",
@@ -140,16 +139,16 @@ pub const FAMILY: [Member; 7] = [
 
 #[cfg(test)]
 mod tests {
-    use super::FAMILY;
+    use super::APPS;
 
     #[test]
     fn every_member_has_a_settings_file_of_its_own_and_quvyta_s_is_launcher_conf() {
-        let ids: Vec<&str> = FAMILY.iter().map(|member| member.settings_id).collect();
+        let ids: Vec<&str> = APPS.iter().map(|member| member.settings_id).collect();
         for (index, id) in ids.iter().enumerate() {
             assert!(!ids[..index].contains(id), "`{id}` is the settings id of two members");
-            assert_ne!(*id, "quvyta", "`quvyta.conf` is the file the whole family shares");
+            assert_ne!(*id, "quvyta", "`quvyta.conf` is the file every Quvyta app shares");
         }
-        let quvyta = FAMILY.iter().find(|member| member.is_self()).expect("quvyta is listed");
+        let quvyta = APPS.iter().find(|member| member.is_self()).expect("quvyta is listed");
         assert_eq!(quvyta.settings_id, crate::machine::LAUNCHER);
     }
 }

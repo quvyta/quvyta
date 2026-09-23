@@ -1,4 +1,4 @@
-//! The screen: the family as a list and the chosen member's details beside it, or on a page of
+//! The screen: the Quvyta apps as a list and the chosen member's details beside it, or on a page of
 //! their own when the terminal is narrow.
 
 mod confirm_install;
@@ -20,7 +20,7 @@ use qframe::runtime::{HandoffOutcome, Termination};
 use qframe::storage::{Family, Preferences, Settings};
 use qframe::widgets::{Appearance, ScrollView, Setup, SetupMsg, Splitter, Tabs, Toast};
 
-use crate::family::{FAMILY, Member, Status};
+use crate::ecosystem::{APPS, Member, Status};
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
 use crate::machine::{LAUNCHER, Machine};
@@ -46,7 +46,7 @@ const LIST_MIN: u16 = 24;
 /// The tabs in the header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
-    /// The family: the list and the chosen member's details.
+    /// The Quvyta apps: the list and the chosen member's details.
     #[default]
     Apps,
     /// quvyta's own settings.
@@ -62,17 +62,17 @@ pub struct Quvyta {
     machine: Machine,
     /// What is installed; `None` until cargo has answered.
     inventory: Option<Inventory>,
-    /// The member shown, an index of [`FAMILY`].
+    /// The member shown, an index of [`APPS`].
     selected: usize,
     size: Size,
     /// On a narrow screen, whether the details have the screen instead of the list.
     detail_page: bool,
     /// quvyta's own settings, read when it starts.
     launcher: Launcher,
-    /// The same file as the framework reads it, `launcher.conf` of the family: what the
+    /// The same file as the framework reads it, `launcher.conf` in the shared folder: what the
     /// appearance rows write their own settings into.
     settings: Settings,
-    /// The family's shared appearance, language, theme and icons, and the rows that change it.
+    /// The shared appearance, language, theme and icons, and the rows that change it.
     appearance: Appearance,
     /// Installs running, waiting and ended.
     installs: Installs,
@@ -85,7 +85,7 @@ pub struct Quvyta {
     asked: VecDeque<usize>,
     /// The tab shown.
     tab: Tab,
-    /// How each installed member follows the family's shared settings, in the family's order;
+    /// How each installed member follows the shared settings, in the order of [`APPS`];
     /// `None` until it has been read, which waits for what is installed.
     following: Option<Vec<follow::MemberFollowing>>,
     /// The row of the follow table the keys are on.
@@ -96,8 +96,8 @@ pub struct Quvyta {
     /// The first-run wizard, while quvyta has no settings file of its own; `None` once it is
     /// over, and from the start for someone who has quvyta's file already.
     setup: Option<Setup<Msg>>,
-    /// Which members are checked on the wizard's own step, by index of [`FAMILY`].
-    picked: [bool; FAMILY.len()],
+    /// Which members are checked on the wizard's own step, by index of [`APPS`].
+    picked: [bool; APPS.len()],
     /// Whether this is Arch Linux, which is where the members marked `arch_only` run. Asked only
     /// when the wizard opens, which is the one screen that offers those members.
     arch: bool,
@@ -108,7 +108,7 @@ pub struct Quvyta {
 pub enum Msg {
     /// The terminal has this size now.
     Resized(Size),
-    /// Selects the member at this index of [`FAMILY`].
+    /// Selects the member at this index of [`APPS`].
     Select(usize),
     /// On a narrow screen, shows the details of the member at this index.
     ShowDetail(usize),
@@ -123,7 +123,7 @@ pub enum Msg {
     Open(usize),
     /// The member at `index` closed and quvyta has the screen back.
     Closed {
-        /// The member, an index of [`FAMILY`].
+        /// The member, an index of [`APPS`].
         index: usize,
         /// How it ended.
         outcome: HandoffOutcome,
@@ -146,7 +146,7 @@ pub enum Msg {
     SetUp,
 }
 
-/// The family's shared appearance of `machine`, with the rows writing into the same folder the
+/// The shared appearance of `machine`, with the rows writing into the same folder the
 /// preferences were read from: a machine rooted in a folder of its own never touches the user's
 /// settings.
 fn appearance_of(machine: &Machine, preferences: Preferences) -> Appearance {
@@ -176,12 +176,12 @@ fn setup(machine: &Machine, i18n: &qframe::i18n::I18n) -> Option<Setup<Msg>> {
 impl Quvyta {
     /// The application for `machine`.
     ///
-    /// The family's shared appearance is resolved here, before the first frame: quvyta's own file
-    /// when it names a language, theme or icon set of its own, else the family's shared file,
+    /// The shared appearance is resolved here, before the first frame: quvyta's own file
+    /// when it names a language, theme or icon set of its own, else the shared file,
     /// else what the machine asks for. [`Quvyta::preferences`] and [`Quvyta::settings`] hand it
-    /// to the runtime, so quvyta opens the way the family looks.
+    /// to the runtime, so quvyta opens the way every Quvyta app looks.
     pub fn new(machine: Machine) -> Self {
-        // Before anything is read, so the family's switch already says what quvyta's old one did.
+        // Before anything is read, so the shared switch already says what quvyta's old one did.
         if let (Some(path), Some(folder)) = (machine.launcher_conf.as_deref(), machine.settings_dir.as_deref()) {
             // A file that cannot be written keeps its line, and the next start tries again.
             let _ = crate::launcher::hand_over_check_updates(path, folder);
@@ -202,7 +202,7 @@ impl Quvyta {
         let arch = setup.is_some() && crate::checks::distro(&machine) == crate::checks::Distro::Arch;
         Self {
             setup,
-            picked: [false; FAMILY.len()],
+            picked: [false; APPS.len()],
             arch,
             machine,
             inventory: None,
@@ -223,28 +223,28 @@ impl Quvyta {
         }
     }
 
-    /// Opens on the install dialogs of `members`, indexes of [`FAMILY`], one after another, as
+    /// Opens on the install dialogs of `members`, indexes of [`APPS`], one after another, as
     /// soon as it is known which of them are installed. A member not released yet is left out:
     /// it has no dialog, and it is not there already either.
     #[must_use]
     pub fn asking(mut self, members: Vec<usize>) -> Self {
-        self.asked = members.into_iter().filter(|index| FAMILY.get(*index).is_some_and(Member::published)).collect();
+        self.asked = members.into_iter().filter(|index| APPS.get(*index).is_some_and(Member::published)).collect();
         self
     }
 
-    /// Opens on the page of the member at `index` of [`FAMILY`]: selected in the list with its
+    /// Opens on the page of the member at `index` of [`APPS`]: selected in the list with its
     /// details beside it, or on a narrow screen its details alone, as a first `enter` shows them,
     /// with `esc` back to the list. The size is not known yet, so the page is chosen for both.
     #[must_use]
     pub fn showing(mut self, index: usize) -> Self {
-        if index < FAMILY.len() {
+        if index < APPS.len() {
             self.selected = index;
             self.detail_page = true;
         }
         self
     }
 
-    /// The family's shared language, theme and icons as quvyta resolved them for itself, for the
+    /// The shared language, theme and icons as quvyta resolved them for itself, for the
     /// runtime to start with.
     #[must_use]
     pub fn preferences(&self) -> &Preferences {
@@ -287,7 +287,7 @@ impl Quvyta {
 
     /// The columns the details need so nothing in them is cut, with the air around them.
     ///
-    /// It is the widest the whole family asks for and not the chosen member's own need: a need
+    /// It is the widest any Quvyta app asks for and not the chosen member's own need: a need
     /// that changed with the selection would move the split while walking down the list.
     ///
     /// `wide` asks for this from `update` and `action` as well as from the view, where the
@@ -295,7 +295,7 @@ impl Quvyta {
     /// language files alone and the badge's dot counts as one cell, the way `list_width` counts
     /// a row's icon.
     fn detail_need(&self) -> u16 {
-        let widest = (0..FAMILY.len()).map(|index| self.detail_content(index)).max().unwrap_or(0);
+        let widest = (0..APPS.len()).map(|index| self.detail_content(index)).max().unwrap_or(0);
         // The row under a running install counts whether or not one is running: were it counted
         // only while cargo works, the split would move the moment somebody pressed Install. The
         // longer rows of a failure and of the queue are not here; they lay themselves out down
@@ -308,8 +308,8 @@ impl Quvyta {
     /// its title, or its badge. The title and the badge stand alone because `detail::show` puts
     /// the badge on its own line when they do not fit beside each other.
     fn detail_content(&self, index: usize) -> u16 {
-        let member = &FAMILY[index];
-        let title = qframe::text::width(&t!(&format!("family.{}.title", member.key)));
+        let member = &APPS[index];
+        let title = qframe::text::width(&t!(&format!("apps.{}.title", member.key)));
         let badge = detail::badge_width(&match member.status {
             Status::Released => t!("status.released"),
             Status::Beta => t!("status.beta"),
@@ -388,11 +388,11 @@ impl App for Quvyta {
 
     fn init(&mut self) -> Command<Msg> {
         self.launcher = Launcher::from_settings(&self.settings);
-        // The family's update notice: turned off in any member, nothing asks crates.io unasked;
+        // The shared update notice: turned off in any member, nothing asks crates.io unasked;
         // `r` still does, since that is someone asking.
         let updates = if self.preferences().update_notice() { self.check_updates(false) } else { Command::none() };
         // On the first start the wizard has the screen, so the appearance rows take the keys.
-        let first = if self.setting_up() { "setup-appearance" } else { "family" };
+        let first = if self.setting_up() { "setup-appearance" } else { "apps" };
         Command::batch([
             Command::focus(first),
             self.read_inventory(),
@@ -420,12 +420,12 @@ impl App for Quvyta {
     }
 
     fn action(&self, name: &str) -> Option<Msg> {
-        // While the wizard asks, the family's keys have nothing to act on: its list is not there
+        // While the wizard asks, the app list's keys have nothing to act on: its list is not there
         // and nothing may be installed before Finish.
         if self.setting_up() {
             return None;
         }
-        // The family's keys act on the list; on the Settings tab they would act on a member
+        // The app list's keys act on the list; on the Settings tab they would act on a member
         // nobody sees.
         if self.tab == Tab::Settings {
             return (name == "back").then_some(Msg::Back);
@@ -442,23 +442,23 @@ impl App for Quvyta {
     fn update(&mut self, msg: Msg) -> Command<Msg> {
         match msg {
             Msg::Resized(size) => self.size = size,
-            Msg::Select(index) if index < FAMILY.len() => self.selected = index,
-            Msg::ShowDetail(index) if index < FAMILY.len() => {
+            Msg::Select(index) if index < APPS.len() => self.selected = index,
+            Msg::ShowDetail(index) if index < APPS.len() => {
                 self.selected = index;
                 self.detail_page = true;
             }
             Msg::Select(_) | Msg::ShowDetail(_) => {}
-            // From the settings esc goes back to the family as it was left, a member's page
+            // From the settings esc goes back to the app list as it was left, a member's page
             // included; the keys go to the list when it is on screen.
             Msg::Back if self.tab == Tab::Settings => {
                 self.tab = Tab::Apps;
                 if self.wide() || !self.detail_page {
-                    return Command::focus("family");
+                    return Command::focus("apps");
                 }
             }
             Msg::Back => {
                 self.detail_page = false;
-                return Command::focus("family");
+                return Command::focus("apps");
             }
             Msg::Inventory(inventory) => {
                 let first = self.inventory.replace(inventory).is_none();
@@ -481,11 +481,11 @@ impl App for Quvyta {
             Msg::Primary => return self.update(Msg::Open(self.selected)),
             Msg::Open(index) => {
                 if let Some(opening) = self.opening(index) {
-                    return opening.handoff(index, &FAMILY[index]);
+                    return opening.handoff(index, &APPS[index]);
                 }
             }
             Msg::Closed { index, outcome } => {
-                let Some(member) = FAMILY.get(index) else { return Command::none() };
+                let Some(member) = APPS.get(index) else { return Command::none() };
                 // An install keeps quvyta here: stopping it unasked would lose the build.
                 if self.leaves_with_member()
                     && matches!(outcome, HandoffOutcome::Finished { .. })
@@ -532,7 +532,7 @@ impl App for Quvyta {
     }
 
     fn view(&self, ui: &mut View<'_, Msg>) {
-        // The first start asks before it shows the family: the wizard has the screen to itself.
+        // The first start asks before it shows the app list: the wizard has the screen to itself.
         if self.setting_up() {
             self.setup_wizard(ui);
             return;
@@ -583,7 +583,7 @@ impl Quvyta {
 
     fn list(&self, ui: &mut View<'_, Msg>) {
         let compact = self.compact();
-        let items = FAMILY.iter().enumerate().map(|(index, member)| {
+        let items = APPS.iter().enumerate().map(|(index, member)| {
             // A failure keeps its mark in the list until it is dismissed; the word says it too.
             let item = if self.install_failed(index) {
                 ListItem::new(member.command).icon("error", Some("danger"))
@@ -598,7 +598,7 @@ impl Quvyta {
         let list = List::new(items).selected(Some(self.selected)).on_select(Msg::Select);
         // On a narrow screen a row opens the details; on a wide one they are already beside it.
         let list = if self.wide() { list } else { list.on_activate(Msg::ShowDetail) };
-        ui.add(list).fill().id("family");
+        ui.add(list).fill().id("apps");
     }
 
     /// The width the list needs for its widest row, `compact` or not, as the list measures it:
@@ -606,9 +606,9 @@ impl Quvyta {
     fn list_width(&self, compact: bool) -> u16 {
         let row = |index: usize| {
             let state = self.row_text(index, compact).map_or(0, |text| qframe::text::width(&text) + 2);
-            qframe::text::width(FAMILY[index].command) + state + 7
+            qframe::text::width(APPS[index].command) + state + 7
         };
-        (0..FAMILY.len()).map(row).max().unwrap_or(0)
+        (0..APPS.len()).map(row).max().unwrap_or(0)
     }
 
     /// What the row of the member at `index` says: an install under way, or how it is installed
@@ -621,7 +621,7 @@ impl Quvyta {
                 (Some(latest), _) => {
                     t!("row.update", version = state.cargo_version().unwrap_or_default(), latest = latest)
                 }
-                (None, state) => row_state(&FAMILY[index], state, compact),
+                (None, state) => row_state(&APPS[index], state, compact),
             })
         })
     }
@@ -647,7 +647,7 @@ impl Quvyta {
     }
 
     fn detail(&self, ui: &mut View<'_, Msg>) {
-        let member = &FAMILY[self.selected];
+        let member = &APPS[self.selected];
         let narrow = !self.wide();
         // Keyed by member so copy confirmations do not carry over to the next one.
         ui.add_with(ScrollView::new(), |ui| {
@@ -714,7 +714,7 @@ fn already_installed(indexes: &[usize]) -> Command<Msg> {
     if indexes.is_empty() {
         return Command::none();
     }
-    let commands: Vec<&str> = indexes.iter().map(|index| FAMILY[*index].command).collect();
+    let commands: Vec<&str> = indexes.iter().map(|index| APPS[*index].command).collect();
     Command::toast(Toast::info(t!("cli.already-installed", commands = commands.join(", "))))
 }
 

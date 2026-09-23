@@ -4,7 +4,7 @@ use qframe::prelude::*;
 use qframe::widgets::{Badge, CopyValue};
 
 use super::Msg;
-use crate::family::{Member, Status};
+use crate::ecosystem::{Member, Status};
 use crate::inventory::State;
 use crate::machine::Machine;
 
@@ -20,7 +20,7 @@ pub(super) fn show(
     room: u16,
     ui: &mut View<'_, Msg>,
 ) {
-    let text = |field: &str| t!(&format!("family.{}.{field}", member.key));
+    let text = |field: &str| t!(&format!("apps.{}.{field}", member.key));
     let title = text("title");
     let (status, variant) = match member.status {
         Status::Released => (t!("status.released"), "success"),

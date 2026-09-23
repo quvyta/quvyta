@@ -1,8 +1,8 @@
-//! Whether each installed member follows the family's shared language, theme and icons, as the
+//! Whether each installed member follows the shared language, theme and icons, as the
 //! Settings tab shows it.
 //!
-//! Each member keeps its own settings file in the family's folder. A shared key it does not name,
-//! or names as the family's id, follows the family; any other value is the member's own. quvyta
+//! Each member keeps its own settings file in the shared folder. A shared key it does not name,
+//! or names as the shared id, follows the shared value; any other value is the member's own. quvyta
 //! only reads these files here: it never writes to a member's file it could not read, since
 //! rewriting a broken file could lose what someone wrote in it by hand.
 
@@ -12,37 +12,37 @@ use qframe::diagnostics::Severity;
 use qframe::icons::IconMode;
 use qframe::storage::{Family, Settings, Shared};
 
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::machine::Machine;
 
-/// How one member's settings file stands with the family's shared settings.
+/// How one member's settings file stands with the shared settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Following {
     /// The member has no settings file yet: it has never been opened, and when it is, it starts
-    /// on the family's values.
+    /// on the shared values.
     NotOpened,
     /// The file cannot be read as settings; the reasons, each at its file, line and column.
     Unreadable(Vec<String>),
     /// The member's own value of each shared key, in the order of [`Shared::ALL`]; `None` where
-    /// it follows the family.
+    /// it follows the shared value.
     Keys([Option<String>; 3]),
 }
 
-/// A member of the family, an index of [`FAMILY`], and how it follows the family.
+/// A Quvyta app, an index of [`APPS`], and how it follows the shared values.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemberFollowing {
-    /// The member, an index of [`FAMILY`].
+    /// The member, an index of [`APPS`].
     pub index: usize,
     /// How its file stands.
     pub following: Following,
 }
 
-/// Reads the settings file of each member at `members`, indexes of [`FAMILY`], in that order.
+/// Reads the settings file of each member at `members`, indexes of [`APPS`], in that order.
 pub(crate) fn read(machine: &Machine, members: &[usize]) -> Vec<MemberFollowing> {
     members
         .iter()
         .filter_map(|index| {
-            let member = FAMILY.get(*index)?;
+            let member = APPS.get(*index)?;
             let following = match machine.member_conf(member.settings_id) {
                 Some(path) => read_file(&path),
                 // Without a settings folder no member could have written a file either.
@@ -53,22 +53,22 @@ pub(crate) fn read(machine: &Machine, members: &[usize]) -> Vec<MemberFollowing>
         .collect()
 }
 
-/// Puts the member at `index` of [`FAMILY`] back on the family's value of `key`: only that key
-/// of its own file changes, to the family's id, and the family's shared file is neither read nor
+/// Puts the member at `index` of [`APPS`] back on the shared value of `key`: only that key
+/// of its own file changes, to the shared id, and the shared file is neither read nor
 /// written. The framework refuses a file it cannot read and leaves it exactly as it was.
 ///
 /// # Errors
 ///
 /// The framework's: a broken file, no settings folder, or a file that cannot be written.
 pub(crate) fn follow(machine: &Machine, index: usize, key: Shared) -> std::io::Result<()> {
-    let member = FAMILY.get(index).ok_or_else(|| std::io::Error::other("no such member"))?;
+    let member = APPS.get(index).ok_or_else(|| std::io::Error::other("no such member"))?;
     match &machine.member_settings {
         Some(folder) => Family::QUVYTA.follow_in(folder, member.settings_id, key),
         None => Family::QUVYTA.follow(member.settings_id, key),
     }
 }
 
-/// How the settings file at `path` stands with the family.
+/// How the settings file at `path` stands with the shared values.
 fn read_file(path: &Path) -> Following {
     if !path.exists() {
         return Following::NotOpened;
@@ -87,8 +87,8 @@ fn read_file(path: &Path) -> Following {
     Following::Keys(Shared::ALL.map(|key| own_value(&settings, key)))
 }
 
-/// The member's own value of `key`, or `None` when it follows the family. A value the framework
-/// would not use, such as an icon set it does not know, falls back to the family's the way the
+/// The member's own value of `key`, or `None` when it follows the shared value. A value the framework
+/// would not use, such as an icon set it does not know, falls back to the shared one the way the
 /// framework resolves it, so the table says what the member will really draw with.
 fn own_value(settings: &Settings, key: Shared) -> Option<String> {
     let text = settings.get::<String>(key.key())?;
@@ -112,13 +112,13 @@ mod tests {
     }
 
     #[test]
-    fn a_key_named_or_left_out_follows_the_family_and_any_other_value_is_the_member_s_own() {
+    fn a_key_named_or_left_out_follows_the_shared_value_and_any_other_value_is_the_member_s_own() {
         let (_folder, path) = file("language = \"quvyta\"\ntheme = \"amber\"\nreduced_motion = true\n");
         assert_eq!(read_file(&path), Following::Keys([None, Some("amber".to_owned()), None]));
     }
 
     #[test]
-    fn an_icon_set_the_framework_does_not_know_follows_the_family_as_the_framework_reads_it() {
+    fn an_icon_set_the_framework_does_not_know_follows_the_shared_value_as_the_framework_reads_it() {
         let (_folder, path) = file("icons = \"sparkly\"\n");
         assert_eq!(read_file(&path), Following::Keys([None, None, None]));
     }

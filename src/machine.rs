@@ -13,7 +13,7 @@ use qframe::storage::Family;
 use crate::shell_path::Environment;
 
 /// The id quvyta's own settings go under: `launcher.conf`, since `quvyta.conf` is the file the
-/// whole family shares. An application whose id were the family's own would be handed that
+/// whole ecosystem shares. An application whose id were the shared one would be handed that
 /// shared file instead of one of its own.
 pub(crate) const LAUNCHER: &str = "launcher";
 
@@ -37,7 +37,7 @@ pub struct Machine {
     pub cargo: Option<PathBuf>,
     /// quvyta's settings file, `launcher.conf`, when the platform names a settings folder.
     pub launcher_conf: Option<PathBuf>,
-    /// The family's settings folder, which removing a member leaves alone; `None` when the
+    /// The shared settings folder, which removing a member leaves alone; `None` when the
     /// platform names none.
     pub settings_dir: Option<PathBuf>,
     /// The folder the members' settings files are read from when it is not the framework's own
@@ -73,7 +73,7 @@ impl Machine {
     }
 
     /// A machine whose home is `root/home`, whose `PATH` is `root/bin`, whose settings are in
-    /// `root/config` (the family's folder), whose data in `root/data`, whose fonts in
+    /// `root/config` (the shared folder), whose data in `root/data`, whose fonts in
     /// `root/fonts` and whose distribution is named in
     /// `root/etc/os-release`, with no `SHELL`, `XDG_CONFIG_HOME` or `ZDOTDIR`. Nothing outside
     /// `root` is touched: the screen can be shown, and tried, without the real home.
@@ -96,7 +96,7 @@ impl Machine {
     }
 
     /// The settings file of the member whose settings id is `id`, as the framework lays out the
-    /// family's folder on this platform; `None` when the platform names no settings folder.
+    /// shared folder on this platform; `None` when the platform names no settings folder.
     pub(crate) fn member_conf(&self, id: &str) -> Option<PathBuf> {
         match &self.member_settings {
             // A test root mirrors the framework's `<folder>/<id>.conf`, as it does for

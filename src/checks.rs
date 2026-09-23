@@ -6,10 +6,10 @@ use std::path::PathBuf;
 
 use crate::machine::Machine;
 
-/// The oldest Rust the family builds with, as in `install.sh`.
+/// The oldest Rust the Quvyta apps build with, as in `install.sh`.
 pub const MIN_RUST: (u32, u32) = (1, 95);
 
-/// The line rustup's own page gives to install Rust. Not the family's install script: that one
+/// The line rustup's own page gives to install Rust. Not the Quvyta install script: that one
 /// would build quvyta again, and quvyta is already here.
 pub const RUSTUP_INSTALL: &str = "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh";
 

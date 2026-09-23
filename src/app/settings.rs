@@ -1,10 +1,10 @@
-//! The Settings tab: the family's shared appearance and quvyta's own settings from
+//! The Settings tab: the shared appearance and quvyta's own settings from
 //! `launcher.conf`, changed in place.
 //!
 //! The appearance rows come from the framework, the same rows in the same order as in every other
 //! Quvyta application, and each of them carries the box that says whether the change holds
-//! everywhere or here only. quvyta is where someone installs the family, so this is where the
-//! family's language, theme and icons are chosen.
+//! everywhere or here only. quvyta is where someone installs the Quvyta apps, so this is where
+//! their shared language, theme and icons are chosen.
 //!
 //! There is no Save button. A change applies to the running quvyta at once and is written in the
 //! background; when the file cannot be written the value goes back and a notice says where and
@@ -21,7 +21,7 @@ use qframe::widgets::{
 use super::follow::{self, Following, MemberFollowing};
 use super::path_notice::PathReach;
 use super::{Msg, Quvyta};
-use crate::family::FAMILY;
+use crate::ecosystem::APPS;
 use crate::inventory::State;
 use crate::launcher::{AfterClose, Launcher};
 
@@ -55,13 +55,13 @@ pub enum SettingMsg {
     },
     /// Shows the PATH notice, the same one quvyta offers on its own.
     AddToPath,
-    /// A change on the appearance rows the whole family shares.
+    /// A change on the appearance rows every Quvyta app shares.
     Appearance(AppearanceChange),
-    /// How each installed member follows the family, read from their files.
+    /// How each installed member follows the shared values, read from their files.
     Followed(Vec<MemberFollowing>),
     /// Moves the keys to this row of the follow table.
     FollowSelect(usize),
-    /// Puts the member at this index of the family back on the family's value of the key.
+    /// Puts the member at this index of [`APPS`] back on the shared value of the key.
     Follow(usize, Shared),
     /// The member's file was written, or why not.
     Follows(Result<(), String>),
@@ -122,13 +122,13 @@ impl Quvyta {
         }
     }
 
-    /// Reads, in the background, how each installed member follows the family. Nothing is read
+    /// Reads, in the background, how each installed member follows the shared values. Nothing is read
     /// before cargo has said what is installed: until then the table would list no one, which
     /// reads as "nothing is installed".
     pub(super) fn read_following(&self) -> Command<Msg> {
         let Some(inventory) = &self.inventory else { return Command::none() };
         // quvyta's own following is the boxes under the appearance rows.
-        let members: Vec<usize> = (0..FAMILY.len())
+        let members: Vec<usize> = (0..APPS.len())
             .filter(|index| matches!(inventory.state(*index), State::Cargo { .. } | State::Elsewhere { .. }))
             .collect();
         let machine = self.machine.clone();
@@ -191,20 +191,20 @@ impl Quvyta {
     }
 
     /// The appearance every Quvyta application shows the same way: language, theme and icons with
-    /// their boxes, then reduced motion and the pillar, and the family's update notice. The rows
+    /// their boxes, then reduced motion and the pillar, and the shared update notice. The rows
     /// are the framework's; quvyta adds none of its own, so a member's settings and quvyta's read
     /// alike.
     fn appearance_settings<'v>(&self, ui: &'v mut View<'_, Msg>) -> NodeMut<'v, Msg> {
         SettingsList::show(ui, |list| {
             let message = |change| Msg::Setting(SettingMsg::Appearance(change));
             self.appearance.section(list, message);
-            // quvyta asks crates.io at start, so it shows the family's switch for that, in the
-            // family's words: the same one every member that asks shows.
+            // quvyta asks crates.io at start, so it shows the shared switch for that, in the
+            // framework's words: the same one every member that asks shows.
             self.appearance.updates(list, message);
         })
     }
 
-    /// Whether each installed member follows the family's language, theme and icons: a table on a
+    /// Whether each installed member follows the shared language, theme and icons: a table on a
     /// wide screen, one line per member on a narrow one. Nothing is drawn before what is
     /// installed is known.
     fn following_section(&self, width: u16, ui: &mut View<'_, Msg>) {
@@ -234,7 +234,7 @@ impl Quvyta {
         let rows: Vec<TableRow> = following
             .iter()
             .map(|member| {
-                let command = TableCell::new(FAMILY[member.index].command);
+                let command = TableCell::new(APPS[member.index].command);
                 let faint = |text: String| TableCell::new(text).color("muted");
                 let cells: [TableCell; 3] = match &member.following {
                     // One word for the row: it has no values to spread over the columns.
@@ -250,7 +250,7 @@ impl Quvyta {
                 TableRow::new(std::iter::once(command).chain(cells))
             })
             .collect();
-        // A row is acted on only by putting its own keys back on the family's, so its menu is what
+        // A row is acted on only by putting its own keys back on the shared ones, so its menu is what
         // enter and a click open; a row that shares everything, or cannot be read, opens nothing.
         let menus: Vec<Vec<ContextItem<Msg>>> = following
             .iter()
@@ -339,7 +339,7 @@ impl Quvyta {
     }
 }
 
-/// The choices that put one of `member`'s own keys back on the family's value, one per key it
+/// The choices that put one of `member`'s own keys back on the shared value, one per key it
 /// does not share, with the message each sends. None for a member that shares everything, has
 /// not been opened, or has a file quvyta could not read and so never writes.
 fn follow_choices(member: &MemberFollowing) -> impl Iterator<Item = (Shared, Msg)> + '_ {
@@ -354,7 +354,7 @@ fn follow_choices(member: &MemberFollowing) -> impl Iterator<Item = (Shared, Msg
         .map(|(key, _)| (key, Msg::Setting(SettingMsg::Follow(member.index, key))))
 }
 
-/// The menu entry that puts `key` back on the family's value.
+/// The menu entry that puts `key` back on the shared value.
 fn follow_label(key: Shared) -> String {
     match key {
         Shared::Language => t!("settings.follow-language"),
@@ -364,12 +364,12 @@ fn follow_label(key: Shared) -> String {
 }
 
 /// One line per member for a narrow screen: its command, then only the keys it does not share
-/// with the family, or that it shares them all. When a member's own keys do not fit on one line
+/// with the others, or that it shares them all. When a member's own keys do not fit on one line
 /// in `width` cells, each takes a line of its own under the first, so a line never breaks inside
 /// a value.
 fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
     let name_width =
-        following.iter().map(|member| qframe::text::width(FAMILY[member.index].command)).max().unwrap_or(0) + 2;
+        following.iter().map(|member| qframe::text::width(APPS[member.index].command)).max().unwrap_or(0) + 2;
     // The section's sides and the name column leave this much for the keys.
     let room = width.saturating_sub(4 + name_width);
     for member in following {
@@ -396,7 +396,7 @@ fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui:
             }
         };
         ui.row(|ui| {
-            ui.add(Text::new(FAMILY[member.index].command).no_wrap()).width(Length::Cells(name_width));
+            ui.add(Text::new(APPS[member.index].command).no_wrap()).width(Length::Cells(name_width));
             // A long language name wraps under itself rather than being cut.
             let text = Text::new(text);
             ui.add(if own { text } else { text.role("faint") }).fill_width();

@@ -5,7 +5,7 @@ use qframe::icons::GlyphMode;
 use tempfile::TempDir;
 
 use super::*;
-use crate::family::Status;
+use crate::ecosystem::Status;
 use crate::inventory::tests::{installed_command, machine_with_cargo, write_program};
 
 /// Built-in files plus the compiled-in locales and keys, as the runtime loads them.
@@ -58,7 +58,7 @@ pub(super) fn harness(width: u16, height: u16) -> (TempDir, Harness<Quvyta>) {
 
 /// Makes `root` a machine quvyta has been set up on: an empty `launcher.conf` is enough, since
 /// the first-run wizard opens only while quvyta has no file of its own. Without this every test
-/// of the family list would see the wizard, which is [`super::wizard::tests`]' own subject.
+/// of the app list would see the wizard, which is [`super::wizard::tests`]' own subject.
 pub(super) fn set_up(root: &Path) {
     let conf = root.join("config/launcher.conf");
     if !conf.exists() {
@@ -93,7 +93,7 @@ pub(super) fn harness_with_settings_at(settings: &str, width: u16, height: u16) 
 }
 
 pub(super) fn index(key: &str) -> usize {
-    FAMILY.iter().position(|member| member.key == key).expect("a member")
+    APPS.iter().position(|member| member.key == key).expect("a member")
 }
 
 /// Long enough for a toast to have slid in.
@@ -147,7 +147,7 @@ fn the_list_shows_every_program_with_how_it_is_installed() {
         .iter()
         .map(|command| rows.iter().position(|row| row.contains(command)).expect("listed"))
         .collect();
-    assert!(order.is_sorted(), "the list keeps the family's order:\n{screen}");
+    assert!(order.is_sorted(), "the list keeps the order of APPS:\n{screen}");
 }
 
 #[test]
@@ -172,7 +172,7 @@ fn an_installed_member_says_which_version_and_where() {
 #[test]
 fn the_keyboard_moves_the_details_along_the_list() {
     let (root, mut h) = harness(100, 24);
-    assert!(h.is_focused("family"), "the list has the keys from the start");
+    assert!(h.is_focused("apps"), "the list has the keys from the start");
     h.press("down");
     let screen = h.screen();
     let path = root.path().join("bin/qfocus").display().to_string();
@@ -215,7 +215,7 @@ fn quvyta_itself_shows_the_running_version() {
 
 #[test]
 fn every_program_installs_under_its_package_name() {
-    for member in FAMILY {
+    for member in APPS {
         assert!(member.repository.starts_with("https://github.com/quvyta/"), "{}", member.repository);
         let expected = match member.key {
             "framework" => Status::Released,
@@ -229,7 +229,7 @@ fn every_program_installs_under_its_package_name() {
 #[test]
 fn an_unknown_index_changes_nothing() {
     let (_root, mut h) = harness(100, 24);
-    h.send(Msg::Select(FAMILY.len())).send(Msg::ShowDetail(FAMILY.len()));
+    h.send(Msg::Select(APPS.len())).send(Msg::ShowDetail(APPS.len()));
     assert!(h.screen().contains("Quvyta Code"));
 }
 
@@ -259,7 +259,7 @@ fn a_narrow_screen_shows_the_list_and_opens_details_on_their_own_page() {
     let screen = h.screen();
     assert!(screen.contains("qtools") && !screen.contains("Quvyta Focus"), "{screen}");
     assert!(line_with(&screen, "qfocus").contains('▌'), "the selection is kept:\n{screen}");
-    assert!(h.is_focused("family"), "and the list has the keys again");
+    assert!(h.is_focused("apps"), "and the list has the keys again");
 }
 
 #[test]
@@ -286,7 +286,7 @@ fn every_member_reads_fully_in_every_language() {
     for locale in LANGUAGES {
         let (_root, mut h) = harness(100, 30);
         h.set_locale(locale);
-        for index in 0..FAMILY.len() {
+        for index in 0..APPS.len() {
             h.send(Msg::Select(index));
             let screen = h.screen();
             assert!(!screen.contains('⟦'), "a key is missing in `{locale}`:\n{screen}");
@@ -343,7 +343,7 @@ fn narrow_ascii_screens_keep_the_rules() {
         for locale in LONGEST_LANGUAGES {
             let (_root, mut h) = harness(width, height);
             h.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
-            for index in 0..FAMILY.len() {
+            for index in 0..APPS.len() {
                 h.send(Msg::Select(index));
                 for page in [false, true] {
                     if page {
@@ -382,7 +382,7 @@ fn visual_review() {
                 fragments.push(h.html(&format!("list {locale} {width}x{height}")));
                 println!("list {locale} {width}x{height}\n{}", h.screen());
             }
-            for (index, member) in FAMILY.iter().enumerate() {
+            for (index, member) in APPS.iter().enumerate() {
                 h.send(if width < WIDE { Msg::ShowDetail(index) } else { Msg::Select(index) });
                 fragments.push(h.html(&format!("{} {locale} {width}x{height}", member.key)));
                 println!("{} {locale} {width}x{height}\n{}", member.key, h.screen());
@@ -540,10 +540,10 @@ fn on_a_narrow_screen_enter_shows_the_details_then_opens() {
 /// so they are the ones a narrow screen cuts.
 fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
     let say = |key: &str| h.env().i18n().translate(key, &[]);
-    let member = &FAMILY[index];
+    let member = &APPS[index];
     let app = h.app();
     let mut labels = vec![
-        say(&format!("family.{}.title", member.key)),
+        say(&format!("apps.{}.title", member.key)),
         say(match member.status {
             Status::Released => "status.released",
             Status::Beta => "status.beta",
@@ -585,7 +585,7 @@ fn no_label_is_cut_on_a_narrow_screen_in_any_language() {
         for locale in LANGUAGES {
             let (_root, mut h) = harness(width, 44);
             h.set_locale(locale);
-            for (index, member) in FAMILY.iter().enumerate() {
+            for (index, member) in APPS.iter().enumerate() {
                 for page in [false, true] {
                     h.send(Msg::Select(index));
                     if page {
