@@ -2,6 +2,12 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.2.10 (2026-09-23)
+
+- A member can be put back on the family's settings from quvyta. On the Settings tab, press enter on or click a member in the follow table that chose a language, theme or icon set of its own: a small menu offers to follow the shared one again, one choice for each setting it does not share. Only that setting changes in the member's own file; the family's shared settings and the member's other settings stay as they are. On a narrow terminal the same choices are buttons under the member. A member that shares everything, has never been opened, or has a file quvyta cannot read offers nothing, and quvyta never writes to a file it could not read.
+- The buttons under an install keep one layout rule in every language: they stand side by side, and the ones that do not fit move to the next line, instead of the whole row turning into a column the moment one button is too wide.
+- Requires quvyta-framework 0.1.19.
+
 ## 0.2.9 (2026-09-23)
 
 - quvyta follows the family's update notice, the one switch every Quvyta application shares. The Settings tab shows it under the appearance rows as **Say when an update is out**, in the same words as every other member, and turning it off there turns it off for the whole family; quvyta's own **Check for updates at start** is gone. quvyta now asks crates.io at most once a day, as the notice promises, instead of every six hours; `r` still asks at any time. If you had turned quvyta's own switch off, your choice is kept: the first start turns the family's switch off and removes `check_updates` from `launcher.conf`. The README has a new section on exactly what quvyta sends over the network.

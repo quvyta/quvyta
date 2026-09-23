@@ -14,8 +14,8 @@ use qframe::prelude::*;
 use qframe::storage::Shared;
 use qframe::widget::NodeMut;
 use qframe::widgets::{
-    AppearanceChange, Column, ColumnWidth, ScrollView, Select, SettingRow, SettingsList, Table, TableCell, TableRow,
-    Toast,
+    AppearanceChange, Column, ColumnWidth, ContextItem, ScrollView, Select, SettingRow, SettingsList, Table, TableCell,
+    TableRow, Toast,
 };
 
 use super::follow::{self, Following, MemberFollowing};
@@ -61,6 +61,10 @@ pub enum SettingMsg {
     Followed(Vec<MemberFollowing>),
     /// Moves the keys to this row of the follow table.
     FollowSelect(usize),
+    /// Puts the member at this index of the family back on the family's value of the key.
+    Follow(usize, Shared),
+    /// The member's file was written, or why not.
+    Follows(Result<(), String>),
 }
 
 impl Quvyta {
@@ -97,6 +101,23 @@ impl Quvyta {
             SettingMsg::FollowSelect(row) => {
                 self.following_selected = Some(row);
                 Command::none()
+            }
+            SettingMsg::Follow(index, key) => {
+                let machine = self.machine.clone();
+                Command::perform(move || {
+                    let written = follow::follow(&machine, index, key).map_err(|error| error.to_string());
+                    Msg::Setting(SettingMsg::Follows(written))
+                })
+            }
+            // The table shows what the files say, so it is read again rather than changed here.
+            SettingMsg::Follows(Ok(())) => self.read_following(),
+            SettingMsg::Follows(Err(reason)) => {
+                let folder = self.machine.settings_dir.as_deref().map(|folder| self.machine.show(folder));
+                let body = folder.map_or(reason.clone(), |folder| format!("{folder}\n{reason}"));
+                Command::batch([
+                    Command::toast(Toast::warning(t!("settings.not-saved")).body(body)),
+                    self.read_following(),
+                ])
             }
         }
     }
@@ -229,10 +250,19 @@ impl Quvyta {
                 TableRow::new(std::iter::once(command).chain(cells))
             })
             .collect();
+        // A row is acted on only by putting its own keys back on the family's, so its menu is what
+        // enter and a click open; a row that shares everything, or cannot be read, opens nothing.
+        let menus: Vec<Vec<ContextItem<Msg>>> = following
+            .iter()
+            .map(|member| follow_choices(member).map(|(key, msg)| ContextItem::new(follow_label(key), msg)).collect())
+            .collect();
         let select = |row: usize| Msg::Setting(SettingMsg::FollowSelect(row));
-        ui.add(Table::new(columns, rows).selected(self.following_selected).on_select(select))
-            .width(Length::Cells(width))
-            .id("following-table");
+        let table = Table::new(columns, rows)
+            .selected(self.following_selected)
+            .on_select(select)
+            .context_menu(move |row| menus.get(row).cloned().unwrap_or_default())
+            .menu_on_activate(true);
+        ui.add(table).width(Length::Cells(width)).id("following-table");
     }
 
     /// The faint title of quvyta's own section and, fainter, the file it is kept in: beside the
@@ -309,6 +339,30 @@ impl Quvyta {
     }
 }
 
+/// The choices that put one of `member`'s own keys back on the family's value, one per key it
+/// does not share, with the message each sends. None for a member that shares everything, has
+/// not been opened, or has a file quvyta could not read and so never writes.
+fn follow_choices(member: &MemberFollowing) -> impl Iterator<Item = (Shared, Msg)> + '_ {
+    let values = match &member.following {
+        Following::Keys(values) => Some(values),
+        Following::NotOpened | Following::Unreadable(_) => None,
+    };
+    Shared::ALL
+        .into_iter()
+        .zip(values.into_iter().flatten())
+        .filter(|(_, value)| value.is_some())
+        .map(|(key, _)| (key, Msg::Setting(SettingMsg::Follow(member.index, key))))
+}
+
+/// The menu entry that puts `key` back on the family's value.
+fn follow_label(key: Shared) -> String {
+    match key {
+        Shared::Language => t!("settings.follow-language"),
+        Shared::Theme => t!("settings.follow-theme"),
+        Shared::Icons => t!("settings.follow-icons"),
+    }
+}
+
 /// One line per member for a narrow screen: its command, then only the keys it does not share
 /// with the family, or that it shares them all. When a member's own keys do not fit on one line
 /// in `width` cells, each takes a line of its own under the first, so a line never breaks inside
@@ -348,6 +402,20 @@ fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui:
             ui.add(if own { text } else { text.role("faint") }).fill_width();
         })
         .padding(Padding::symmetric(0, 2));
+        // The table's menu is not there on a narrow screen, so its choices stand under the member
+        // as buttons, moving to the next line when they do not fit.
+        let choices: Vec<(Shared, Msg)> = follow_choices(member).collect();
+        if !choices.is_empty() {
+            ui.row(|ui| {
+                ui.add(Text::new(t!("settings.follow-narrow")).role("faint").no_wrap());
+                for (key, msg) in choices {
+                    ui.add(Button::new(words.key(key)).on_press(msg));
+                }
+            })
+            .gap(1)
+            .wrap(true)
+            .padding(Padding { top: 0, right: 2, bottom: 0, left: 2 + name_width });
+        }
     }
 }
 

@@ -496,9 +496,9 @@ pub(in crate::app) fn review() -> Vec<String> {
 /// All three states of the PATH row are walked, because its value is the one line on this page
 /// that may not wrap: a `yes` that broke over two lines would look like a second setting.
 ///
-/// Three lines shorten themselves on purpose and are let through by name: the path of the
-/// settings file, the `PATH` line a shell would be given, and — until the framework's select
-/// stops doing it — the language select, which cuts `Português (Brasil)` at every width.
+/// Two lines shorten themselves on purpose and are let through by name: the path of the
+/// settings file and the `PATH` line a shell would be given. The language select, which once cut
+/// `Português (Brasil)`, has no exception: the framework's select fits it now.
 #[test]
 fn nothing_on_the_settings_tab_is_cut_in_any_language() {
     for (width, height) in [(40, 30), (48, 40), (60, 40), (80, 44), (100, 44)] {
@@ -523,14 +523,12 @@ fn nothing_on_the_settings_tab_is_cut_in_any_language() {
                 }
                 let mut h = settings_on(machine, width, height);
                 h.set_locale(locale);
-                let language = h.env().i18n().translate("quvyta.appearance.language", &[]);
                 let screen = h.screen();
                 for line in screen.lines() {
                     if !line.contains('\u{2026}') {
                         continue;
                     }
-                    let shortens_itself =
-                        line.ends_with("launcher.conf") || line.contains("export PATH=") || line.contains(&language);
+                    let shortens_itself = line.ends_with("launcher.conf") || line.contains("export PATH=");
                     assert!(
                         shortens_itself,
                         "`{}` is cut in {locale} at {width}x{height} with PATH {reach}:\n{screen}",
@@ -565,11 +563,8 @@ fn nothing_on_the_settings_tab_is_cut_in_any_language() {
             for word in words {
                 assert!(screen.contains(&word), "`{word}` in {locale} at {width}:\n{screen}");
             }
-            let language = i18n.translate("quvyta.appearance.language", &[]);
             for line in screen.lines().filter(|line| line.contains('\u{2026}')) {
-                let shortens_itself =
-                    line.ends_with("launcher.conf") || (line.contains(&language) && line.contains('▾'));
-                assert!(shortens_itself, "`{}` is cut in {locale} at {width}:\n{screen}", line.trim());
+                assert!(line.ends_with("launcher.conf"), "`{}` is cut in {locale} at {width}:\n{screen}", line.trim());
             }
         }
     }
@@ -708,4 +703,113 @@ fn a_narrow_screen_gives_each_member_one_line_with_only_what_it_does_not_share()
     assert_eq!(first.trim(), "qcode   Language: Русский", "{screen}");
     let next = screen.lines().skip_while(|line| *line != first).nth(1).expect("a line after");
     assert_eq!(next.trim(), "Theme: Nordic", "{screen}");
+}
+
+/// Clicks the follow table's row of `command` on its name, where a person would.
+fn click_follow_row(h: &mut Harness<Quvyta>, command: &str) {
+    let screen = h.screen();
+    let row = follow_line(&screen, command);
+    let y = screen.lines().position(|line| line == row).expect("the row is on screen");
+    let x = qframe::text::width(&row[..row.find(command).expect("in the row")]);
+    h.click(i32::from(x), i32::try_from(y).expect("y")).advance(TOAST_IN);
+}
+
+fn member_conf(root: &Path, id: &str) -> String {
+    fs::read_to_string(root.join(format!("config/{id}.conf"))).expect("the member's file")
+}
+
+#[test]
+fn a_click_on_a_member_offers_its_own_keys_and_following_changes_that_key_alone() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = settings_on(member_files(root.path(), &[("code", QCODE)]), 100, 60);
+    let shared_before = quvyta_conf(root.path());
+    click_follow_row(&mut h, "qcode");
+    let screen = h.screen();
+    assert!(screen.contains("Follow the shared language") && screen.contains("Follow the shared theme"), "{screen}");
+    assert!(!screen.contains("Follow the shared icons"), "qcode shares its icons already:\n{screen}");
+    h.click_text("Follow the shared theme").advance(TOAST_IN);
+    let own = member_conf(root.path(), "code");
+    assert!(own.contains("theme = \"quvyta\""), "{own}");
+    assert!(own.contains("language = \"tr\"") && own.contains("reduced_motion = true"), "the rest stays:\n{own}");
+    assert_eq!(quvyta_conf(root.path()), shared_before, "the family's own file is not touched");
+    let qcode = follow_line(&h.screen(), "qcode");
+    assert!(qcode.contains("Türkçe") && !qcode.contains("Nordic"), "the table reads the file again:\n{}", h.screen());
+    assert_eq!(qcode.matches("shared").count(), 2, "{qcode}");
+    assert!(h.handoffs().is_empty());
+}
+
+#[test]
+fn enter_on_a_member_opens_the_same_choices() {
+    let root = tempfile::tempdir().expect("temp");
+    // qfocus this time, so a choice that reached the wrong member's file would show.
+    let mut h = settings_on(member_files(root.path(), &[("focus", QCODE), ("code", QCODE)]), 100, 60);
+    click_follow_row(&mut h, "qfocus");
+    h.press("esc").advance(TOAST_IN);
+    assert!(!h.screen().contains("Follow the shared theme"), "esc closes it:\n{}", h.screen());
+    h.press("enter").advance(TOAST_IN);
+    assert!(h.screen().contains("Follow the shared theme"), "{}", h.screen());
+    h.press("down").press("enter").advance(TOAST_IN);
+    assert!(member_conf(root.path(), "focus").contains("theme = \"quvyta\""), "{}", h.screen());
+    assert!(member_conf(root.path(), "focus").contains("language = \"tr\""), "one key only");
+    assert_eq!(member_conf(root.path(), "code"), QCODE, "and one member only");
+}
+
+#[test]
+fn a_member_that_shares_everything_or_cannot_be_read_offers_nothing() {
+    let root = tempfile::tempdir().expect("temp");
+    let machine = member_files(root.path(), &[("code", "theme = \"quvyta\"\n"), ("showcase", BROKEN)]);
+    let mut h = settings_on(machine, 100, 60);
+    h.advance(TOAST_IN);
+    for command in ["qcode", "qframe", "qfocus"] {
+        click_follow_row(&mut h, command);
+        assert!(!h.screen().contains("Follow the shared"), "{command} offers a choice:\n{}", h.screen());
+    }
+    assert_eq!(member_conf(root.path(), "showcase"), BROKEN, "left exactly as it was");
+    assert!(!root.path().join("config/focus.conf").exists(), "no file is made for a member never opened");
+}
+
+#[test]
+fn a_narrow_screen_puts_the_choices_under_the_member_as_buttons() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = settings_on(member_files(root.path(), &[("code", QCODE)]), 60, 60);
+    let screen = h.screen();
+    let choices = following_choices(&screen);
+    assert_eq!(
+        choices.split_whitespace().collect::<Vec<_>>(),
+        ["Back", "to", "shared:", "Language", "Theme"],
+        "{screen}"
+    );
+    // On the line of the choices, not the appearance row of the same name above.
+    let y = screen.lines().position(|line| line == choices).expect("on screen");
+    let x = qframe::text::width(&choices[..choices.find("Language").expect("the button")]);
+    h.click(i32::from(x), i32::try_from(y).expect("y")).advance(TOAST_IN);
+    let own = member_conf(root.path(), "code");
+    assert!(own.contains("language = \"quvyta\"") && own.contains("theme = \"nordic\""), "{own}");
+    let screen = h.screen();
+    assert_eq!(
+        following_choices(&screen).split_whitespace().last(),
+        Some("Theme"),
+        "only what is still its own:\n{screen}"
+    );
+    assert_eq!(follow_line(&screen, "qcode").trim(), "qcode   Theme: Nordic", "{screen}");
+}
+
+#[test]
+fn a_member_file_that_cannot_be_written_says_so_and_stays_as_it_was() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = settings_on(member_files(root.path(), &[("code", QCODE)]), 100, 60);
+    let config = root.path().join("config");
+    click_follow_row(&mut h, "qcode");
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o555)).expect("read-only");
+    h.click_text("Follow the shared theme").advance(TOAST_IN);
+    let screen = h.screen();
+    fs::set_permissions(&config, fs::Permissions::from_mode(0o755)).expect("writable again");
+    assert!(screen.contains("The setting could not be saved"), "{screen}");
+    assert_eq!(member_conf(root.path(), "code"), QCODE);
+    assert!(follow_line(&screen, "qcode").contains("Nordic"), "{screen}");
+}
+
+/// The line of the narrow follow section offering the choices of its only member with any.
+fn following_choices(screen: &str) -> String {
+    line_with(&screen[at(screen, "Do the applications follow")..], "Back to shared:").to_owned()
 }

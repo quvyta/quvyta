@@ -259,6 +259,10 @@ follow-own = "{key}: {value}"
 follow-none = "Другие приложения Quvyta не установлены."
 follow-next-start = "Запущенные приложения увидят изменения при следующем запуске."
 follow-unreadable-told = "Не удалось прочитать настройки приложения"
+follow-language = "Следовать общему языку"
+follow-theme = "Следовать общей цветовой теме"
+follow-icons = "Следовать общим значкам"
+follow-narrow = "Вернуть к общему:"
 
 [wizard]
 step-apps = "Приложения"

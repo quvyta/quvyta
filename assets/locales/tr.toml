@@ -257,6 +257,10 @@ follow-own = "{key}: {value}"
 follow-none = "Kurulu başka Quvyta uygulaması yok."
 follow-next-start = "Açık uygulamalar değişikliği bir sonraki açılışta görür."
 follow-unreadable-told = "Bir uygulamanın ayarları okunamadı"
+follow-language = "Ortak dili izle"
+follow-theme = "Ortak renk temasını izle"
+follow-icons = "Ortak ikonları izle"
+follow-narrow = "Ortağa döndür:"
 
 [wizard]
 step-apps = "Uygulamalar"

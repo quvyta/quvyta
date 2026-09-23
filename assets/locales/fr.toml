@@ -259,6 +259,10 @@ follow-own = "{key} : {value}"
 follow-none = "Aucune autre application Quvyta n’est installée."
 follow-next-start = "Les applications ouvertes verront le changement au prochain démarrage."
 follow-unreadable-told = "Impossible de lire les réglages d’une application"
+follow-language = "Suivre la langue partagée"
+follow-theme = "Suivre le thème de couleurs partagé"
+follow-icons = "Suivre les icônes partagées"
+follow-narrow = "Revenir au partagé :"
 
 [wizard]
 step-apps = "Applications"

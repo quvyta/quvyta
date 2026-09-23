@@ -53,6 +53,21 @@ pub(crate) fn read(machine: &Machine, members: &[usize]) -> Vec<MemberFollowing>
         .collect()
 }
 
+/// Puts the member at `index` of [`FAMILY`] back on the family's value of `key`: only that key
+/// of its own file changes, to the family's id, and the family's shared file is neither read nor
+/// written. The framework refuses a file it cannot read and leaves it exactly as it was.
+///
+/// # Errors
+///
+/// The framework's: a broken file, no settings folder, or a file that cannot be written.
+pub(crate) fn follow(machine: &Machine, index: usize, key: Shared) -> std::io::Result<()> {
+    let member = FAMILY.get(index).ok_or_else(|| std::io::Error::other("no such member"))?;
+    match &machine.member_settings {
+        Some(folder) => Family::QUVYTA.follow_in(folder, member.settings_id, key),
+        None => Family::QUVYTA.follow(member.settings_id, key),
+    }
+}
+
 /// How the settings file at `path` stands with the family.
 fn read_file(path: &Path) -> Following {
     if !path.exists() {

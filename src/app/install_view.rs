@@ -127,12 +127,9 @@ impl Quvyta {
             ui.add(Text::new(progress.krate.clone().unwrap_or_default()).role("faint").no_wrap()).fill_width();
         })
         .fill_width();
-        let side_by_side = running_row_width() <= self.room();
-        actions(side_by_side, ui, |ui| {
+        actions(ui, |ui| {
             self.details_button(ui);
-            if side_by_side {
-                ui.spacer();
-            }
+            ui.spacer();
             ui.add(Button::new(t!("install.stop")).on_press(Msg::Install(InstallMsg::AskStop))).id("stop");
         });
         self.details(running.index, ui);
@@ -200,21 +197,9 @@ impl Quvyta {
         if let Some(path) = install::log_path(&self.machine, member).filter(|_| !removing) {
             ui.add(Text::new(t!("install.log-file", path = self.machine.show(&path)))).selectable(true).fill_width();
         }
-        let row = row_width(
-            &[
-                details_button_width(),
-                button_width(&t!("install.copy-log")),
-                button_width(&t!("install.close")),
-                button_width(&t!("install.retry")),
-            ],
-            true,
-        );
-        let side_by_side = row <= self.room();
-        actions(side_by_side, ui, |ui| {
+        actions(ui, |ui| {
             self.details_button(ui);
-            if side_by_side {
-                ui.spacer();
-            }
+            ui.spacer();
             ui.add(Button::new(t!("install.copy-log")).on_press(Msg::Install(InstallMsg::CopyLog(index))))
                 .id("copy-log");
             ui.add(Button::new(t!("install.close")).on_press(Msg::Install(InstallMsg::Dismiss(index)))).id("dismiss");
@@ -222,12 +207,6 @@ impl Quvyta {
             ui.add(Button::new(t!("install.retry")).variant("primary").on_press(retry)).id("retry");
         });
         self.details(index, ui);
-    }
-
-    /// The columns the details are drawn in, inside the air they keep on both sides: how wide
-    /// a row of buttons may be before it has to lay itself out down the screen.
-    fn room(&self) -> u16 {
-        self.detail_width().saturating_sub(4)
     }
 
     fn details_button(&self, ui: &mut View<'_, Msg>) {
@@ -247,15 +226,11 @@ impl Quvyta {
     }
 }
 
-/// Buttons side by side while they fit, one under another when they do not. A button cannot
-/// shorten its words, and a row wider than its room loses the buttons at its end off the
+/// Buttons side by side, the ones that do not fit moving to the next line. A button cannot
+/// shorten its words, and a row wider than its room would lose the buttons at its end off the
 /// screen, which after a failure would be Close and Try again.
-fn actions<M: Clone + 'static>(side_by_side: bool, ui: &mut View<'_, M>, build: impl FnOnce(&mut View<'_, M>)) {
-    if side_by_side {
-        ui.row(build).gap(2).fill_width();
-    } else {
-        ui.column(build).fill_width();
-    }
+fn actions<M: Clone + 'static>(ui: &mut View<'_, M>, build: impl FnOnce(&mut View<'_, M>)) {
+    ui.row(build).gap(2).wrap(true).line_gap(1).fill_width();
 }
 
 /// The columns a button takes: its words with the theme's air on both sides.

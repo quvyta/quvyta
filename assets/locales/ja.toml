@@ -259,6 +259,10 @@ follow-own = "{key}: {value}"
 follow-none = "他の Quvyta アプリはインストールされていません。"
 follow-next-start = "開いているアプリは、次に起動したときに変更を反映します。"
 follow-unreadable-told = "アプリの設定を読み取れませんでした"
+follow-language = "共通の言語に合わせる"
+follow-theme = "共通のカラーテーマに合わせる"
+follow-icons = "共通のアイコンに合わせる"
+follow-narrow = "共有に戻す："
 
 [wizard]
 step-apps = "アプリ"

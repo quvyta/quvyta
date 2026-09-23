@@ -259,6 +259,10 @@ follow-own = "{key}: {value}"
 follow-none = "没有安装其他 Quvyta 应用。"
 follow-next-start = "已打开的应用会在下次启动时看到更改。"
 follow-unreadable-told = "无法读取某个应用的设置"
+follow-language = "跟随共享语言"
+follow-theme = "跟随共享颜色主题"
+follow-icons = "跟随共享图标"
+follow-narrow = "恢复为共享："
 
 [wizard]
 step-apps = "应用"
