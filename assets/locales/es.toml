@@ -262,6 +262,10 @@ follow-unreadable-told = "No se han podido leer los ajustes de una aplicación"
 follow-language = "Seguir el idioma compartido"
 follow-theme = "Seguir el tema de color compartido"
 follow-icons = "Seguir los iconos compartidos"
+follow-reduced-motion = "Seguir el ajuste de movimiento compartido"
+follow-motion = "Movimiento"
+motion-reduced = "reducido"
+motion-full = "completo"
 follow-narrow = "Volver a lo compartido:"
 
 [wizard]

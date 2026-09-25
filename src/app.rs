@@ -310,7 +310,7 @@ impl Quvyta {
     fn detail_content(&self, index: usize) -> u16 {
         let member = &APPS[index];
         let title = qframe::text::width(&t!(&format!("apps.{}.title", member.key)));
-        let badge = detail::badge_width(&match member.status {
+        let badge = detail::badge_width(&match member.status() {
             Status::Released => t!("status.released"),
             Status::Beta => t!("status.beta"),
             Status::Soon => t!("status.soon"),
@@ -722,7 +722,7 @@ fn already_installed(indexes: &[usize]) -> Command<Msg> {
 fn row_state(member: &Member, state: &State, compact: bool) -> String {
     match state {
         // Not there because it is not out yet: "not installed" would suggest installing it.
-        State::Missing if member.status == Status::Soon => t!("row.soon"),
+        State::Missing if member.status() == Status::Soon => t!("row.soon"),
         State::Missing => t!("row.missing"),
         State::Cargo { version, .. } => version.clone(),
         State::Elsewhere { .. } => t!("row.unknown"),

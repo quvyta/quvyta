@@ -45,7 +45,7 @@ The first start asks what every Quvyta app should look like — the language, th
 | [Focus](https://github.com/quvyta/focus) | `quvyta-focus` | `qfocus` | `cargo install quvyta-focus` | Beta |
 | [Tools](https://github.com/quvyta/tools) | `quvyta-tools` | `qtools` | `cargo install quvyta-tools` | Beta |
 | [Packages](https://github.com/quvyta/packages) | `quvyta-packages` | `qpac` | `cargo install quvyta-packages` | Beta |
-| [Desktop](https://github.com/quvyta/desktop) | `quvyta-desktop` | `qdesk` | not released yet | Coming soon |
+| [Desktop](https://github.com/quvyta/desktop) | `quvyta-desktop` | `qdesk` | `cargo install quvyta-desktop` | Beta |
 | [Framework](https://github.com/quvyta/framework) showcase | `quvyta-framework-showcase` | `qframe` | `cargo install quvyta-framework-showcase` | Released |
 | [quvyta](https://github.com/quvyta/quvyta) | `quvyta` | `quvyta` | `cargo install quvyta` | Beta |
 
@@ -55,9 +55,8 @@ The first start asks what every Quvyta app should look like — the language, th
   preview, a backup and an undo.
 - **qpackages** is a package manager for Arch Linux that shows exactly what will change before
   anything does.
-- **qdesk** will be a desktop inside the terminal, with windows, a dock, a launcher and a file
-  manager, made for working over SSH and on small machines. quvyta lists it already, but it is
-  not released yet, so there is nothing to install.
+- **qdesk** is a desktop inside the terminal, with windows, icons, a dock and a launcher, made
+  for working over SSH and on small machines.
 - **qframe** shows off the framework every member is built on; the framework itself is a Rust
   library you add to a project with `cargo add quvyta-framework`.
 
@@ -78,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh 
 curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- quvyta
 ```
 
-The names are `framework` (the framework's showcase, `qframe`), `code`, `focus`, `packages`, `tools`, `quvyta` and `all`; several can be given at once. `desk` is known too, but qdesk is not released yet: naming it says so and installs nothing, and `all` leaves it out.
+The names are `framework` (the framework's showcase, `qframe`), `code`, `focus`, `packages`, `tools`, `desk` (qdesk), `quvyta` and `all`; several can be given at once.
 
 What the script does, asking before each step:
 

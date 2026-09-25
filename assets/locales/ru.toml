@@ -262,6 +262,10 @@ follow-unreadable-told = "Не удалось прочитать настрой�
 follow-language = "Следовать общему языку"
 follow-theme = "Следовать общей цветовой теме"
 follow-icons = "Следовать общим значкам"
+follow-reduced-motion = "Следовать общей настройке анимации"
+follow-motion = "Анимация"
+motion-reduced = "уменьшена"
+motion-full = "полная"
 follow-narrow = "Вернуть к общему:"
 
 [wizard]

@@ -1,5 +1,7 @@
 //! The Quvyta apps this program lists, opens and will install.
 
+use qframe::storage::MEMBERS;
+
 /// How settled a member is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
@@ -30,13 +32,9 @@ pub struct Member {
     /// Whether it only runs on Arch Linux, as `install.sh` and `install.ps1` also know it: on
     /// another system it is listed, and told apart, but not offered for installing.
     pub arch_only: bool,
-    /// How settled it is.
+    /// How settled it is. quvyta reads it through `Member::status()`, which a test can answer
+    /// otherwise.
     pub status: Status,
-    /// The id its settings file goes under in the shared settings folder, `<id>.conf`: the id the
-    /// member itself asks the framework for, which is not always its key. The showcase's file is
-    /// `showcase.conf` although the member is the framework, and quvyta's is `launcher.conf`,
-    /// since `quvyta.conf` is the file every Quvyta app shares.
-    pub settings_id: &'static str,
 }
 
 impl Member {
@@ -45,9 +43,28 @@ impl Member {
         self.package == env!("CARGO_PKG_NAME")
     }
 
+    /// The id its settings file goes under in the shared settings folder, `<id>.conf`, as the
+    /// framework's list of Quvyta apps gives it: the id the member itself asks the framework for,
+    /// which is not always its key. qdesk's file is `desktop.conf`, the showcase's `showcase.conf`
+    /// and quvyta's `launcher.conf`, since `quvyta.conf` is the file every Quvyta app shares. Taken
+    /// from the framework rather than kept here, so the two cannot drift apart.
+    pub(crate) fn settings_id(&self) -> &'static str {
+        MEMBERS.iter().find(|member| member.package == self.package).map_or(self.key, |member| member.settings_id)
+    }
+
+    /// How settled it is: its `status` field, except in a test that made it one still to come
+    /// with `tests::unreleased`.
+    pub(crate) fn status(&self) -> Status {
+        #[cfg(test)]
+        if tests::is_unreleased(self.key) {
+            return Status::Soon;
+        }
+        self.status
+    }
+
     /// Whether crates.io has it, so quvyta may install and update it.
     pub(crate) fn published(&self) -> bool {
-        self.status != Status::Soon
+        self.status() != Status::Soon
     }
 }
 
@@ -64,7 +81,6 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/code",
         library: None,
         arch_only: false,
-        settings_id: "code",
         status: Status::Beta,
     },
     Member {
@@ -75,7 +91,6 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/focus",
         library: None,
         arch_only: false,
-        settings_id: "focus",
         status: Status::Beta,
     },
     Member {
@@ -86,7 +101,6 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/tools",
         library: None,
         arch_only: true,
-        settings_id: "tools",
         status: Status::Beta,
     },
     Member {
@@ -97,7 +111,6 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/packages",
         library: None,
         arch_only: true,
-        settings_id: "packages",
         status: Status::Beta,
     },
     Member {
@@ -110,8 +123,7 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/desktop",
         library: None,
         arch_only: false,
-        settings_id: "desk",
-        status: Status::Soon,
+        status: Status::Beta,
     },
     Member {
         key: "framework",
@@ -121,7 +133,6 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/framework",
         library: Some("cargo add quvyta-framework"),
         arch_only: false,
-        settings_id: "showcase",
         status: Status::Released,
     },
     Member {
@@ -132,23 +143,82 @@ pub const APPS: [Member; 7] = [
         repository: "https://github.com/quvyta/quvyta",
         library: None,
         arch_only: false,
-        settings_id: "launcher",
         status: Status::Beta,
     },
 ];
 
 #[cfg(test)]
-mod tests {
-    use super::APPS;
+pub(crate) mod tests {
+    use std::cell::Cell;
+
+    use super::{APPS, MEMBERS, Status};
+
+    thread_local! {
+        /// The key of the member the running test treats as not released yet.
+        static UNRELEASED: Cell<Option<&'static str>> = const { Cell::new(None) };
+    }
+
+    /// While the returned guard lives, the member `key` is one still to come on this thread,
+    /// whatever its real status: every member is out today, and what quvyta does with one that is
+    /// not has to stay tested for the next one. The screen's work runs on the test's thread in
+    /// the harness, so everything the screen asks sees it.
+    pub(crate) fn unreleased(key: &'static str) -> Unreleased {
+        assert!(APPS.iter().any(|member| member.key == key), "`{key}` is not a member");
+        UNRELEASED.with(|cell| cell.set(Some(key)));
+        Unreleased
+    }
+
+    /// Puts the member back as it really is when dropped.
+    pub(crate) struct Unreleased;
+
+    impl Drop for Unreleased {
+        fn drop(&mut self) {
+            UNRELEASED.with(|cell| cell.set(None));
+        }
+    }
+
+    pub(super) fn is_unreleased(key: &str) -> bool {
+        UNRELEASED.with(|cell| cell.get() == Some(key))
+    }
+
+    #[test]
+    fn a_member_is_still_to_come_only_while_a_test_says_so() {
+        let desk = APPS.iter().find(|member| member.key == "desk").expect("qdesk is listed");
+        assert_eq!(desk.status(), Status::Beta);
+        {
+            let _soon = unreleased("desk");
+            assert_eq!(desk.status(), Status::Soon);
+            assert!(!desk.published());
+            let code = APPS.iter().find(|member| member.key == "code").expect("qcode is listed");
+            assert!(code.published(), "only the member named");
+        }
+        assert!(desk.published(), "the guard puts it back");
+    }
+
+    #[test]
+    fn every_member_is_one_the_framework_knows_and_keeps_its_settings_where_the_framework_says() {
+        for member in &APPS {
+            let known = MEMBERS.iter().find(|known| known.package == member.package);
+            let known = known.unwrap_or_else(|| panic!("the framework does not list `{}`", member.package));
+            assert_eq!(
+                (member.command, member.settings_id()),
+                (known.command, known.settings_id),
+                "{}",
+                member.package
+            );
+        }
+        let desk = APPS.iter().find(|member| member.command == "qdesk").expect("qdesk is listed");
+        assert_eq!(desk.settings_id(), "desktop", "qdesk keeps its settings in desktop.conf");
+    }
 
     #[test]
     fn every_member_has_a_settings_file_of_its_own_and_quvyta_s_is_launcher_conf() {
-        let ids: Vec<&str> = APPS.iter().map(|member| member.settings_id).collect();
+        let ids: Vec<&str> = APPS.iter().map(super::Member::settings_id).collect();
         for (index, id) in ids.iter().enumerate() {
             assert!(!ids[..index].contains(id), "`{id}` is the settings id of two members");
             assert_ne!(*id, "quvyta", "`quvyta.conf` is the file every Quvyta app shares");
         }
         let quvyta = APPS.iter().find(|member| member.is_self()).expect("quvyta is listed");
-        assert_eq!(quvyta.settings_id, crate::machine::LAUNCHER);
+        assert_eq!(quvyta.settings_id(), crate::machine::LAUNCHER);
     }
 }

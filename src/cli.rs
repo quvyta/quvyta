@@ -382,12 +382,15 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
         assert_eq!(text, "quvyta: show yalnızca bir ad alır\nNeler yazılabileceğini görmek için: quvyta --help\n");
         let Answer::Refuse(text) = answer("tr", &["show"]) else { panic!("refused") };
         assert!(text.starts_with("quvyta: show bir ad bekliyor, örneğin qfocus\n"), "{text}");
+        let _soon = crate::ecosystem::tests::unreleased("desk");
         assert_eq!(answer("en", &["show", "qdesk"]).code(), None, "a member still to come has a page too");
     }
 
     #[test]
     fn a_member_not_released_yet_is_refused_in_one_line() {
         let desk = index("desk");
+        assert_eq!(parsed(&["install", "qdesk"]), Parsed::Open(Start::Install(vec![desk])), "qdesk is out");
+        let _soon = crate::ecosystem::tests::unreleased("desk");
         for name in ["qdesk", "desk", "QUVYTA-DESKTOP"] {
             assert_eq!(parsed(&["install", name]), wrong(Mistake::Unreleased(desk)), "{name}");
         }

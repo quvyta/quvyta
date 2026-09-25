@@ -1,13 +1,18 @@
 //! A member that is not released yet: listed with what it will be, never installed or updated
 //! from quvyta, and opened like any other when a build of it is already on the machine.
+//!
+//! Every member is out today, so each test here makes qdesk one still to come for as long as it
+//! runs ([`unreleased`]); qdesk has a page, words in every language and a local build to stand in
+//! with, which is what the next member still to come will have.
 
 use std::path::Path;
 
 use qframe::icons::GlyphMode;
 
-use super::install_tests::{DIALOG_IN, calls, has, run, settle};
+use super::install_tests::{DIALOG_IN, calls, confirm, has, run, settle};
 use super::tests::{LANGUAGES, LIST, TOAST_IN, harness, index, line_with, machine};
 use super::*;
+use crate::ecosystem::tests::unreleased;
 use crate::install::tests::packages;
 use crate::inventory::tests::installed_command;
 use crate::updates::tests::search_scenario;
@@ -43,6 +48,7 @@ fn installs(root: &Path) -> usize {
 
 #[test]
 fn its_row_says_it_is_coming_between_the_programs_and_the_framework() {
+    let _soon = unreleased("desk");
     let (_root, mut h) = harness(100, 24);
     let screen = h.screen();
     assert!(line_with(&screen, "qdesk ").contains("coming soon"), "{screen}");
@@ -56,6 +62,7 @@ fn its_row_says_it_is_coming_between_the_programs_and_the_framework() {
 
 #[test]
 fn its_details_say_what_it_will_be_and_that_it_is_not_out() {
+    let _soon = unreleased("desk");
     let (_root, mut h) = harness(100, 30);
     h.send(Msg::Select(desk()));
     let screen = h.screen();
@@ -83,6 +90,7 @@ fn its_details_say_what_it_will_be_and_that_it_is_not_out() {
 
 #[test]
 fn nothing_on_the_screen_installs_it() {
+    let _soon = unreleased("desk");
     let root = tempfile::tempdir().expect("temp");
     let app = Quvyta::new(machine(root.path()));
     packages(root.path());
@@ -101,6 +109,7 @@ fn nothing_on_the_screen_installs_it() {
 
 #[test]
 fn a_narrow_screen_shows_its_page_without_a_way_to_install() {
+    let _soon = unreleased("desk");
     let (_root, mut h) = harness(48, 24);
     h.send(Msg::Select(desk())).press("enter");
     let screen = h.screen();
@@ -112,6 +121,7 @@ fn a_narrow_screen_shows_its_page_without_a_way_to_install() {
 
 #[test]
 fn the_command_line_never_opens_on_its_install_dialog() {
+    let _soon = unreleased("desk");
     let root = tempfile::tempdir().expect("temp");
     let app = Quvyta::new(machine(root.path())).asking(vec![desk()]);
     let mut h = run(app, 100, 30);
@@ -122,6 +132,7 @@ fn the_command_line_never_opens_on_its_install_dialog() {
 
 #[test]
 fn a_local_build_is_installed_elsewhere_opens_and_is_never_updated() {
+    let _soon = unreleased("desk");
     let root = tempfile::tempdir().expect("temp");
     let mut h = with_local_build(root.path());
     let screen = h.screen();
@@ -135,7 +146,7 @@ fn a_local_build_is_installed_elsewhere_opens_and_is_never_updated() {
     for text in ["Update", "Remove", "9.9.9"] {
         assert!(!screen.contains(text), "`{text}` is offered:\n{screen}");
     }
-    h.press("u").send(Msg::Updates(UpdateMsg::InstallAll));
+    h.click_text("Install updates");
     settle(&mut h);
     let updates: Vec<String> =
         calls(root.path()).into_iter().filter(|call| call.starts_with("install --locked")).collect();
@@ -148,6 +159,7 @@ fn a_local_build_is_installed_elsewhere_opens_and_is_never_updated() {
 
 #[test]
 fn ascii_screens_of_it_keep_the_rules() {
+    let _soon = unreleased("desk");
     for (width, height) in [(40, 16), (48, 20), (60, 20), (100, 24)] {
         for locale in LANGUAGES {
             let (_root, mut h) = harness(width, height);
@@ -160,4 +172,21 @@ fn ascii_screens_of_it_keep_the_rules() {
             }
         }
     }
+}
+
+#[test]
+fn qdesk_is_out_so_its_row_installs_it_like_any_other() {
+    let root = tempfile::tempdir().expect("temp");
+    let app = Quvyta::new(machine(root.path()));
+    packages(root.path());
+    let mut h = run(app, 100, 30);
+    let screen = h.screen();
+    assert!(line_with(&screen, "qdesk ").contains("not installed"), "{screen}");
+    h.send(Msg::Select(desk())).press("enter").advance(DIALOG_IN);
+    assert!(h.app().installs.dialog.is_some(), "enter asks to install it:\n{}", h.screen());
+    confirm(&mut h);
+    settle(&mut h);
+    let installs: Vec<String> =
+        calls(root.path()).into_iter().filter(|call| call.starts_with("install --locked")).collect();
+    assert_eq!(installs, ["install --locked quvyta-desktop"]);
 }

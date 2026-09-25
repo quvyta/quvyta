@@ -22,9 +22,9 @@ names="framework code focus packages tools quvyta desk"
 
 # Members that are not released yet: there is nothing on crates.io to install. Naming one says so
 # and installs nothing for it; they are left out of all and out of the picker's numbers.
-# The day qdesk is published, take desk out of this one line. Two more places change with it:
-# Soon = $false in install.ps1's list, and Status::Soon -> Status::Beta in src/ecosystem.rs.
-soon="desk"
+# Every member is out today. A new one that is not goes here by name, and in two more places:
+# Soon = $true in install.ps1's list, and Status::Soon in src/ecosystem.rs.
+soon=""
 
 crate_of() {
     case $1 in
@@ -55,7 +55,7 @@ about() {
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
         tools) echo "the settings Arch Linux users usually set up by hand, with undo" ;;
         quvyta) echo "installs, opens, updates and removes the Quvyta apps" ;;
-        desk) echo "a desktop inside the terminal: windows, a dock, a launcher and a file manager" ;;
+        desk) echo "a desktop inside the terminal: windows, icons, a dock and a launcher" ;;
     esac
 }
 
@@ -105,7 +105,7 @@ Names (several may be given; none lets you choose):
   packages    quvyta-packages, command qpac; Arch Linux only
   tools       quvyta-tools, command qtools; Arch Linux only
   quvyta      quvyta, command quvyta
-  desk        quvyta-desktop, command qdesk; not released yet, so it cannot be installed
+  desk        quvyta-desktop, command qdesk
   all         every one of the above that can be installed
 
 Options:

@@ -22,7 +22,7 @@ pub(super) fn show(
 ) {
     let text = |field: &str| t!(&format!("apps.{}.{field}", member.key));
     let title = text("title");
-    let (status, variant) = match member.status {
+    let (status, variant) = match member.status() {
         Status::Released => (t!("status.released"), "success"),
         Status::Beta => (t!("status.beta"), "info"),
         // The accent, not a warning: nothing is wrong, it is only not out yet.
@@ -72,7 +72,7 @@ pub(super) fn show(
     }
     // Copyable values go under their label so a narrow screen never cuts them short.
     copyable(ui, t!("detail.source"), member.repository, "source");
-    match member.status {
+    match member.status() {
         Status::Beta => {
             ui.add(Text::new(t!("detail.beta")).role("secondary")).fill_width();
         }

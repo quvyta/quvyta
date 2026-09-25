@@ -18,9 +18,8 @@ function Get-QuvytaApps {
     #
     # Soon marks a member that is not released yet: there is nothing on crates.io to install.
     # Naming it says so and installs nothing for it; it is left out of all and out of the picker's
-    # numbers. The day qdesk is published, set its Soon to $false on its one line here. Two more
-    # places change with it: the soon= line in install.sh, and Status::Soon -> Status::Beta in
-    # src/ecosystem.rs.
+    # numbers. Every member is out today; a new one that is not gets Soon = $true on its line here,
+    # its name on the soon= line in install.sh, and Status::Soon in src/ecosystem.rs.
     @(
         [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; Soon = $false; About = 'the showcase of the framework every member is built on' }
         [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; Soon = $false; About = 'coding agents inside Podman or Docker containers' }
@@ -28,7 +27,7 @@ function Get-QuvytaApps {
         [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; Soon = $false; About = 'a package manager for Arch Linux that shows every change first' }
         [pscustomobject]@{ Name = 'tools'; Crate = 'quvyta-tools'; Command = 'qtools'; ArchOnly = $true; Soon = $false; About = 'the settings Arch Linux users usually set up by hand, with undo' }
         [pscustomobject]@{ Name = 'quvyta'; Crate = 'quvyta'; Command = 'quvyta'; ArchOnly = $false; Soon = $false; About = 'installs, opens, updates and removes the Quvyta apps' }
-        [pscustomobject]@{ Name = 'desk'; Crate = 'quvyta-desktop'; Command = 'qdesk'; ArchOnly = $false; Soon = $true; About = 'a desktop inside the terminal: windows, a dock, a launcher and a file manager' }
+        [pscustomobject]@{ Name = 'desk'; Crate = 'quvyta-desktop'; Command = 'qdesk'; ArchOnly = $false; Soon = $false; About = 'a desktop inside the terminal: windows, icons, a dock and a launcher' }
     )
 }
 
@@ -67,7 +66,7 @@ Names (several may be given; none lets you choose):
   packages    quvyta-packages, command qpac; Arch Linux only, not installed on Windows
   tools       quvyta-tools, command qtools; Arch Linux only, not installed on Windows
   quvyta      quvyta, command quvyta
-  desk        quvyta-desktop, command qdesk; not released yet, so it cannot be installed
+  desk        quvyta-desktop, command qdesk
   all         every one of the above that runs on Windows and is released
 
 Options:

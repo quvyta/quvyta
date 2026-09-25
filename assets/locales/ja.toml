@@ -262,6 +262,10 @@ follow-unreadable-told = "アプリの設定を読み取れませんでした"
 follow-language = "共通の言語に合わせる"
 follow-theme = "共通のカラーテーマに合わせる"
 follow-icons = "共通のアイコンに合わせる"
+follow-reduced-motion = "共通のアニメーション設定に合わせる"
+follow-motion = "アニメーション"
+motion-reduced = "控えめ"
+motion-full = "すべて"
 follow-narrow = "共有に戻す："
 
 [wizard]

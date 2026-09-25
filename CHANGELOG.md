@@ -2,6 +2,14 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.3.1 (2026-09-25)
+
+- qdesk is out, so quvyta no longer calls it coming soon: its row says whether it is installed, its page has an Install button, `quvyta install qdesk` and both install scripts install it, `all` includes it, and the setup wizard offers it. What quvyta does with a member that is not released yet stays as it was, for the next one.
+- Reduced motion is now shared by every Quvyta app, like the language and the theme: the Settings tab has an "In every Quvyta application" box under it too, and the follow table shows, in a column of its own, which apps reduce motion or keep full motion of their own, with a choice to put them back on the shared setting.
+- The follow table reads qdesk's settings from `desktop.conf`, where qdesk keeps them, instead of a `desk.conf` it never writes; which file each app keeps its settings in now comes from the framework's own list of Quvyta apps.
+- Where the table's columns do not all fit, as with a long language name in Portuguese at 100 columns, the Settings tab shows one line per app instead of a table that scrolls sideways and hides a value.
+- Requires quvyta-framework 0.1.29.
+
 ## 0.3.0 (2026-09-23)
 
 - The Quvyta apps are now called the Quvyta ecosystem everywhere quvyta speaks of them, instead of a family: in the descriptions on the list, the command-line help and messages, the notes about Rust and cargo before an install, the one-line installers, the README and the package description, in all nine languages. Nothing else changes: the same apps, the same settings files and the same shared switch.

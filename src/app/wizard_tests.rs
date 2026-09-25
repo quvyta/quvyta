@@ -169,6 +169,7 @@ fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
 
 #[test]
 fn a_member_that_is_not_out_yet_cannot_be_checked_at_all() {
+    let _soon = crate::ecosystem::tests::unreleased("desk");
     for distro in ["ID=debian\n", "ID=arch\n"] {
         let root = tempfile::tempdir().expect("temp");
         let mut h = start(root.path(), distro, 80, 30);
@@ -176,9 +177,19 @@ fn a_member_that_is_not_out_yet_cannot_be_checked_at_all() {
         let screen = h.screen();
         assert!(screen.contains("qdesk") && screen.contains("Not out yet"), "{distro}:\n{screen}");
         assert!(!h.app().choosable(index("desk")), "{distro}");
-        h.send(Msg::Wizard(WizardMsg::Pick(index("desk"), true)));
+        h.click_text("qdesk");
         assert!(!h.app().picked[index("desk")], "{distro}");
     }
+}
+
+#[test]
+fn qdesk_is_out_so_it_can_be_checked() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = start(root.path(), "ID=debian\n", 80, 30);
+    to_apps_step(&mut h);
+    assert!(!h.screen().contains("Not out yet"), "{}", h.screen());
+    h.click_text("qdesk");
+    assert!(h.app().picked[index("desk")], "{}", h.screen());
 }
 
 #[test]
@@ -242,6 +253,8 @@ fn the_appearance_chosen_in_the_wizard_is_what_the_application_draws() {
 
 #[test]
 fn turkish_reads_naturally() {
+    // With a member still to come, so its line is read too.
+    let _soon = crate::ecosystem::tests::unreleased("desk");
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     h.set_locale("tr");

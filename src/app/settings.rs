@@ -204,9 +204,9 @@ impl Quvyta {
         })
     }
 
-    /// Whether each installed member follows the shared language, theme and icons: a table on a
-    /// wide screen, one line per member on a narrow one. Nothing is drawn before what is
-    /// installed is known.
+    /// Whether each installed member follows the shared language, theme, icons and reduced motion:
+    /// a table where its columns fit, one line per member where they do not. Nothing is drawn
+    /// before what is installed is known.
     fn following_section(&self, width: u16, ui: &mut View<'_, Msg>) {
         let Some(following) = &self.following else { return };
         let words = Words::of(ui.env());
@@ -216,7 +216,10 @@ impl Quvyta {
                 ui.add(Text::new(t!("settings.follow-none")).role("faint")).padding(Padding::symmetric(0, 2));
                 return;
             }
-            if self.size.width >= WIDE {
+            // The table only where all its columns fit: four shared keys and a long language name
+            // in some languages do not, even on a wide screen, and a column that scrolls sideways
+            // hides a member's own value.
+            if self.size.width >= WIDE && table_need(following, &words) <= width {
                 self.following_table(following, &words, width, ui);
             } else {
                 following_lines(following, &words, width, ui);
@@ -230,23 +233,15 @@ impl Quvyta {
     /// The follow table: a member per row, a shared key per column.
     fn following_table(&self, following: &[MemberFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
         let columns = std::iter::once(Column::new(String::new()).width(ColumnWidth::Fit))
-            .chain(words.keys.iter().map(|key| Column::new(key.clone()).width(ColumnWidth::Fit)));
+            .chain(words.keys.iter().map(|(_, name)| Column::new(name.clone()).width(ColumnWidth::Fit)));
         let rows: Vec<TableRow> = following
             .iter()
             .map(|member| {
                 let command = TableCell::new(APPS[member.index].command);
-                let faint = |text: String| TableCell::new(text).color("muted");
-                let cells: [TableCell; 3] = match &member.following {
-                    // One word for the row: it has no values to spread over the columns.
-                    Following::NotOpened => {
-                        [faint(t!("settings.follow-not-opened")), TableCell::new(""), TableCell::new("")]
-                    }
-                    Following::Unreadable(_) => std::array::from_fn(|_| faint(t!("settings.follow-unreadable"))),
-                    Following::Keys(values) => std::array::from_fn(|column| match &values[column] {
-                        Some(value) => TableCell::new(words.value(Shared::ALL[column], value)),
-                        None => faint(t!("settings.follow-shared")),
-                    }),
-                };
+                let cells = table_cells(member, words).into_iter().map(|(text, faint)| {
+                    let cell = TableCell::new(text);
+                    if faint { cell.color("muted") } else { cell }
+                });
                 TableRow::new(std::iter::once(command).chain(cells))
             })
             .collect();
@@ -344,23 +339,61 @@ impl Quvyta {
 /// not been opened, or has a file quvyta could not read and so never writes.
 fn follow_choices(member: &MemberFollowing) -> impl Iterator<Item = (Shared, Msg)> + '_ {
     let values = match &member.following {
-        Following::Keys(values) => Some(values),
-        Following::NotOpened | Following::Unreadable(_) => None,
+        Following::Keys(values) => values.as_slice(),
+        Following::NotOpened | Following::Unreadable(_) => &[],
     };
-    Shared::ALL
-        .into_iter()
-        .zip(values.into_iter().flatten())
-        .filter(|(_, value)| value.is_some())
-        .map(|(key, _)| (key, Msg::Setting(SettingMsg::Follow(member.index, key))))
+    values
+        .iter()
+        .filter(|(_, own)| own.is_some())
+        .map(|(key, _)| (*key, Msg::Setting(SettingMsg::Follow(member.index, *key))))
+}
+
+/// The follow table's cells of `member` after its name, one per shared key, each with whether it
+/// is drawn faint.
+fn table_cells(member: &MemberFollowing, words: &Words) -> Vec<(String, bool)> {
+    match &member.following {
+        // One word for the row: it has no values to spread over the columns.
+        Following::NotOpened => std::iter::once((t!("settings.follow-not-opened"), true))
+            .chain(std::iter::repeat_with(|| (String::new(), false)))
+            .take(words.keys.len())
+            .collect(),
+        Following::Unreadable(_) => words.keys.iter().map(|_| (t!("settings.follow-unreadable"), true)).collect(),
+        // Each column finds its own key's value, so the order of what was read does not have to be
+        // the order of the columns.
+        Following::Keys(values) => words
+            .keys
+            .iter()
+            .map(|(key, _)| match values.iter().find(|(read, _)| read == key).and_then(|(_, own)| own.as_ref()) {
+                Some(value) => (words.value(*key, value), false),
+                None => (t!("settings.follow-shared"), true),
+            })
+            .collect(),
+    }
+}
+
+/// The cells the follow table needs to show every column whole, measured the way the framework's
+/// table sizes a column that fits its content: its widest cell and one cell more, or its title,
+/// with two cells between columns, and a few cells for the selection mark and the section's
+/// sides.
+fn table_need(following: &[MemberFollowing], words: &Words) -> u16 {
+    let width = |text: &str| qframe::text::width(text);
+    let mut columns: Vec<u16> =
+        std::iter::once(0).chain(words.keys.iter().map(|(_, name)| width(name).saturating_sub(1))).collect();
+    for member in following {
+        let cells: Vec<u16> = std::iter::once(width(APPS[member.index].command))
+            .chain(table_cells(member, words).iter().map(|(text, _)| width(text)))
+            .collect();
+        for (column, cell) in columns.iter_mut().zip(cells) {
+            *column = (*column).max(cell);
+        }
+    }
+    let gaps = 2 * u16::try_from(columns.len().saturating_sub(1)).unwrap_or(u16::MAX);
+    columns.iter().fold(gaps, |sum, column| sum.saturating_add(column + 1)).saturating_add(8)
 }
 
 /// The menu entry that puts `key` back on the shared value.
 fn follow_label(key: Shared) -> String {
-    match key {
-        Shared::Language => t!("settings.follow-language"),
-        Shared::Theme => t!("settings.follow-theme"),
-        Shared::Icons => t!("settings.follow-icons"),
-    }
+    follow::SHOWN.iter().find(|(shown, ..)| *shown == key).map_or_else(|| key.key().to_owned(), |(.., label)| t!(label))
 }
 
 /// One line per member for a narrow screen: its command, then only the keys it does not share
@@ -377,9 +410,8 @@ fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui:
             Following::NotOpened => (t!("settings.follow-not-opened"), false),
             Following::Unreadable(_) => (t!("settings.follow-unreadable"), false),
             Following::Keys(values) => {
-                let own: Vec<String> = Shared::ALL
+                let own: Vec<String> = values
                     .iter()
-                    .zip(values)
                     .filter_map(|(key, value)| {
                         let value = words.value(*key, value.as_deref()?);
                         Some(t!("settings.follow-own", key = words.key(*key), value = value))
@@ -421,9 +453,9 @@ fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui:
 
 /// The words the follow table shows for keys and values, in the language on screen.
 struct Words {
-    /// The name of each shared key, in the order of [`Shared::ALL`], as the appearance rows name
+    /// Each shared key the table shows, in its order, with its name as the appearance rows name
     /// it.
-    keys: [String; 3],
+    keys: Vec<(Shared, String)>,
     /// Each language code with its name in that language.
     languages: Vec<(String, String)>,
     /// Each theme id with its name.
@@ -433,15 +465,14 @@ struct Words {
 impl Words {
     fn of(env: &qframe::env::Env) -> Self {
         Self {
-            keys: [t!("quvyta.appearance.language"), t!("quvyta.appearance.theme"), t!("quvyta.appearance.icons")],
+            keys: follow::SHOWN.iter().map(|(key, name, _)| (*key, t!(name))).collect(),
             languages: env.i18n().list(),
             themes: env.themes(),
         }
     }
 
     fn key(&self, key: Shared) -> &str {
-        let index = Shared::ALL.iter().position(|shared| *shared == key).unwrap_or(0);
-        &self.keys[index]
+        self.keys.iter().find(|(shown, _)| *shown == key).map_or_else(|| key.key(), |(_, name)| name.as_str())
     }
 
     /// `value` of `key` as the appearance rows would name it: a language in its own name, a
@@ -449,13 +480,23 @@ impl Words {
     /// newer member brought, is shown as it is written.
     fn value(&self, key: Shared, value: &str) -> String {
         let named = |names: &[(String, String)]| names.iter().find(|(id, _)| id == value).map(|(_, name)| name.clone());
-        match key {
-            Shared::Language => named(&self.languages),
-            Shared::Theme => named(&self.themes),
-            Shared::Icons => qframe::icons::IconMode::from_name(value)
-                .map(|mode| t!(&format!("quvyta.appearance.icons-{}", mode.name()))),
-        }
-        .unwrap_or_else(|| value.to_owned())
+        // Compared, not matched: a shared setting the framework adds later is shown as written.
+        let name = if key == Shared::Language {
+            named(&self.languages)
+        } else if key == Shared::Theme {
+            named(&self.themes)
+        } else if key == Shared::Icons {
+            qframe::icons::IconMode::from_name(value)
+                .map(|mode| t!(&format!("quvyta.appearance.icons-{}", mode.name())))
+        } else if key == Shared::ReducedMotion {
+            value
+                .parse::<bool>()
+                .ok()
+                .map(|reduced| t!(if reduced { "settings.motion-reduced" } else { "settings.motion-full" }))
+        } else {
+            None
+        };
+        name.unwrap_or_else(|| value.to_owned())
     }
 }
 

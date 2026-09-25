@@ -72,14 +72,14 @@ fn the_appearance_every_app_shares_stands_above_quvyta_s_own_settings() {
     for text in ["Appearance", "Language", "Theme", "Icons", "Reduce motion", "Pillar"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    assert_eq!(screen.matches("In every Quvyta application").count(), 3, "one box under each shared row:\n{screen}");
+    assert_eq!(screen.matches("In every Quvyta application").count(), 4, "one box under each shared row:\n{screen}");
     assert!(at(&screen, "Appearance") < at(&screen, "launcher.conf"), "the shared rows come first:\n{screen}");
     assert!(at(&screen, "Pillar") < at(&screen, "Say when an update is out"), "{screen}");
     assert!(
         at(&screen, "Say when an update is out") < at(&screen, "launcher.conf"),
         "the shared switch is its own:\n{screen}"
     );
-    // quvyta writes no appearance row of its own: the three rows and their boxes are the only ones.
+    // quvyta writes no appearance row of its own: the four shared rows and their boxes are the only ones.
     // The follow table below names the same keys over its columns.
     let appearance = &screen[..at(&screen, "Do the applications follow the shared settings")];
     assert_eq!(appearance.matches("Language").count(), 1, "{screen}");
@@ -108,7 +108,7 @@ fn a_theme_chosen_here_goes_to_the_shared_file_and_every_member_follows() {
 fn clearing_the_box_keeps_the_choice_to_quvyta_and_leaves_the_shared_file_alone() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = settings_on(shared_files(root.path(), SHARED, "after_close = \"shell\"\n"), 100, 44);
-    // The box under the theme row: the keys reach it from the row above, since all three boxes
+    // The box under the theme row: the keys reach it from the row above, since all four boxes
     // read the same.
     h.click_text("Theme");
     h.press("down").press("space").render();
@@ -137,7 +137,7 @@ fn quvyta_in_its_own_file_follows_the_shared_value_and_its_own_value_does_not() 
     assert_eq!(h.app().launcher.after_close, AfterClose::Shell, "the rows of launcher.conf are read as before");
     assert_eq!(h.app().settings().diagnostics(), [], "`quvyta` is a value its own file may hold");
     let screen = h.screen();
-    assert_eq!(screen.matches("In every Quvyta application").count(), 3, "{screen}");
+    assert_eq!(screen.matches("In every Quvyta application").count(), 4, "{screen}");
 
     let own = shared_files(root.path(), shared, "theme = \"amber\"\n");
     let h = settings_on(own, 100, 44);
@@ -540,7 +540,7 @@ fn nothing_on_the_settings_tab_is_cut_in_any_language() {
     }
     // The follow table with the longest language name, every key a member's own, and a broken
     // file, on a screen tall enough to hold the whole page.
-    let own = "language = \"pt-BR\"\ntheme = \"nordic\"\nicons = \"ascii\"\n";
+    let own = "language = \"pt-BR\"\ntheme = \"nordic\"\nicons = \"ascii\"\nreduced-motion = true\n";
     for width in [40, 48, 60, 80, 100, 120] {
         for locale in LANGUAGES {
             let root = tempfile::tempdir().expect("temp");
@@ -558,6 +558,7 @@ fn nothing_on_the_settings_tab_is_cut_in_any_language() {
                 "Nordic".to_owned(),
                 "Русский".to_owned(),
                 i18n.translate("quvyta.appearance.icons-ascii", &[]),
+                i18n.translate("settings.motion-reduced", &[]),
                 i18n.translate("settings.follow-unreadable", &[]),
             ];
             for word in words {
@@ -603,7 +604,7 @@ fn the_follow_table_shows_each_installed_member_s_own_values_and_what_it_shares(
     assert!(qcode.contains("Türkçe") && qcode.contains("Nordic") && qcode.contains("shared"), "{screen}");
     assert!(at(&qcode, "Türkçe") < at(&qcode, "Nordic") && at(&qcode, "Nordic") < at(&qcode, "shared"), "{qcode}");
     assert!(follow_line(&screen, "qfocus").contains("not opened yet"), "{screen}");
-    assert_eq!(follow_line(&screen, "qframe").matches("unreadable").count(), 3, "{screen}");
+    assert_eq!(follow_line(&screen, "qframe").matches("unreadable").count(), 4, "{screen}");
     // Only what is installed, and quvyta's own following is the boxes above.
     let note = "Open applications see a change the next time they start.";
     let section = &screen[at(&screen, "Do the applications follow")..at(&screen, note)];
@@ -627,6 +628,27 @@ fn the_follow_table_shows_each_installed_member_s_own_values_and_what_it_shares(
         assert_eq!(tone(command, faint), muted, "`{faint}`:\n{screen}");
     }
     assert!(h.handoffs().is_empty(), "nothing reaches the desktop");
+}
+
+#[test]
+fn a_member_s_own_reduced_motion_has_a_column_of_its_own_and_following_it_puts_that_key_back() {
+    let root = tempfile::tempdir().expect("temp");
+    let focus = "reduced-motion = true\ntheme = \"amber\"\n";
+    let code = "reduced-motion = false\n";
+    let mut h = settings_on(member_files(root.path(), &[("focus", focus), ("code", code)]), 100, 60);
+    let screen = h.screen();
+    let header = line_with(&screen[at(&screen, "Do the applications follow")..], "Language").to_owned();
+    let column = at(&header, "Motion");
+    let qfocus = follow_line(&screen, "qfocus");
+    assert_eq!(qfocus.find("reduced"), Some(column), "under its column:\n{screen}");
+    assert_eq!(follow_line(&screen, "qcode").find("full"), Some(column), "off is its own value too:\n{screen}");
+    click_follow_row(&mut h, "qfocus");
+    h.click_text("Follow the shared motion setting").advance(TOAST_IN);
+    let own = member_conf(root.path(), "focus");
+    assert!(own.contains("reduced-motion = \"quvyta\"") && own.contains("theme = \"amber\""), "{own}");
+    let qfocus = follow_line(&h.screen(), "qfocus");
+    assert!(!qfocus.contains("reduced") && qfocus.contains("Amber"), "{}", h.screen());
+    assert!(h.handoffs().is_empty());
 }
 
 #[test]
@@ -662,7 +684,7 @@ fn a_file_a_member_wrote_meanwhile_is_read_again_when_the_settings_tab_opens() {
     fs::write(root.path().join("config/focus.conf"), "icons = \"ascii\"\n").expect("qfocus's first start");
     h.click_text("Settings");
     let line = follow_line(&h.screen(), "qfocus");
-    assert!(line.contains("ASCII") && line.matches("shared").count() == 2, "{}", h.screen());
+    assert!(line.contains("ASCII") && line.matches("shared").count() == 3, "{}", h.screen());
 }
 
 #[test]
@@ -734,7 +756,7 @@ fn a_click_on_a_member_offers_its_own_keys_and_following_changes_that_key_alone(
     assert_eq!(quvyta_conf(root.path()), shared_before, "the shared file is not touched");
     let qcode = follow_line(&h.screen(), "qcode");
     assert!(qcode.contains("Türkçe") && !qcode.contains("Nordic"), "the table reads the file again:\n{}", h.screen());
-    assert_eq!(qcode.matches("shared").count(), 2, "{qcode}");
+    assert_eq!(qcode.matches("shared").count(), 3, "{qcode}");
     assert!(h.handoffs().is_empty());
 }
 

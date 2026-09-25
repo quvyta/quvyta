@@ -17,6 +17,13 @@ shell_path=$(command -v "$shell") || { echo "no $shell to test with" >&2; exit 1
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Every member is out today, so the cases about one that is not run a copy of the script in which
+# qdesk is still to come: the same script with only its soon= line changed.
+released_script=$script
+soon_script="$work/install-soon.sh"
+sed 's/^soon=""$/soon="desk"/' "$script" >"$soon_script"
+grep -qx 'soon="desk"' "$soon_script" || { echo "install.sh has no empty soon= line to fill" >&2; exit 1; }
+
 # The basic tools install.sh relies on, and nothing else from the machine.
 tools="$work/tools"
 mkdir -p "$tools"
@@ -209,7 +216,7 @@ fresh help
 run --help
 expect_status 0
 expect_output "quvyta-packages, command qpac"
-expect_output "desk        quvyta-desktop, command qdesk; not released yet"
+expect_output "desk        quvyta-desktop, command qdesk"
 expect_output "-y, --yes"
 expect_home_untouched
 
@@ -235,17 +242,27 @@ expect_count "$log" "cargo install --locked quvyta-code" 1
 fresh all
 run -y all
 expect_status 0
-for crate in quvyta-framework-showcase quvyta-code quvyta-focus quvyta-packages quvyta-tools quvyta; do
+for crate in quvyta-framework-showcase quvyta-code quvyta-focus quvyta-packages quvyta-tools quvyta quvyta-desktop; do
     expect_logged "cargo install --locked $crate"
 done
-for command in qframe qcode qfocus qpac qtools quvyta; do
+for command in qframe qcode qfocus qpac qtools quvyta qdesk; do
     expect_output "  $command "
 done
-# all is every member that can be installed, and qdesk is not one of them.
+
+# --- A member that is not released yet, in the copy where qdesk is one
+script=$soon_script
+
+fresh soon-help
+run --help
+expect_output "desk        quvyta-desktop, command qdesk"
+
+fresh soon-all
+run -y all
+expect_status 0
+expect_logged "cargo install --locked quvyta-code"
+# all is every member that can be installed, and qdesk is not one of them here.
 expect_not_logged "quvyta-desktop"
 expect_not_logged "qdesk"
-
-# --- A member that is not released yet
 
 fresh soon-alone
 run --yes desk
@@ -273,6 +290,8 @@ if grep -qE '^  [0-9]+  desk ' "$home/.out"; then
 fi
 expect_not_logged "cargo"
 expect_home_untouched
+
+script=$released_script
 
 # --- Without a terminal
 
@@ -706,6 +725,7 @@ n
     expect_output "start them by their full path"
 
     fresh tty-pick-soon-then-a-name
+    script=$soon_script
     run_tty "desk
 code
 y
@@ -715,6 +735,7 @@ y
     expect_output "qdesk is not released yet, so it cannot be installed"
     expect_logged "cargo install --locked quvyta-code"
     expect_not_logged "quvyta-desktop"
+    script=$released_script
 
     fresh tty-bad-then-good
     run_tty "9

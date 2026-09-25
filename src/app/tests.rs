@@ -15,7 +15,16 @@ pub(super) fn env() -> Env {
         keymap_source: Some(("keymap.toml".to_owned(), crate::KEYS.to_owned())),
         ..AssetDirs::default()
     };
-    Env::load(&dirs).expect("the locales are readable")
+    Env::load_with(&dirs, test_machine).expect("the locales are readable")
+}
+
+/// The environment every test sees, whatever the terminal that runs them: a terminal that says
+/// it draws millions of colours, and nothing else set. The colour depth is otherwise read from
+/// the machine, and under `TERM=xterm` without `COLORTERM` the theme's colours come out as the
+/// nearest of 256 and the tests that look for them fail; the language and the region would
+/// otherwise be the machine's too.
+fn test_machine(name: &str) -> Option<String> {
+    (name == "COLORTERM").then(|| "truecolor".to_owned())
 }
 
 /// What cargo answers on the machine of [`machine`].
@@ -135,7 +144,7 @@ fn the_list_shows_every_program_with_how_it_is_installed() {
         ("qfocus", "unknown version".to_owned()),
         ("qtools", "not installed".to_owned()),
         ("qpac", "not installed".to_owned()),
-        ("qdesk", "coming soon".to_owned()),
+        ("qdesk", "not installed".to_owned()),
         ("qframe", "0.1.4".to_owned()),
         ("quvyta", format!("{version}  this application")),
     ] {
@@ -219,10 +228,9 @@ fn every_program_installs_under_its_package_name() {
         assert!(member.repository.starts_with("https://github.com/quvyta/"), "{}", member.repository);
         let expected = match member.key {
             "framework" => Status::Released,
-            "desk" => Status::Soon,
             _ => Status::Beta,
         };
-        assert_eq!(member.status, expected, "{}", member.package);
+        assert_eq!(member.status(), expected, "{}", member.package);
     }
 }
 
@@ -544,7 +552,7 @@ fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
     let app = h.app();
     let mut labels = vec![
         say(&format!("apps.{}.title", member.key)),
-        say(match member.status {
+        say(match member.status() {
             Status::Released => "status.released",
             Status::Beta => "status.beta",
             Status::Soon => "status.soon",

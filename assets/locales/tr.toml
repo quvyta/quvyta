@@ -260,6 +260,10 @@ follow-unreadable-told = "Bir uygulamanın ayarları okunamadı"
 follow-language = "Ortak dili izle"
 follow-theme = "Ortak renk temasını izle"
 follow-icons = "Ortak ikonları izle"
+follow-reduced-motion = "Ortak hareket ayarını izle"
+follow-motion = "Hareket"
+motion-reduced = "azaltılmış"
+motion-full = "tam"
 follow-narrow = "Ortağa döndür:"
 
 [wizard]

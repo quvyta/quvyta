@@ -252,6 +252,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_crate_named_like_a_member_still_to_come_is_not_kept() {
+        let _soon = crate::ecosystem::tests::unreleased("desk");
         let latest = Latest::from_search(&format!("{SEARCH_OUT}quvyta-desktop = \"0.0.1\"\n"), NOW);
         assert_eq!(latest.version("quvyta-desktop"), None);
         assert_eq!(latest.version("quvyta-code"), Some("0.1.1"));

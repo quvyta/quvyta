@@ -93,7 +93,7 @@ pub(super) fn click_beside(h: &mut Harness<Quvyta>, anchor: &str, text: &str) {
 }
 
 /// Presses the Install button of the open dialog.
-fn confirm(h: &mut Harness<Quvyta>) {
+pub(super) fn confirm(h: &mut Harness<Quvyta>) {
     click_beside(h, "Cancel", "Install");
 }
 

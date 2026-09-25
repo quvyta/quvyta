@@ -262,6 +262,10 @@ follow-unreadable-told = "无法读取某个应用的设置"
 follow-language = "跟随共享语言"
 follow-theme = "跟随共享颜色主题"
 follow-icons = "跟随共享图标"
+follow-reduced-motion = "跟随共享动效设置"
+follow-motion = "动效"
+motion-reduced = "减弱"
+motion-full = "完整"
 follow-narrow = "恢复为共享："
 
 [wizard]

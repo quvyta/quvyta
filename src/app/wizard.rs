@@ -146,7 +146,7 @@ impl Quvyta {
             .on_toggle(move |on| Msg::Wizard(WizardMsg::Pick(index, on)));
         ui.add(box_).id(format!("wizard-{}", member.key));
         let line = t!(&format!("wizard.line-{}", member.key));
-        let line = match (member.status, member.arch_only && !self.arch) {
+        let line = match (member.status(), member.arch_only && !self.arch) {
             (Status::Soon, _) => t!("wizard.soon", line = line),
             (_, true) => t!("wizard.arch-only", line = line),
             _ => line,

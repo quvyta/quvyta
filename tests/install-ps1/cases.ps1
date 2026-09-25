@@ -246,7 +246,7 @@ New-Case 'help'
 Invoke-Case @('-Help')
 Assert-Status 0
 Assert-Output 'quvyta-packages, command qpac; Arch Linux only'
-Assert-Output 'desk        quvyta-desktop, command qdesk; not released yet'
+Assert-Output 'desk        quvyta-desktop, command qdesk'
 Assert-Output '-Yes'
 Assert-NothingDone
 
@@ -285,18 +285,33 @@ Assert-Equal ($installs -join ',') 'cargo install --locked quvyta-focus,cargo in
 New-Case 'all-leaves-out-arch-only'
 Invoke-Case @('-Yes', 'all')
 Assert-Status 0
-foreach ($crate in @('quvyta-framework-showcase', 'quvyta-code', 'quvyta-focus', 'quvyta')) {
+foreach ($crate in @('quvyta-framework-showcase', 'quvyta-code', 'quvyta-focus', 'quvyta', 'quvyta-desktop')) {
     Assert-Logged "cargo install --locked $crate"
 }
 Assert-NotLogged 'quvyta-packages'
 Assert-NotLogged 'quvyta-tools'
 Assert-Output 'Skipping packages (qpac): it runs on Arch Linux only.'
 Assert-Output 'Skipping tools (qtools): it runs on Arch Linux only.'
-# all is every member that can be installed, and qdesk is not one of them.
-Assert-NotLogged 'quvyta-desktop'
-Assert-NotLogged 'qdesk'
 
 # --- A member that is not released yet
+#
+# Every member is out today, so these cases run with the installer's own list changed in one
+# place: qdesk marked Soon, as a member still to come would be.
+$script:RealApps = ${function:Get-QuvytaApps}
+function Get-QuvytaApps {
+    & $script:RealApps | ForEach-Object {
+        if ($_.Name -eq 'desk') { $_.Soon = $true }
+        $_
+    }
+}
+
+New-Case 'soon-all'
+Invoke-Case @('-Yes', 'all')
+Assert-Status 0
+Assert-Logged 'cargo install --locked quvyta-code'
+# all is every member that can be installed, and qdesk is not one of them here.
+Assert-NotLogged 'quvyta-desktop'
+Assert-NotLogged 'qdesk'
 
 New-Case 'soon-alone'
 Invoke-Case @('-Yes', 'desk')
@@ -316,7 +331,7 @@ New-Case 'soon-in-the-app-list'
 Invoke-Case @()
 Assert-Status 1
 Assert-Output 'There is no console to choose on'
-Assert-Output '     desk       qdesk    a desktop inside the terminal: windows, a dock, a launcher and a file manager; coming soon, not released yet'
+Assert-Output '     desk       qdesk    a desktop inside the terminal: windows, icons, a dock and a launcher; coming soon, not released yet'
 # Not a numbered choice: the picker installs, and this cannot be installed.
 foreach ($line in $script:Out) {
     if ($line -match '^  [0-9]+  desk ') { Fail "desk has a number in the picker's list" }
@@ -331,6 +346,8 @@ Assert-Status 0
 Assert-Output 'qdesk is not released yet, so it cannot be installed'
 Assert-Logged 'cargo install --locked quvyta-code'
 Assert-NotLogged 'quvyta-desktop'
+
+${function:Get-QuvytaApps} = $script:RealApps
 
 New-Case 'arch-only-alone'
 Invoke-Case @('-Yes', 'tools')
