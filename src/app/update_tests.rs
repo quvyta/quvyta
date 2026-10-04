@@ -43,13 +43,13 @@ fn start_with(root: &Path, search: &str, code: i32, width: u16, height: u16) -> 
 }
 
 fn updating() -> (TempDir, Harness<Quvyta>) {
-    let root = tempfile::tempdir().expect("temp");
+    let root = crate::app::tests::temp_root();
     let h = start_with(root.path(), &search(), 0, 100, 30);
     (root, h)
 }
 
 fn searches(root: &Path) -> usize {
-    calls(root).iter().filter(|call| call.as_str() == "search quvyta --limit 20").count()
+    calls(root).iter().filter(|call| **call == crate::updates::SEARCH.join(" ")).count()
 }
 
 /// The list row of `command`: one of its first words is the command, which the lines of the
@@ -215,7 +215,8 @@ fn quvyta_s_old_switch_turned_off_keeps_the_start_quiet_and_moves_to_the_shared_
 #[test]
 fn install_updates_queues_every_update_in_the_order_of_the_list() {
     let (root, mut h) = updating();
-    h.click_text("Install updates");
+    h.click_text("Install updates").advance(DIALOG_IN);
+    click_beside(&mut h, "Cancel", "Update");
     settle(&mut h);
     assert_eq!(
         installs(root.path()),
@@ -234,7 +235,19 @@ fn queued_updates_leave_the_count() {
     app.inventory = Some(Inventory::read(&app.machine));
     let latest = crate::updates::Latest::from_search(&search(), crate::updates::now());
     let _ = app.update(Msg::Updates(UpdateMsg::Checked(crate::updates::Check::Known(latest))));
+    // The question a person opens on the Install updates button and agrees to on its Update
+    // button, sent here because the app is built before any harness runs it. What the answers
+    // return is dropped on purpose: the queue is what this test reads, and a harness would run
+    // the updates to their end.
     let _ = app.update(Msg::Updates(UpdateMsg::InstallAll));
+    // The checks' own answer, which is no person's to give: a background task's.
+    let _ = app.update(Msg::Install(InstallMsg::Checked {
+        index: index("code"),
+        problems: Vec::new(),
+        other_window: false,
+        named: None,
+    }));
+    let _ = app.update(Msg::Install(InstallMsg::Confirm));
     let queued: Vec<usize> = app.installs.running.iter().map(|running| running.index).collect();
     assert_eq!(queued, [index("code")], "the first runs");
     let waiting: Vec<(usize, Action)> = app.installs.queue.iter().cloned().collect();
@@ -307,15 +320,37 @@ fn a_failed_update_is_tried_again_at_the_new_version() {
     assert!(!row(&h.screen(), "qcode").contains("new"), "{}", h.screen());
 }
 
+/// The cells a person reaches for where the Update button would stand beside Open, had the
+/// member an update: the ground the details leave there, which must answer nothing at all.
+fn where_update_would_be(h: &mut Harness<Quvyta>) {
+    let screen = h.screen();
+    let (y, x) = screen
+        .lines()
+        .enumerate()
+        .skip(1)
+        .find_map(|(y, line)| {
+            let (before, _) = line.split_once("Open")?;
+            Some((y, before.chars().count() + "Open".chars().count()))
+        })
+        .unwrap_or_else(|| panic!("Open is not on the screen:\n{screen}"));
+    for x in x..=x + 6 {
+        h.click(i32::try_from(x).expect("x"), i32::try_from(y).expect("y"));
+    }
+}
+
 #[test]
 fn members_installed_elsewhere_get_no_update() {
     let (_root, mut h) = updating();
     h.send(Msg::Select(index("focus")));
     let screen = h.screen();
     assert!(screen.contains("Open") && !screen.contains("  Update"), "{screen}");
-    assert!(!line_with(&screen, "Installed").contains("new"), "{screen}");
-    h.send(Msg::Install(InstallMsg::Ask(index("focus"))));
-    assert!(h.app().installs.dialog.is_none());
+    // Only the details' part of the line: a list row with an update of its own can sit beside it.
+    let installed = line_with(&screen, "Installed").split_once("Installed").map_or("", |(_, rest)| rest);
+    assert!(!installed.contains("new"), "{screen}");
+    h.press("u");
+    assert!(h.app().installs.dialog.is_none(), "u asks nothing about it:\n{}", h.screen());
+    where_update_would_be(&mut h);
+    assert!(h.app().installs.dialog.is_none(), "and there is no button there to press:\n{}", h.screen());
 }
 
 /// quvyta installed by cargo at 0.1.1, with `latest` on crates.io.
@@ -388,7 +423,7 @@ fn update_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
             let mut screens = vec![h.screen()];
             h.send(Msg::ShowDetail(index("code")));
             screens.push(h.screen());
-            h.send(Msg::Install(InstallMsg::Ask(index("code"))));
+            h.press("u");
             screens.push(h.screen());
             for screen in screens {
                 for forbidden in ['[', ']', '{', '}', '|', '▌', '⟦'] {
@@ -409,7 +444,11 @@ fn on_a_narrow_list_the_count_and_its_button_fit() {
 
 /// With `QUVYTA_REVIEW=1`, writes the screens of updates in both languages, wide and narrow, to
 /// `target/quvyta-update-review.html` in colour for a visual review.
+///
+/// Ignored like [`visual_review`](super::tests::visual_review): a review writes a file for a
+/// person to look at, and a run of the gate must read it as skipped and not as passed.
 #[test]
+#[ignore = "visual review: QUVYTA_REVIEW=1 cargo test visual_review -- --ignored"]
 fn visual_review_updates() {
     if std::env::var_os("QUVYTA_REVIEW").is_none() {
         return;
@@ -428,7 +467,7 @@ fn visual_review_updates() {
             shot(&h, format!("updates {size}"));
             h.send(Msg::ShowDetail(index("code")));
             shot(&h, format!("a member with an update {size}"));
-            h.send(Msg::Install(InstallMsg::Ask(index("code")))).advance(DIALOG_IN);
+            h.press("u").advance(DIALOG_IN);
             shot(&h, format!("update dialog {size}"));
             let root = tempfile::tempdir().expect("temp");
             let mut h = start_with(root.path(), "", 101, width, height);

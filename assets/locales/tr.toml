@@ -9,6 +9,7 @@ tagline = "Özenle yapılmış terminal uygulamaları"
 [status]
 released = "Yayında"
 beta = "Beta"
+alpha = "Alfa"
 soon = "Yakında"
 
 [row]
@@ -41,6 +42,7 @@ where = "{version}, {path}"
 unknown = "sürümü bilinmiyor"
 elsewhere = "cargo dışında bir yoldan kurulmuş; güncel tutmak onu kuranın işi."
 beta = "Beta sürümü: çalışıyor, ama arayüzü ve dosyaları sürümler arasında hâlâ değişebilir."
+alpha = "Alfa sürümü: bilerek küçük tutulmuş erken bir sürüm; ayarları ve dosyaları sürümler arasında hâlâ değişebilir."
 soon = "Henüz yayımlanmadı: çıkana kadar kurulacak bir şey yok."
 
 [nav]
@@ -71,6 +73,18 @@ summary = "Arch Linux kullanıcılarının genelde elle yaptığı ayarları tek
 [apps.packages]
 title = "Quvyta Packages"
 summary = "Arch Linux için, bir şey değişmeden önce neyin değişeceğini tam olarak gösteren bir paket yöneticisi. Bu ilk sürüm pacman paketlerini yönetir; AUR, Flatpak ve Snap tanınır ama henüz yönetilmez."
+
+[apps.explorer]
+title = "Quvyta Explorer"
+summary = "Terminal için bir dosya gezgini. Her dosya türünün kendi ikonu var; bir dosya, masaüstünün onu açtığı programla açılır, arşivler sağ tıkla çıkarılır; yeni, yeniden adlandır, kopyala, yapıştır, sürükle bırak ve çöpe silme de yerinde."
+
+[apps.browser]
+title = "Quvyta Browser"
+summary = "Terminalin içinde gerçek bir web tarayıcısı: sayfaları görünmeden çalışan, hiç değiştirilmemiş bir Chromium çizer; sekmeler, adres çubuğu ve düğmeler terminalin kendisinindir. Chromium ya da Google Chrome gerekir; ikisi de yoksa Chromium'u kurmayı önerir."
+
+[apps.cli]
+title = "Quvyta CLI"
+summary = "Terminalde küçük bir kodlama ajanı: tek bir klasörde okuyan, arayan, düzenleyen ve komut çalıştıran bir modelle sohbet edersin. Bir dosyayı değiştirmeden önce farkı, bir komutu çalıştırmadan önce komutu gösterir; sen izin vermeden hiçbir şey olmaz."
 
 [apps.desk]
 title = "Quvyta Desktop"
@@ -108,6 +122,9 @@ cancel = "Vazgeç"
 install = "Kur"
 update-title = "{command} {from} sürümünden {to} sürümüne güncellensin mi?"
 update = "Güncelle"
+update-all-title = { one = "{n} uygulama güncellensin mi?", other = "{n} uygulama güncellensin mi?" }
+update-line = "{command}: {from} sürümünden {to} sürümüne"
+crates-io-all = "crates.io, her uygulamanın kendi paketi"
 
 [checks]
 no-cargo = "Rust'ın paket aracı cargo kurulu değil; Quvyta uygulamaları onunla derleniyor."
@@ -218,11 +235,11 @@ about = "Quvyta ekosisteminin terminal uygulamalarını kurar, açar ve güncell
 usage = "Kullanım"
 name = "AD"
 list = "Quvyta uygulamalarının listesini açar"
-install = "bu üyeleri kurmak için sırayla onay ister"
-show = "bu üyenin sayfasını açar"
+install = "bu uygulamaları kurmak için sırayla onay ister"
+show = "bu uygulamanın sayfasını açar"
 help = "bu yardımı gösterir"
 version = "sürümü gösterir"
-names = "Ad olarak üyenin kısa adı (code), komutu (qcode) ya da paketi (quvyta-code) yazılabilir."
+names = "Ad olarak uygulamanın kısa adı (code), komutu (qcode) ya da paketi (quvyta-code) yazılabilir."
 unknown-option = "{option} diye bir seçenek yok"
 unknown-name = "{name} adında bir Quvyta uygulaması yok"
 unknown-command = "quvyta {command} diye bir iş bilmiyor"
@@ -273,7 +290,32 @@ line-code = "Kodlama ajanlarını Podman ya da Docker kapsayıcılarında çalı
 line-focus = "Neye odaklandığını ve zamanının nereye gittiğini tutar."
 line-tools = "Arch Linux ayarları tek listede, hepsi geri alınabilir."
 line-packages = "Her değişikliği önce gösteren paket yöneticisi."
+line-explorer = "Her dosya türü için ikonu olan bir dosya gezgini."
+line-browser = "Terminalde Chromium'un çizdiği gerçek bir web tarayıcısı."
+line-cli = "Bir şeyi değiştirmeden önce soran küçük bir kodlama ajanı."
 line-desk = "Terminalin içinde bir masaüstü: pencereler, dosyalar."
 line-framework = "Hepsinin üzerinde durduğu framework'ün vitrini."
 arch-only = "{line}  Yalnızca Arch Linux."
+unix-only = "{line}  Windows için değil."
 soon = "{line}  Henüz çıkmadı."
+
+# Bir uygulamanın bu makineden neden kurulamayacağı. İlk açılış aynı iddiayı bütün cümleyle söyler;
+# liste satırına bu birkaç kelime sığar.
+[platform]
+arch-only = "Yalnızca Arch Linux"
+unix-only = "Windows için değil"
+# Aynı iddia bir bildirimde, cümle de varken, adıyla.
+arch-only-toast = "{command} yalnızca Arch Linux'ta çalışır"
+unix-only-toast = "{command} Windows'ta çalışmaz"
+
+# Çalıştığın sürümde ne değişti. Girdinin kendisi günlüğün kendi kelimeleri, İngilizce; yalnız
+# başlık, geri dönüş yolu ve yanındaki not burada söylenir.
+[whats-new]
+title = "{version} sürümünde ne değişti"
+forgotten = "quvyta bunu okuduğunuzu hatırlayamıyor, bir sonraki açılışta yine gösterecek."
+# Ayarlar sekmesi Nerd Font simgelerini kurmadan önce sorulan soru (app::settings).
+
+[font]
+checked = "İndirilen dosya, bir şey kopyalanmadan önce quvyta'nın içinde yazan sağlama toplamıyla karşılaştırılır."
+registered = "Yeni yazı tipi yalnızca senin hesabına bildirilir, sistemin geri kalanına dokunulmaz."
+undo = "Geri almak için o klasörü silmen yeter."

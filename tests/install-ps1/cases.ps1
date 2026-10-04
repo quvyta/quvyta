@@ -247,6 +247,7 @@ Invoke-Case @('-Help')
 Assert-Status 0
 Assert-Output 'quvyta-packages, command qpac; Arch Linux only'
 Assert-Output 'desk        quvyta-desktop, command qdesk'
+Assert-Output 'cli         quvyta-cli, command qcli; Linux and macOS only, not installed on Windows'
 Assert-Output '-Yes'
 Assert-NothingDone
 
@@ -292,6 +293,11 @@ Assert-NotLogged 'quvyta-packages'
 Assert-NotLogged 'quvyta-tools'
 Assert-Output 'Skipping packages (qpac): it runs on Arch Linux only.'
 Assert-Output 'Skipping tools (qtools): it runs on Arch Linux only.'
+# Built for Linux and macOS only, so left out on Windows the same way.
+foreach ($member in @(@('explorer', 'qexp', 'quvyta-explorer'), @('browser', 'qbrow', 'quvyta-browser'), @('cli', 'qcli', 'quvyta-cli'))) {
+    Assert-NotLogged $member[2]
+    Assert-Output "Skipping $($member[0]) ($($member[1])): it runs on Linux and macOS only."
+}
 
 # --- A member that is not released yet
 #
@@ -410,10 +416,10 @@ Assert-Output 'Not added.'
 Assert-Output "start them by their full path, such as $(Join-Path (& $bin) 'quvyta.exe')"
 
 New-Case 'pick-bad-then-good'
-Set-Answers @('9', 'code', 'y', 'y')
+Set-Answers @('12', 'code', 'y', 'y')
 Invoke-Case @()
 Assert-Status 0
-Assert-Output 'Unknown choice: 9'
+Assert-Output 'Unknown choice: 12'
 Assert-Logged 'cargo install --locked quvyta-code'
 
 New-Case 'pick-empty'

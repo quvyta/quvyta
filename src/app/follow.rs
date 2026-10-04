@@ -7,10 +7,12 @@
 //! rewriting a broken file could lose what someone wrote in it by hand.
 
 use std::path::Path;
+use std::sync::LazyLock;
 
 use qframe::diagnostics::Severity;
 use qframe::icons::IconMode;
 use qframe::storage::{Family, Settings, Shared};
+use qframe::theme::ThemeRegistry;
 
 use crate::ecosystem::APPS;
 use crate::machine::Machine;
@@ -29,18 +31,19 @@ pub enum Following {
 }
 
 /// The shared settings the follow table shows, in its order, each with the locale key of its
-/// name, as the appearance rows name it, and of the choice that puts it back on the shared value.
-/// Reduced motion's row is named by what it does, "Reduce motion", which is too long for a column
-/// of a table that must fit four of them in every language; its column says what it is about.
+/// name and of the choice that puts it back on the shared value. A name of `None` is the one the
+/// appearance rows give it ([`Appearance::label`](qframe::widgets::Appearance::label)). Reduced
+/// motion's row is named by what it does, "Reduce motion", which is too long for a column of a
+/// table that must fit four of them in every language; its column says what it is about.
 ///
 /// A list of its own rather than every shared setting the framework knows: the framework may add
 /// one, and the table then keeps showing what it knows how to name and to put back, instead of a
 /// column it would have no words for.
-pub(crate) const SHOWN: [(Shared, &str, &str); 4] = [
-    (Shared::Language, "quvyta.appearance.language", "settings.follow-language"),
-    (Shared::Theme, "quvyta.appearance.theme", "settings.follow-theme"),
-    (Shared::Icons, "quvyta.appearance.icons", "settings.follow-icons"),
-    (Shared::ReducedMotion, "settings.follow-motion", "settings.follow-reduced-motion"),
+pub(crate) const SHOWN: [(Shared, Option<&str>, &str); 4] = [
+    (Shared::Language, None, "settings.follow-language"),
+    (Shared::Theme, None, "settings.follow-theme"),
+    (Shared::Icons, None, "settings.follow-icons"),
+    (Shared::ReducedMotion, Some("settings.follow-motion"), "settings.follow-reduced-motion"),
 ];
 
 /// A Quvyta app, an index of [`APPS`], and how it follows the shared values.
@@ -103,8 +106,9 @@ fn read_file(path: &Path) -> Following {
 }
 
 /// The member's own value of `key`, or `None` when it follows the shared value. A value the framework
-/// would not use, such as an icon set it does not know, falls back to the shared one the way the
-/// framework resolves it, so the table says what the member will really draw with.
+/// would not use is shown the way the framework resolves it, so the table says what the member
+/// will really draw with: an icon set it does not know follows the shared one, and a theme it
+/// cannot build is drawn with the built-in default.
 fn own_value(settings: &Settings, key: Shared) -> Option<String> {
     // Reduced motion of its own is written as a boolean; following, as the shared id in text.
     if key == Shared::ReducedMotion
@@ -122,8 +126,18 @@ fn own_value(settings: &Settings, key: Shared) -> Option<String> {
     } else {
         !text.is_empty()
     };
-    (usable && text != Family::QUVYTA.id()).then(|| text.to_owned())
+    if !usable || text == Family::QUVYTA.id() {
+        return None;
+    }
+    // A theme the framework cannot build is not drawn: the app falls back to the built-in default.
+    if key == Shared::Theme {
+        return Some(THEMES.resolve_or_default(text).0.id().to_owned());
+    }
+    Some(text.to_owned())
 }
+
+/// The themes a Quvyta app knows: the built-in ones. They are read once; each is a file to parse.
+static THEMES: LazyLock<ThemeRegistry> = LazyLock::new(ThemeRegistry::builtin);
 
 #[cfg(test)]
 mod tests {
@@ -167,6 +181,14 @@ mod tests {
         let expected =
             vec![(Shared::Language, None), (Shared::Theme, None), (Shared::Icons, None), (Shared::ReducedMotion, None)];
         assert_eq!(read_file(&path), Following::Keys(expected));
+    }
+
+    #[test]
+    fn a_theme_the_framework_does_not_know_is_drawn_with_the_built_in_default_and_the_table_says_so() {
+        let (_folder, path) = file("theme = \"no-such-theme\"\n");
+        let Following::Keys(values) = read_file(&path) else { panic!("unreadable") };
+        let theme = values.into_iter().find(|(key, _)| *key == Shared::Theme).expect("shown").1;
+        assert_eq!(theme.as_deref(), Some("monochrome"));
     }
 
     #[test]

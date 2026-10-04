@@ -41,10 +41,15 @@ fn app_in(root: &Path) -> Quvyta {
 
 /// Queues `key` as the dialog would, without running anything: the first one queued becomes
 /// the running install whose task never starts.
+///
+/// The two answers are sent rather than pressed because the app is built before any harness runs
+/// it, and each one's command is dropped on purpose: a harness would run the install to its end,
+/// and what these tests want is a screen with cargo still working. The middle one is the checks'
+/// own answer, which is no person's to give: a background task's.
 fn queue(app: &mut Quvyta, key: &str) {
     let index = index(key);
     let _ = app.update(install(InstallMsg::Ask(index)));
-    let _ = app.update(install(InstallMsg::Checked { index, problems: Vec::new(), other_window: false }));
+    let _ = app.update(install(InstallMsg::Checked { index, problems: Vec::new(), other_window: false, named: None }));
     let _ = app.update(install(InstallMsg::Confirm));
 }
 
@@ -92,9 +97,41 @@ pub(super) fn click_beside(h: &mut Harness<Quvyta>, anchor: &str, text: &str) {
     h.click(i32::try_from(x).expect("x"), i32::try_from(y).expect("y"));
 }
 
-/// Presses the Install button of the open dialog.
+/// Presses the Install button of the open dialog, in the language the screen speaks.
 pub(super) fn confirm(h: &mut Harness<Quvyta>) {
-    click_beside(h, "Cancel", "Install");
+    let cancel = said(h, "confirm.cancel");
+    let install = said(h, "confirm.install");
+    click_beside(h, &cancel, &install);
+}
+
+/// Asks to install or update the member at `index` the way a person does, with the key that runs
+/// the member's main button. The selection is set as the list itself sends it; the ask is the part
+/// a person does, so it is a key and not a message. A screen too narrow for the split asks for the
+/// member's page first, which the same key reaches and the key after it answers.
+pub(super) fn ask(h: &mut Harness<Quvyta>, index: usize) {
+    h.send(Msg::Select(index)).press("enter");
+    if h.app().installs.dialog.is_none() {
+        h.press("enter");
+    }
+    h.advance(DIALOG_IN);
+}
+
+/// Asks to remove the member at `index` the way a person does, with the Remove button in its
+/// details. The label is read from the language files, so the button is found in every language,
+/// and a screen too narrow for the split shows the page the button stands on first.
+pub(super) fn ask_remove(h: &mut Harness<Quvyta>, index: usize) {
+    h.send(Msg::Select(index));
+    if !h.app().wide() && !h.app().detail_page {
+        h.press("enter");
+    }
+    let remove = said(h, "detail.remove");
+    h.click_text(&remove).advance(DIALOG_IN);
+}
+
+/// The words the screen puts on the control named by `key`, in the language the screen speaks, so
+/// that a test clicks the button a person reads rather than the one it happens to spell in English.
+pub(super) fn said(h: &Harness<Quvyta>, key: &str) -> String {
+    h.env().i18n().translate(key, &[])
 }
 
 pub(super) fn has(h: &Harness<Quvyta>, text: &str) -> bool {
@@ -168,7 +205,7 @@ fn the_command_in_the_dialog_is_copied_whole() {
 /// The machine of the list's tests under a folder with a long name, as a home folder often
 /// is, so the commands in the dialogs are as long as on a real machine.
 fn long_named() -> (TempDir, std::path::PathBuf) {
-    let root = tempfile::tempdir().expect("temp");
+    let root = super::tests::temp_root();
     let deep = root.path().join("home-of-somebody-with-a-long-name");
     std::fs::create_dir_all(&deep).expect("folder");
     (root, deep)
@@ -178,10 +215,11 @@ fn long_named() -> (TempDir, std::path::PathBuf) {
 fn a_long_command_is_shown_whole_on_a_wide_screen() {
     let (_root, deep) = long_named();
     let mut h = super::tests::start(&deep, 120, 36);
-    h.send(install(InstallMsg::Ask(index("packages")))).advance(DIALOG_IN);
+    ask(&mut h, index("packages"));
     let command = format!("{} install --locked quvyta-packages", deep.join("bin/cargo").display());
     assert!(has(&h, &command), "`{command}` is cut:\n{}", h.screen());
-    h.send(install(InstallMsg::Close)).send(install(InstallMsg::AskRemove(index("code")))).advance(DIALOG_IN);
+    h.press("esc");
+    ask_remove(&mut h, index("code"));
     let command = format!("{} uninstall quvyta-code", deep.join("bin/cargo").display());
     assert!(has(&h, &command), "`{command}` is cut:\n{}", h.screen());
 }
@@ -191,7 +229,7 @@ fn a_long_command_wraps_on_a_narrow_screen_and_is_still_copied_whole() {
     for width in [80, 72] {
         let (_root, deep) = long_named();
         let mut h = super::tests::start(&deep, width, 36);
-        h.send(install(InstallMsg::Ask(index("packages")))).advance(DIALOG_IN);
+        ask(&mut h, index("packages"));
         let cargo = deep.join("bin/cargo").display().to_string();
         let screen = h.screen();
         for word in [cargo.as_str(), "install", "--locked", "quvyta-packages"] {
@@ -206,7 +244,7 @@ fn a_long_command_wraps_on_a_narrow_screen_and_is_still_copied_whole() {
 #[test]
 fn quvyta_never_offers_to_install_itself() {
     let (_root, mut h) = harness(100, 30);
-    h.send(Msg::Select(index("quvyta"))).send(install(InstallMsg::Ask(index("quvyta"))));
+    ask(&mut h, index("quvyta"));
     assert!(h.app().installs.dialog.is_none());
     assert!(!has(&h, "Install"), "{}", h.screen());
 }
@@ -239,6 +277,8 @@ fn without_cargo_the_dialog_shows_rustup_and_offers_to_run_it() {
     assert!(!screen.contains("install.sh"), "the Quvyta install script would build quvyta again:\n{screen}");
     click_beside(&mut h, "curl --proto", "copy");
     assert_eq!(h.copied(), [crate::checks::RUSTUP_INSTALL]);
+    // A dialog with a problem in the way has no Install button, so this message stands in for the
+    // press nobody can make: it is what would start an install unchecked, and it starts nothing.
     h.send(install(InstallMsg::Confirm));
     assert!(h.app().installs.running.is_none(), "a dialog with problems installs nothing");
     assert!(h.handoffs().is_empty(), "nothing runs before the button is pressed");
@@ -534,6 +574,9 @@ fn frames_stay_out_of_the_details_and_the_copied_log() {
     let screen = h.screen();
     assert!(screen.contains("Compiling serde v1.0.219"), "cargo's own lines are there:\n{screen}");
     assert!(!screen.contains("Building ["), "a frame is no log line:\n{screen}");
+    // An install still running shows no Copy log button: the button belongs to a failure, and
+    // nothing on this screen copies the log. So this message stands in for the click nobody
+    // can make, and the log it would copy is the same one the details hold.
     h.send(install(InstallMsg::CopyLog(tools)));
     assert_eq!(h.copied(), ["   Compiling serde v1.0.219"]);
 }
@@ -619,6 +662,28 @@ fn stopping_asks_and_leaves_the_queue_running() {
 }
 
 #[test]
+fn an_install_that_ends_while_stop_is_asked_closes_the_question_and_the_next_one_is_not_stopped() {
+    // The race is between a person and cargo, so the app is driven message by message here: the
+    // harness would run the next install to its end before a late Stop could reach it.
+    let root = tempfile::tempdir().expect("temp");
+    let mut app = app_in(root.path());
+    queue(&mut app, "tools");
+    queue(&mut app, "packages");
+    let _ = app.update(install(InstallMsg::AskStop));
+    assert_eq!(app.installs.stop, Some(false), "the question about qtools is open");
+    // qtools finishes on its own before the question is answered, and qpac starts.
+    let done = Outcome::Installed { version: Some("0.1.2".to_owned()) };
+    let _ = app.update(install(InstallMsg::Finished { index: index("tools"), outcome: done, problems: Vec::new() }));
+    assert_eq!(app.installs.running.as_ref().map(|running| running.index), Some(index("packages")));
+    assert_eq!(app.installs.stop, None, "nothing is left to stop that was asked about");
+    // A Stop pressed a moment late lands on no question, and qpac goes on.
+    let _ = app.update(install(InstallMsg::Stop));
+    assert_eq!(app.installs.running.as_ref().map(|running| running.index), Some(index("packages")));
+    let h = run(app, 100, 30);
+    assert!(!h.screen().contains("Stop installing"), "{}", h.screen());
+}
+
+#[test]
 fn stopping_the_queued_ones_too_empties_the_queue() {
     let (root, mut h) = installing();
     h.click_text("Stop");
@@ -693,7 +758,8 @@ fn with_after_close_shell_quvyta_stays_while_an_install_runs() {
     app.launcher = Launcher::load(app.machine.launcher_conf.as_deref());
     queue(&mut app, "tools");
     let mut h = run(app, 100, 30);
-    h.set_handoff_outcome(HandoffOutcome::Finished { code: Some(0) }).send(Msg::Open(index("code")));
+    h.set_handoff_outcome(HandoffOutcome::Finished { code: Some(0) });
+    h.send(Msg::Select(index("code"))).press("enter");
     h.render();
     assert!(!h.quit_requested(), "the install would stop unseen");
     assert!(line_with(&h.screen(), "qtools ").contains("installing"), "{}", h.screen());
@@ -874,11 +940,16 @@ fn install_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
             h.send(Msg::ShowDetail(index("tools")));
             let mut screens = vec![h.screen()];
             h.send(install(InstallMsg::Line(index("tools"), "   Compiling serde v1.0.219".to_owned())));
-            h.send(install(InstallMsg::ToggleDetails));
+            let details = said(&h, "install.details");
+            h.click_text(&details);
             screens.push(h.screen());
-            h.send(install(InstallMsg::AskStop));
+            // The stop question, opened and left the way a person would: the Stop button, then
+            // the one that keeps the install going. Both labels are read from the language files.
+            let (stop, keep) = (said(&h, "install.stop"), said(&h, "stop.keep"));
+            h.click_text(&stop).advance(DIALOG_IN);
             screens.push(h.screen());
-            h.send(install(InstallMsg::KeepRunning)).send(install(InstallMsg::Finished {
+            h.click_text(&keep);
+            h.send(install(InstallMsg::Finished {
                 index: index("tools"),
                 outcome: Outcome::Failed(Failure::NoLinker),
                 problems: vec![Problem::NoLinker(crate::checks::Distro::Other)],
@@ -887,7 +958,7 @@ fn install_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
             screens.push(h.screen());
             let (_other, mut dialog) = harness(width, height);
             dialog.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
-            dialog.send(install(InstallMsg::Ask(index("tools"))));
+            ask(&mut dialog, index("tools"));
             screens.push(dialog.screen());
             for screen in screens {
                 for forbidden in ['[', ']', '{', '}', '|', '▌'] {
@@ -904,6 +975,9 @@ fn removing() -> (TempDir, Harness<Quvyta>) {
     let root = tempfile::tempdir().expect("temp");
     let mut app = app_in(root.path());
     let at = index("code");
+    // The question and the answer are the buttons', sent here because the app is built before any
+    // harness runs it; what the answer returns is dropped on purpose, so the screen is one where
+    // cargo is still working.
     let _ = app.update(install(InstallMsg::AskRemove(at)));
     let _ = app.update(install(InstallMsg::ConfirmRemove));
     app.selected = at;
@@ -1056,7 +1130,11 @@ fn turkish_install_screens_read_naturally() {
 /// to `target/quvyta-install-review.html` in colour for a visual review: the dialog, the
 /// dialog with a problem, an install under way with its details, the queue, the stop question,
 /// a failure and the question before quitting.
+///
+/// Ignored like [`visual_review`](super::tests::visual_review): a review writes a file for a
+/// person to look at, and a run of the gate must read it as skipped and not as passed.
 #[test]
+#[ignore = "visual review: QUVYTA_REVIEW=1 cargo test visual_review -- --ignored"]
 fn visual_review_installs() {
     if std::env::var_os("QUVYTA_REVIEW").is_none() {
         return;
@@ -1070,16 +1148,16 @@ fn visual_review_installs() {
         for locale in ["en", "tr"] {
             let size = format!("{locale} {width}x{height}");
             let (_root, mut h) = harness(width, height);
-            h.set_locale(locale).send(Msg::Select(index("tools")));
-            h.send(install(InstallMsg::Ask(index("tools")))).advance(DIALOG_IN);
+            h.set_locale(locale);
+            ask(&mut h, index("tools"));
             shot(&h, format!("dialog {size}"));
 
             let root = tempfile::tempdir().expect("temp");
             let app = Quvyta::new(machine(root.path()));
             std::fs::remove_file(root.path().join("bin/cc")).expect("no linker");
             let mut h = run(app, width, height);
-            h.set_locale(locale).send(Msg::Select(index("tools")));
-            h.send(install(InstallMsg::Ask(index("tools")))).advance(DIALOG_IN);
+            h.set_locale(locale);
+            ask(&mut h, index("tools"));
             shot(&h, format!("dialog without a linker {size}"));
 
             let (_root, mut h) = installing();
@@ -1088,13 +1166,15 @@ fn visual_review_installs() {
             h.send(install(InstallMsg::Line(tools, "   Compiling ratatui v0.29.0".to_owned())));
             shot(&h, format!("compiling, no count {size}"));
             h.send(install(InstallMsg::Line(tools, "    Building [=====>  ] 142/231: ratatui, serde".to_owned())));
-            h.send(install(InstallMsg::ToggleDetails));
+            let (details, stop, keep) = (said(&h, "install.details"), said(&h, "install.stop"), said(&h, "stop.keep"));
+            h.click_text(&details);
             shot(&h, format!("compiling with a count and details {size}"));
-            h.send(install(InstallMsg::ToggleDetails)).send(install(InstallMsg::AskStop)).advance(DIALOG_IN);
+            h.click_text(&details);
+            h.click_text(&stop).advance(DIALOG_IN);
             shot(&h, format!("stop {size}"));
-            h.send(install(InstallMsg::KeepRunning)).send(Msg::ShowDetail(index("packages")));
+            h.click_text(&keep).send(Msg::ShowDetail(index("packages")));
             shot(&h, format!("queued {size}"));
-            h.send(install(InstallMsg::AskQuit)).advance(DIALOG_IN);
+            h.press("ctrl+q").advance(DIALOG_IN);
             shot(&h, format!("quit {size}"));
 
             let (_root, mut h) = failed(

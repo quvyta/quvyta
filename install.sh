@@ -18,13 +18,19 @@ set -u
 min_rust_major=1
 min_rust_minor=95
 
-names="framework code focus packages tools quvyta desk"
+names="framework code focus packages tools explorer browser cli quvyta desk"
 
 # Members that are not released yet: there is nothing on crates.io to install. Naming one says so
 # and installs nothing for it; they are left out of all and out of the picker's numbers.
 # Every member is out today. A new one that is not goes here by name, and in two more places:
 # Soon = $true in install.ps1's list, and Status::Soon in src/ecosystem.rs.
 soon=""
+
+# Members released only as pre-releases so far, such as 0.1.0-alpha.2. cargo installs a
+# pre-release only when its version is named, so the newest one is asked of crates.io first.
+# The day one has a full release, take it out of this line and set its Status::Alpha in
+# src/ecosystem.rs to Status::Beta.
+alpha="cli"
 
 crate_of() {
     case $1 in
@@ -43,6 +49,9 @@ command_of() {
         packages) echo qpac ;;
         tools) echo qtools ;;
         quvyta) echo quvyta ;;
+        explorer) echo qexp ;;
+        browser) echo qbrow ;;
+        cli) echo qcli ;;
         desk) echo qdesk ;;
     esac
 }
@@ -55,6 +64,9 @@ about() {
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
         tools) echo "the settings Arch Linux users usually set up by hand, with undo" ;;
         quvyta) echo "installs, opens, updates and removes the Quvyta apps" ;;
+        explorer) echo "a file explorer with an icon for every kind of file" ;;
+        browser) echo "a real web browser in the terminal, drawn by Chromium, which it needs" ;;
+        cli) echo "a small coding agent that asks before it changes anything; an alpha" ;;
         desk) echo "a desktop inside the terminal: windows, icons, a dock and a launcher" ;;
     esac
 }
@@ -65,6 +77,21 @@ unreleased() {
         *" $1 "*) return 0 ;;
     esac
     return 1
+}
+
+# The arguments cargo installs a member with. A pre-release member gets the newest version
+# crates.io names; when crates.io cannot be asked, cargo is left to say what it could not find.
+install_args() {
+    crate=$(crate_of "$1")
+    case " $alpha " in
+        *" $1 "*)
+            newest=$(cargo search "$crate" --limit 1 2>/dev/null </dev/null |
+                sed -n "s/^$crate = \"\([0-9][0-9A-Za-z.+-]*\)\".*/\1/p")
+            echo "install --locked $crate${newest:+ --version $newest}"
+            return
+            ;;
+    esac
+    echo "install --locked $crate"
 }
 
 # The one line a person sees for a member that is not out yet, in the words quvyta itself uses.
@@ -104,6 +131,9 @@ Names (several may be given; none lets you choose):
   focus       quvyta-focus, command qfocus
   packages    quvyta-packages, command qpac; Arch Linux only
   tools       quvyta-tools, command qtools; Arch Linux only
+  explorer    quvyta-explorer, command qexp
+  browser     quvyta-browser, command qbrow; needs Chromium or Google Chrome
+  cli         quvyta-cli, command qcli; an alpha, installed at its newest version
   quvyta      quvyta, command quvyta
   desk        quvyta-desktop, command qdesk
   all         every one of the above that can be installed
@@ -504,7 +534,7 @@ install_chosen() {
         *)
             say "There is no terminal to ask on, so nothing was installed. Run with --yes, or yourself:"
             for name in $chosen; do
-                say "  cargo install --locked $(crate_of "$name")"
+                say "  cargo $(install_args "$name")"
             done
             return 1
             ;;
@@ -515,7 +545,9 @@ install_chosen() {
         crate=$(crate_of "$name")
         say ""
         say "Installing $crate..."
-        if cargo install --locked "$crate" </dev/null; then
+        # Split into cargo's words on purpose: the arguments hold no spaces.
+        # shellcheck disable=SC2046
+        if cargo $(install_args "$name") </dev/null; then
             installed="${installed:+$installed }$name"
         else
             failed="${failed:+$failed }$crate"
@@ -537,14 +569,25 @@ detect_shell() {
 # The start-up file and the line that puts cargo's folder on PATH, for the detected shell.
 # Paths under the home folder are written with $HOME so the file still reads well.
 path_line_for() {
-    shown_dir=$bin_dir
+    shown_home=
+    rest=$bin_dir
     case $bin_dir in
-        "$HOME"/*) shown_dir="\$HOME${bin_dir#"$HOME"}" ;;
+        # shellcheck disable=SC2016 # written as it is, for the shell to read at start
+        "$HOME"/*) shown_home='$HOME/' rest=${bin_dir#"$HOME"/} ;;
     esac
+    # Inside double quotes a quote, a $, a backquote and a backslash keep a meaning of their own;
+    # a folder named with one would otherwise break the start-up file.
+    shown_dir=$shown_home$(printf '%s' "$rest" | sed 's/[\\"$`]/\\&/g')
     case $1 in
         fish)
             rc_file="${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
-            path_line="fish_add_path $shown_dir"
+            # fish's own line goes unquoted, as everyone writes it, unless the folder needs quotes.
+            case $rest in
+                *[!A-Za-z0-9/._+,:@%=-]*)
+                    path_line="fish_add_path \"$shown_home$(printf '%s' "$rest" | sed 's/[\\"$]/\\&/g')\""
+                    ;;
+                *) path_line="fish_add_path $shown_home$rest" ;;
+            esac
             ;;
         zsh)
             # macOS terminals open login shells, which read .zprofile; Linux ones read .zshrc.

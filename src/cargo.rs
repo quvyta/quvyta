@@ -1,7 +1,7 @@
 //! Reading what cargo prints. Pure functions over its text, tested with recorded output.
 //!
-//! On a terminal cargo colours its words and redraws its progress line in place; [`plain`]
-//! takes those escapes out, and the rest reads the plain lines.
+//! On a terminal cargo colours its words and redraws its progress line in place; [`plain`] leaves
+//! each line as the terminal itself would, and the rest reads the plain lines.
 
 /// One package in the output of `cargo install --list`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +12,9 @@ pub struct Installed {
     pub version: String,
     /// The commands it put in cargo's `bin` folder.
     pub commands: Vec<String>,
+    /// Whether cargo took it from crates.io. One built from a folder or a git repository names
+    /// its source after the version, and crates.io's version of the same name is not what it is.
+    pub from_crates_io: bool,
 }
 
 /// The packages in the output of `cargo install --list`.
@@ -52,10 +55,16 @@ fn package_line(line: &str) -> Option<Installed> {
     let mut words = line.splitn(3, ' ');
     let package = words.next()?;
     let version = words.next()?.strip_prefix('v')?;
+    let source = words.next();
     let valid = !package.is_empty()
         && version.starts_with(|c: char| c.is_ascii_digit())
-        && words.next().is_none_or(|source| source.starts_with('(') && source.ends_with(')'));
-    valid.then(|| Installed { package: package.to_owned(), version: version.to_owned(), commands: Vec::new() })
+        && source.is_none_or(|source| source.starts_with('(') && source.ends_with(')'));
+    valid.then(|| Installed {
+        package: package.to_owned(),
+        version: version.to_owned(),
+        commands: Vec::new(),
+        from_crates_io: source.is_none(),
+    })
 }
 
 /// One crate in the output of `cargo search`.
@@ -87,41 +96,12 @@ fn search_line(line: &str) -> Option<Found> {
     valid.then(|| Found { package: package.to_owned(), version: version.to_owned() })
 }
 
-/// `line` without the terminal escapes cargo writes on a terminal: colours, erasing the line and
-/// the links around words (`ESC ] 8 ;; url ESC \\`).
+/// `line` without what only a terminal can show: the escapes cargo writes around its words, the
+/// links around `release`, and every other control character. This is the framework's
+/// [`qframe::text::printable`], which is what a cell can be given — a carriage return's last word,
+/// a tab as spaces up to the next stop — and a second copy of it here could only lag behind.
 pub fn plain(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut chars = line.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c != '\u{1b}' {
-            out.push(c);
-            continue;
-        }
-        match chars.next() {
-            // A control sequence ends with its first byte in `@`..`~`.
-            Some('[') => {
-                for c in chars.by_ref() {
-                    if ('@'..='~').contains(&c) {
-                        break;
-                    }
-                }
-            }
-            // An operating system command ends with BEL or with ESC `\`.
-            Some(']') => {
-                while let Some(c) = chars.next() {
-                    if c == '\u{7}' {
-                        break;
-                    }
-                    if c == '\u{1b}' {
-                        chars.next_if_eq(&'\\');
-                        break;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    out
+    qframe::text::printable(line).into_owned()
 }
 
 /// Where an install is, from one plain line of `cargo install`.
@@ -263,7 +243,12 @@ mod tests {
             package: package.to_owned(),
             version: version.to_owned(),
             commands: commands.iter().map(|command| (*command).to_owned()).collect(),
+            from_crates_io: true,
         }
+    }
+
+    fn built_elsewhere(package: &str, version: &str, commands: &[&str]) -> Installed {
+        Installed { from_crates_io: false, ..installed(package, version, commands) }
     }
 
     #[test]
@@ -289,7 +274,7 @@ quvyta-framework-showcase v0.1.4:
     }
 
     #[test]
-    fn packages_from_a_folder_or_git_keep_their_version() {
+    fn packages_from_a_folder_or_git_keep_their_version_and_say_where_they_came_from() {
         let text = "\
 quvyta v0.1.2 (/home/ayse/quvyta):
     quvyta
@@ -298,7 +283,8 @@ ripgrep v14.1.1 (https://github.com/BurntSushi/ripgrep#4649aa99):
 ";
         assert_eq!(
             parse_install_list(text),
-            [installed("quvyta", "0.1.2", &["quvyta"]), installed("ripgrep", "14.1.1", &["rg"])]
+            [built_elsewhere("quvyta", "0.1.2", &["quvyta"]), built_elsewhere("ripgrep", "14.1.1", &["rg"])],
+            "the version is kept, and that crates.io did not provide it"
         );
     }
 
@@ -369,15 +355,35 @@ quvyta-inject = \"0.1.0\n\"
         text.lines().map(ToOwned::to_owned).collect()
     }
 
+    /// A line cargo printed is left exactly as the framework's own line cleaner leaves it: the
+    /// escapes and the links out, and no character a cell cannot hold left in. A copy of the
+    /// stripping kept here would let the tab, the words a carriage return wrote over and the bare
+    /// bell through, and these are the words that say so.
     #[test]
-    fn escapes_are_taken_out_and_text_is_kept() {
-        assert_eq!(plain("\u{1b}[1m\u{1b}[92m   Compiling\u{1b}[0m serde v1.0.219"), "   Compiling serde v1.0.219");
-        assert_eq!(plain("\u{1b}[K    Finished"), "    Finished");
-        let link = "\u{1b}]8;;https://doc.rust-lang.org/cargo/reference/profiles.html\u{1b}\\`release` profile\u{1b}]8;;\u{1b}\\ done";
-        assert_eq!(plain(link), "`release` profile done");
-        assert_eq!(plain("bell \u{1b}]0;title\u{7}after"), "bell after");
-        assert_eq!(plain("çalışıyor ✓"), "çalışıyor ✓");
-        assert_eq!(plain("cut \u{1b}["), "cut ");
+    fn a_line_cargo_prints_is_left_as_the_framework_leaves_it() {
+        for (line, want) in [
+            ("\u{1b}[1m\u{1b}[92m   Compiling\u{1b}[0m serde v1.0.219", "   Compiling serde v1.0.219"),
+            ("\u{1b}[K    Finished", "    Finished"),
+            (
+                "\u{1b}]8;;https://doc.rust-lang.org/cargo/reference/profiles.html\u{1b}\\`release` profile\u{1b}]8;;\u{1b}\\ done",
+                "`release` profile done",
+            ),
+            ("bell \u{1b}]0;title\u{7}after", "bell after"),
+            ("çalışıyor ✓", "çalışıyor ✓"),
+            ("cut \u{1b}[", "cut "),
+            // What a copy that knew only about escapes would let a cell hold.
+            ("10%\r50%\rdone", "done"),
+            ("a\tb", "a       b"),
+            ("ready\u{7} now", "ready now"),
+        ] {
+            assert_eq!(plain(line), want, "{line:?}");
+            assert_eq!(plain(line), qframe::text::printable(line), "{line:?}");
+        }
+        // Every line of a whole recorded install, which is what the log and the copied log hold.
+        for line in INSTALL.split(['\r', '\n']).filter(|line| !line.trim().is_empty()) {
+            assert_eq!(plain(line), qframe::text::printable(line), "{line:?}");
+            assert!(!plain(line).chars().any(char::is_control), "{line:?} keeps what a cell cannot hold");
+        }
     }
 
     #[test]

@@ -78,6 +78,11 @@ fn both_installers_know_the_same_apps() {
     for name in soon.split_whitespace() {
         assert!(names.iter().any(|known| known == name), "{name} is not a Quvyta app");
     }
+    let alpha = sh
+        .lines()
+        .find_map(|line| line.strip_prefix("alpha=\""))
+        .expect("install.sh lists the members that have only pre-releases")
+        .trim_end_matches('"');
     for line in members {
         let name = ps1_field(line, "Name");
         for (field, function) in [("Crate", "crate_of"), ("Command", "command_of"), ("About", "about")] {
@@ -92,6 +97,16 @@ fn both_installers_know_the_same_apps() {
         let member = APPS.iter().find(|member| member.key == name).expect("the screen knows {name}");
         assert_eq!(member.arch_only, sh_arch, "whether {name} runs on Arch Linux only");
         assert_eq!(member.status == Status::Soon, sh_soon, "whether {name} is out");
+        // cargo installs a pre-release only when its version is named, so the script has to know
+        // which members have nothing else yet, as the screen does.
+        let sh_alpha = alpha.split_whitespace().any(|word| word == name);
+        assert_eq!(member.status == Status::Alpha, sh_alpha, "whether {name} has only pre-releases");
+        // install.ps1 never offers a member that does not build on Windows.
+        assert_eq!(
+            ps1_field(line, "UnixOnly") == "true",
+            member.unix_only,
+            "whether {name} is for Linux and macOS only"
+        );
     }
 }
 

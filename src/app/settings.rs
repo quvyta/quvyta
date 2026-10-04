@@ -10,20 +10,24 @@
 //! background; when the file cannot be written the value goes back and a notice says where and
 //! why, so the screen never shows a setting the next start would not have.
 
+use qframe::icons::nerd_font::{self, Archive, Install, Progress};
+use qframe::icons::{GlyphMode, GlyphSample};
 use qframe::prelude::*;
 use qframe::storage::Shared;
 use qframe::widget::NodeMut;
 use qframe::widgets::{
-    AppearanceChange, Column, ColumnWidth, ContextItem, ScrollView, Select, SettingRow, SettingsList, Table, TableCell,
-    TableRow, Toast,
+    Appearance, AppearanceChange, Column, ColumnWidth, ContextItem, Modal, ProgressBar, ScrollView, Select, SettingRow,
+    SettingsList, SettingsRows, Table, TableCell, TableRow, Toast,
 };
 
+use super::confirm_install::field;
 use super::follow::{self, Following, MemberFollowing};
 use super::path_notice::PathReach;
 use super::{Msg, Quvyta};
 use crate::ecosystem::APPS;
 use crate::inventory::State;
 use crate::launcher::{AfterClose, Launcher};
+use crate::machine::Machine;
 
 /// The widest the settings grow: beyond it the label and its control drift too far apart to be
 /// read as one line.
@@ -33,6 +37,47 @@ const SECTION: u16 = 76;
 const WIDE: u16 = 100;
 /// The order of the choices after a member closes, as the select lists them.
 const AFTER_CLOSE: [AfterClose; 2] = [AfterClose::Return, AfterClose::Shell];
+
+/// The width of the bar a running font install shows in place of its button: wide enough to be
+/// read as a bar, narrow enough to stay beside the sentence on a narrow screen.
+const FONT_BAR: u16 = 16;
+
+/// What the Settings tab knows about the Nerd Font: whether this machine has one, whether the
+/// question before installing it is open, and how far the install is.
+#[derive(Debug)]
+pub(super) struct Font {
+    /// Whether a Nerd Font lies in the font folders of this machine, read at start.
+    installed: bool,
+    /// Whether the question before installing is open.
+    asking: bool,
+    /// The last step of the install, once one has started.
+    progress: Option<Progress>,
+    /// Where the font is installed and whether the system is told, as the wizard does it.
+    install: Install,
+    /// What is downloaded: the framework's release, which the question names before anything runs.
+    archive: Archive,
+}
+
+impl Font {
+    /// What `machine` has, installed with `install` when it is asked to.
+    pub(super) fn new(machine: &Machine, install: Install) -> Self {
+        Self { installed: font_installed(machine), asking: false, progress: None, install, archive: Archive::release() }
+    }
+
+    /// Whether an install is running: a failed one may be tried again, so it is not.
+    fn busy(&self) -> bool {
+        matches!(self.progress, Some(Progress::Downloading { .. } | Progress::Verifying | Progress::Installing))
+    }
+}
+
+/// Whether a Nerd Font is in the font folders of `machine`: the ones it names, which only a test or
+/// a demo does, or else the framework's own.
+fn font_installed(machine: &Machine) -> bool {
+    match &machine.font_dirs {
+        Some(dirs) => nerd_font::installed_in(dirs),
+        None => nerd_font::installed(),
+    }
+}
 
 /// A setting and its new value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +110,14 @@ pub enum SettingMsg {
     Follow(usize, Shared),
     /// The member's file was written, or why not.
     Follows(Result<(), String>),
+    /// Opens the question before installing the Nerd Font.
+    FontAsk,
+    /// Closes the question without installing anything.
+    FontCancel,
+    /// The question was agreed to: the font is installed in the background.
+    FontInstall,
+    /// A step of the running install.
+    FontStep(Progress),
 }
 
 impl Quvyta {
@@ -118,6 +171,29 @@ impl Quvyta {
                     Command::toast(Toast::warning(t!("settings.not-saved")).body(body)),
                     self.read_following(),
                 ])
+            }
+            SettingMsg::FontAsk => {
+                self.font.asking = true;
+                Command::none()
+            }
+            SettingMsg::FontCancel => {
+                self.font.asking = false;
+                Command::none()
+            }
+            // Only the question's own button sends this, and the offer has no button while an
+            // install runs, so one install never starts over another.
+            SettingMsg::FontInstall => {
+                self.font.asking = false;
+                self.font.progress = Some(Progress::Downloading { fraction: None });
+                let install = self.font.install.clone().archive(self.font.archive.clone());
+                // The task is built here, where the language is known: its own thread has none.
+                Command::task(install.task(|progress| Msg::Setting(SettingMsg::FontStep(progress))))
+            }
+            // A finished install is told in place of the offer for as long as quvyta runs, so the
+            // machine is not asked again.
+            SettingMsg::FontStep(progress) => {
+                self.font.progress = Some(progress);
+                Command::none()
             }
         }
     }
@@ -188,6 +264,7 @@ impl Quvyta {
         // The shared appearance, quvyta's own settings and the PATH notice together outgrow a
         // short screen, so the page scrolls.
         ui.add_with(ScrollView::new(), page).fill().id("page");
+        self.font_question(ui);
     }
 
     /// The appearance every Quvyta application shows the same way: language, theme and icons with
@@ -198,10 +275,105 @@ impl Quvyta {
         SettingsList::show(ui, |list| {
             let message = |change| Msg::Setting(SettingMsg::Appearance(change));
             self.appearance.section(list, message);
+            self.font_row(list);
             // quvyta asks crates.io at start, so it shows the shared switch for that, in the
             // framework's words: the same one every member that asks shows.
             self.appearance.updates(list, message);
         })
+    }
+
+    /// The Nerd Font, in the appearance section because it is what the icon set row needs: on a
+    /// machine without one, the framework's sentence saying so and its Install button, then how far
+    /// the install is, and once it is done what it did and what to look at. A machine that has one
+    /// is told nothing.
+    fn font_row(&self, list: &mut SettingsRows<'_, Msg>) {
+        let font = &self.font;
+        match &font.progress {
+            Some(done @ Progress::Done { .. }) => {
+                let row = SettingRow::new(done.text()).description(nerd_font::after_install_text());
+                list.row(row, |_| {});
+                // The samples the framework's note asks to look at: the Nerd glyphs, which need the
+                // font, beside the Unicode ones every terminal draws.
+                for (mode, name) in [(GlyphMode::Nerd, "nerd"), (GlyphMode::Unicode, "unicode")] {
+                    let label = qframe::t!(&format!("quvyta.appearance.icons-{name}"));
+                    list.row(SettingRow::new(label).nested(true), |ui| {
+                        ui.add(GlyphSample::new(mode));
+                    });
+                }
+            }
+            _ if font.installed => {}
+            Some(step) if font.busy() => {
+                let row = SettingRow::new(nerd_font::status_text(false)).description(step.text());
+                let bar = match step {
+                    Progress::Downloading { fraction: Some(fraction) } => ProgressBar::new(*fraction).percent(true),
+                    // The framework's bar keeps still by itself under reduced motion.
+                    _ => ProgressBar::indeterminate(),
+                };
+                list.row(row, |ui| {
+                    ui.add(bar).width(Length::Cells(FONT_BAR));
+                });
+            }
+            step => {
+                let row = SettingRow::new(nerd_font::status_text(false));
+                // A reason is never told in colour alone: the warning mark stands in front of it.
+                let row = match step {
+                    Some(failed @ Progress::Failed(_)) => {
+                        let mark = list.env().icons().glyph("warning").into_owned();
+                        row.description(format!("{mark} {}", failed.text()))
+                    }
+                    _ => row,
+                };
+                list.row(row, |ui| {
+                    ui.add(Button::new(qframe::t!("quvyta.setup.install")).on_press(Msg::Setting(SettingMsg::FontAsk)));
+                });
+            }
+        }
+    }
+
+    /// The question before the font is installed: where it comes from, where it goes, that no sudo
+    /// is needed and nothing outside the user's account is told, and that deleting that folder
+    /// undoes it.
+    fn font_question(&self, ui: &mut View<'_, Msg>) {
+        if !self.font.asking {
+            return;
+        }
+        let cancel = Msg::Setting(SettingMsg::FontCancel);
+        let modal = Modal::new()
+            .title(t!("confirm.title", command = nerd_font::FAMILY))
+            .on_close(cancel.clone())
+            .action(Button::new(t!("confirm.cancel")).on_press(cancel))
+            .action(
+                Button::new(t!("confirm.install")).variant("primary").on_press(Msg::Setting(SettingMsg::FontInstall)),
+            );
+        let folder = self.font.install.target_dir().map(|folder| self.machine.show(folder));
+        ui.add_with(modal, |ui| {
+            ui.column(|ui| {
+                let mut fields = vec![
+                    (t!("confirm.source"), self.font.archive.url().to_owned()),
+                    (t!("confirm.version"), nerd_font::RELEASE.to_owned()),
+                ];
+                fields.extend(folder.clone().map(|folder| (t!("confirm.target"), folder)));
+                let width = fields.iter().map(|(label, _)| qframe::text::width(label)).max().unwrap_or(0);
+                ui.column(|ui| {
+                    for (label, value) in &fields {
+                        field(ui, label, width, value);
+                    }
+                })
+                .fill_width();
+                ui.column(|ui| {
+                    let mut lines = vec![t!("font.checked")];
+                    lines.extend(folder.as_deref().map(|folder| t!("confirm.no-sudo", folder = folder)));
+                    lines.push(t!("font.registered"));
+                    lines.push(t!("font.undo"));
+                    for line in lines {
+                        ui.add(Text::new(line).role("secondary")).fill_width();
+                    }
+                })
+                .fill_width();
+            })
+            .gap(1)
+            .fill_width();
+        });
     }
 
     /// Whether each installed member follows the shared language, theme, icons and reduced motion:
@@ -211,7 +383,7 @@ impl Quvyta {
         let Some(following) = &self.following else { return };
         let words = Words::of(ui.env());
         ui.column(|ui| {
-            ui.add(Text::new(t!("settings.follow-title")).role("secondary")).padding(Padding::symmetric(0, 2));
+            ui.add(Text::new(t!("settings.follow-title")).role("heading")).padding(Padding::symmetric(0, 2));
             if following.is_empty() {
                 ui.add(Text::new(t!("settings.follow-none")).role("faint")).padding(Padding::symmetric(0, 2));
                 return;
@@ -240,7 +412,7 @@ impl Quvyta {
                 let command = TableCell::new(APPS[member.index].command);
                 let cells = table_cells(member, words).into_iter().map(|(text, faint)| {
                     let cell = TableCell::new(text);
-                    if faint { cell.color("muted") } else { cell }
+                    if faint { cell.role("faint") } else { cell }
                 });
                 TableRow::new(std::iter::once(command).chain(cells))
             })
@@ -260,12 +432,13 @@ impl Quvyta {
         ui.add(table).width(Length::Cells(width)).id("following-table");
     }
 
-    /// The faint title of quvyta's own section and, fainter, the file it is kept in: beside the
-    /// title on a wide screen, under it on a narrow one, shortened in the middle when it does
-    /// not fit, since the file name at the end matters as much as the folder at the start.
+    /// The title of quvyta's own section, drawn as the framework draws a heading, and, fainter,
+    /// the file it is kept in: beside the title on a wide screen, under it on a narrow one,
+    /// shortened in the middle when it does not fit, since the file name at the end matters as
+    /// much as the folder at the start.
     fn section_title(&self, width: u16, ui: &mut View<'_, Msg>) {
         let words = t!("settings.title");
-        let title = Text::new(words.clone()).role("secondary").no_wrap();
+        let title = Text::new(words.clone()).role("heading").no_wrap();
         let Some(path) = self.machine.launcher_conf.as_deref().map(|path| self.machine.show(path)) else {
             ui.add(title).padding(Padding::symmetric(0, 2));
             return;
@@ -460,12 +633,18 @@ struct Words {
     languages: Vec<(String, String)>,
     /// Each theme id with its name.
     themes: Vec<(String, String)>,
+    /// Each icon set with its name, as the appearance rows name it.
+    icons: Vec<(IconMode, String)>,
 }
 
 impl Words {
     fn of(env: &qframe::env::Env) -> Self {
         Self {
-            keys: follow::SHOWN.iter().map(|(key, name, _)| (*key, t!(name))).collect(),
+            keys: follow::SHOWN
+                .iter()
+                .map(|(key, name, _)| (*key, name.map_or_else(|| Appearance::label(env.i18n(), *key), |name| t!(name))))
+                .collect(),
+            icons: IconMode::ALL.iter().map(|mode| (*mode, mode.label(env.i18n()))).collect(),
             languages: env.i18n().list(),
             themes: env.themes(),
         }
@@ -486,8 +665,8 @@ impl Words {
         } else if key == Shared::Theme {
             named(&self.themes)
         } else if key == Shared::Icons {
-            qframe::icons::IconMode::from_name(value)
-                .map(|mode| t!(&format!("quvyta.appearance.icons-{}", mode.name())))
+            IconMode::from_name(value)
+                .and_then(|mode| self.icons.iter().find(|(shown, _)| *shown == mode).map(|(_, name)| name.clone()))
         } else if key == Shared::ReducedMotion {
             value
                 .parse::<bool>()
@@ -502,3 +681,6 @@ impl Words {
 
 #[cfg(test)]
 pub(super) mod tests;
+
+#[cfg(test)]
+pub(super) mod font_tests;

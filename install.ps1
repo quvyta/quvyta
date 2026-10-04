@@ -20,14 +20,20 @@ function Get-QuvytaApps {
     # Naming it says so and installs nothing for it; it is left out of all and out of the picker's
     # numbers. Every member is out today; a new one that is not gets Soon = $true on its line here,
     # its name on the soon= line in install.sh, and Status::Soon in src/ecosystem.rs.
+    #
+    # UnixOnly marks a member built for Linux and macOS only: it is listed, but never installed on
+    # Windows.
     @(
-        [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; Soon = $false; About = 'the showcase of the framework every member is built on' }
-        [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; Soon = $false; About = 'coding agents inside Podman or Docker containers' }
-        [pscustomobject]@{ Name = 'focus'; Crate = 'quvyta-focus'; Command = 'qfocus'; ArchOnly = $false; Soon = $false; About = 'tracks what you focus on and where your time went' }
-        [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; Soon = $false; About = 'a package manager for Arch Linux that shows every change first' }
-        [pscustomobject]@{ Name = 'tools'; Crate = 'quvyta-tools'; Command = 'qtools'; ArchOnly = $true; Soon = $false; About = 'the settings Arch Linux users usually set up by hand, with undo' }
-        [pscustomobject]@{ Name = 'quvyta'; Crate = 'quvyta'; Command = 'quvyta'; ArchOnly = $false; Soon = $false; About = 'installs, opens, updates and removes the Quvyta apps' }
-        [pscustomobject]@{ Name = 'desk'; Crate = 'quvyta-desktop'; Command = 'qdesk'; ArchOnly = $false; Soon = $false; About = 'a desktop inside the terminal: windows, icons, a dock and a launcher' }
+        [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'the showcase of the framework every member is built on' }
+        [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'coding agents inside Podman or Docker containers' }
+        [pscustomobject]@{ Name = 'focus'; Crate = 'quvyta-focus'; Command = 'qfocus'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'tracks what you focus on and where your time went' }
+        [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; UnixOnly = $false; Soon = $false; About = 'a package manager for Arch Linux that shows every change first' }
+        [pscustomobject]@{ Name = 'tools'; Crate = 'quvyta-tools'; Command = 'qtools'; ArchOnly = $true; UnixOnly = $false; Soon = $false; About = 'the settings Arch Linux users usually set up by hand, with undo' }
+        [pscustomobject]@{ Name = 'explorer'; Crate = 'quvyta-explorer'; Command = 'qexp'; ArchOnly = $false; UnixOnly = $true; Soon = $false; About = 'a file explorer with an icon for every kind of file' }
+        [pscustomobject]@{ Name = 'browser'; Crate = 'quvyta-browser'; Command = 'qbrow'; ArchOnly = $false; UnixOnly = $true; Soon = $false; About = 'a real web browser in the terminal, drawn by Chromium, which it needs' }
+        [pscustomobject]@{ Name = 'cli'; Crate = 'quvyta-cli'; Command = 'qcli'; ArchOnly = $false; UnixOnly = $true; Soon = $false; About = 'a small coding agent that asks before it changes anything; an alpha' }
+        [pscustomobject]@{ Name = 'quvyta'; Crate = 'quvyta'; Command = 'quvyta'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'installs, opens, updates and removes the Quvyta apps' }
+        [pscustomobject]@{ Name = 'desk'; Crate = 'quvyta-desktop'; Command = 'qdesk'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'a desktop inside the terminal: windows, icons, a dock and a launcher' }
     )
 }
 
@@ -65,6 +71,9 @@ Names (several may be given; none lets you choose):
   focus       quvyta-focus, command qfocus
   packages    quvyta-packages, command qpac; Arch Linux only, not installed on Windows
   tools       quvyta-tools, command qtools; Arch Linux only, not installed on Windows
+  explorer    quvyta-explorer, command qexp; Linux and macOS only, not installed on Windows
+  browser     quvyta-browser, command qbrow; Linux and macOS only, not installed on Windows
+  cli         quvyta-cli, command qcli; Linux and macOS only, not installed on Windows
   quvyta      quvyta, command quvyta
   desk        quvyta-desktop, command qdesk
   all         every one of the above that runs on Windows and is released
@@ -185,6 +194,7 @@ function Write-QuvytaApps {
             continue
         }
         if ($member.ArchOnly) { $about = "$about; Arch Linux only, not for Windows" }
+        elseif ($member.UnixOnly) { $about = "$about; Linux and macOS only, not for Windows" }
         Write-QuvytaLine ('  {0}  {1,-10} {2,-8} {3}' -f $number, $member.Name, $member.Command, $about)
         $number++
     }
@@ -240,7 +250,7 @@ function Select-QuvytaMember {
     }
 }
 
-# Leaves out the members that run on Arch Linux only, saying so for each.
+# Leaves out the members that do not run on Windows, saying so for each.
 function Select-QuvytaSupported {
     param($State)
     $kept = @()
@@ -248,6 +258,8 @@ function Select-QuvytaSupported {
         $member = Get-QuvytaMember $name
         if ($member.ArchOnly) {
             Write-QuvytaLine "Skipping $name ($($member.Command)): it runs on Arch Linux only."
+        } elseif ($member.UnixOnly) {
+            Write-QuvytaLine "Skipping $name ($($member.Command)): it runs on Linux and macOS only."
         } else {
             $kept += $name
         }

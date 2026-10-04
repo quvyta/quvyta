@@ -3,9 +3,9 @@
 //! asks before removing.
 
 use qframe::prelude::*;
-use qframe::widgets::{Checkbox, CopyValue, Modal};
+use qframe::widgets::{Checkbox, CopyValue, Field, Modal};
 
-use super::installs::{Dialog, InstallMsg};
+use super::installs::{Also, Dialog, InstallMsg};
 use super::{Msg, Quvyta};
 use crate::checks::{self, Distro, Problem};
 use crate::ecosystem::APPS;
@@ -79,6 +79,10 @@ impl Quvyta {
     }
 
     fn confirm_dialog(&self, dialog: &Dialog, ui: &mut View<'_, Msg>) {
+        if !dialog.more.is_empty() {
+            self.update_all_dialog(dialog, ui);
+            return;
+        }
         let member = &APPS[dialog.index];
         let job = Job::new(&self.machine, member, dialog.version.clone());
         let found = dialog.problems.as_deref();
@@ -135,6 +139,91 @@ impl Quvyta {
                     _ => {
                         if let Some(job) = &job {
                             copyable(ui, t!("confirm.command"), job.command_line(), "command", room);
+                        }
+                        ui.column(|ui| {
+                            ui.add(Text::new(t!("confirm.built-here")).role("secondary")).fill_width();
+                            let home = self.machine.show(&self.machine.cargo_home);
+                            ui.add(Text::new(t!("confirm.no-sudo", folder = home)).role("secondary")).fill_width();
+                        })
+                        .fill_width();
+                    }
+                }
+                if ready && self.installs.other_window {
+                    ui.add(Text::new(t!("install.other-window")).role("secondary")).fill_width();
+                }
+            })
+            .gap(1)
+            .fill_width();
+        });
+    }
+
+    /// The question before Install updates: every member it updates, from which version to which,
+    /// each with the exact command that runs, and what the checks find, as one member's update
+    /// dialog shows it.
+    fn update_all_dialog(&self, dialog: &Dialog, ui: &mut View<'_, Msg>) {
+        let first =
+            dialog.from.clone().zip(dialog.version.clone()).map(|(from, to)| Also { index: dialog.index, from, to });
+        let members: Vec<&Also> = first.iter().chain(dialog.more.iter()).collect();
+        let jobs: Vec<(&Also, Option<Job>)> = members
+            .iter()
+            .map(|also| (*also, Job::new(&self.machine, &APPS[also.index], Some(also.to.clone()))))
+            .collect();
+        let found = dialog.problems.as_deref();
+        let ready = found.is_some_and(<[Problem]>::is_empty);
+        let close = Msg::Install(InstallMsg::Close);
+        let width = match found {
+            Some(found) if !found.is_empty() => width_for(found.iter().flat_map(problem_commands)),
+            _ => {
+                let lines: Vec<String> =
+                    jobs.iter().filter_map(|(_, job)| job.as_ref().map(Job::command_line)).collect();
+                width_for(lines.iter().map(String::as_str))
+            }
+        };
+        let room = shown_width(ui, width);
+        let mut modal = Modal::new()
+            .title(t!("confirm.update-all-title", n = members.len()))
+            .width(width)
+            .on_close(close.clone())
+            .action(Button::new(t!("confirm.cancel")).on_press(close));
+        modal = if found.is_some_and(|found| !found.is_empty()) {
+            modal.action(Button::new(t!("checks.again")).on_press(Msg::Install(InstallMsg::Recheck)))
+        } else {
+            // Disabled while the checks run: they take a moment, and nothing starts unchecked.
+            let update = Button::new(t!("confirm.update")).variant("primary").disabled(!ready);
+            modal.action(update.on_press(Msg::Install(InstallMsg::Confirm)))
+        };
+        ui.add_with(modal, |ui| {
+            ui.column(|ui| {
+                let fields = [
+                    (t!("confirm.source"), t!("confirm.crates-io-all")),
+                    (t!("confirm.target"), self.machine.show(&self.machine.cargo_bin())),
+                ];
+                let width = fields.iter().map(|(label, _)| qframe::text::width(label)).max().unwrap_or(0);
+                ui.column(|ui| {
+                    for (label, value) in &fields {
+                        field(ui, label, width, value);
+                    }
+                })
+                .fill_width();
+                match found {
+                    Some(found) if !found.is_empty() => problems(found, true, room, ui),
+                    _ => {
+                        for (also, job) in &jobs {
+                            let member = &APPS[also.index];
+                            let label = t!(
+                                "confirm.update-line",
+                                command = member.command,
+                                from = also.from.as_str(),
+                                to = also.to.as_str()
+                            );
+                            match job {
+                                Some(job) => {
+                                    copyable(ui, label, job.command_line(), &format!("command-{}", member.key), room);
+                                }
+                                None => {
+                                    ui.add(Text::new(label).role("faint")).fill_width();
+                                }
+                            }
                         }
                         ui.column(|ui| {
                             ui.add(Text::new(t!("confirm.built-here")).role("secondary")).fill_width();
@@ -262,19 +351,23 @@ fn run_here(ui: &mut View<'_, Msg>, problem: &Problem, note: String) {
     ui.add(Text::new(note).role("secondary")).fill_width();
 }
 
-/// A quiet label, padded to `width` columns, and its value on one line.
-fn field(ui: &mut View<'_, Msg>, label: &str, width: u16, value: &str) {
-    let pad = " ".repeat(usize::from(width.saturating_sub(qframe::text::width(label))) + 2);
-    ui.add(Text::rich([Span::new(format!("{label}{pad}")).role("faint"), Span::new(value)])).fill_width();
+/// A quiet label in a column `width` cells wide and its value beside it, or under it when the
+/// screen is too narrow for both.
+pub(super) fn field(ui: &mut View<'_, Msg>, label: &str, width: u16, value: &str) {
+    ui.add(Field::new(label).label_width(width).value(value)).fill_width();
 }
 
 /// A label with a copyable value under it, on a surface `room` columns wide. A value too long
 /// for one line there is shown whole above it as well, wrapped, since the copyable value keeps
 /// to one line and cuts what does not fit; a command is agreed to by reading all of it.
+/// `CopyValue::labelled` does the same but keeps its label to one line, and the label here can
+/// name an app and two versions, all part of what is agreed to.
 fn copyable(ui: &mut View<'_, Msg>, label: String, value: String, id: &str, room: u16) {
     let fits = qframe::text::width(&value).saturating_add(AROUND_VALUE) <= room;
     ui.column(|ui| {
-        ui.add(Text::new(label).role("faint").no_wrap());
+        // A label that does not fit wraps rather than losing its end: the member and its
+        // versions are part of what is agreed to.
+        ui.add(Text::new(label).role("faint")).fill_width();
         if !fits {
             ui.add(Text::new(value.clone())).fill_width().selectable(true);
         }

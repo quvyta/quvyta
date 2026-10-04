@@ -91,16 +91,22 @@ pub fn decide(env: &Environment<'_>, read: impl Fn(&Path) -> Option<String>) -> 
     }
     // The line names the folder through $HOME when it can, so the start-up file still reads well
     // and keeps working if the home folder moves.
-    let shown_dir = match bin_dir.strip_prefix(env.home) {
-        Ok(rest) => format!("$HOME/{}", rest.display()),
-        Err(_) => bin_dir.display().to_string(),
+    let (home, rest) = match bin_dir.strip_prefix(env.home) {
+        Ok(rest) => ("$HOME/", rest.display().to_string()),
+        Err(_) => ("", bin_dir.display().to_string()),
     };
-    let export = format!("export PATH=\"{shown_dir}:$PATH\"");
+    let export = format!("export PATH=\"{home}{}:$PATH\"", escaped(&rest, "\\\"$`"));
+    // fish's own line goes unquoted, as everyone writes it, unless the folder needs quotes.
+    let fish = if rest.chars().all(plain) {
+        format!("fish_add_path {home}{rest}")
+    } else {
+        format!("fish_add_path \"{home}{}\"", escaped(&rest, "\\\"$"))
+    };
     let config = || set(env.xdg_config_home).map_or_else(|| env.home.join(".config"), Path::to_path_buf);
     let (shell, file, line) = match env.shell.map(Path::new).and_then(Path::file_name).and_then(|name| name.to_str()) {
         Some("bash") => (Shell::Bash, env.home.join(".bashrc"), export),
         Some("zsh") => (Shell::Zsh, set(env.zdotdir).unwrap_or(env.home).join(".zshrc"), export),
-        Some("fish") => (Shell::Fish, config().join("fish/config.fish"), format!("fish_add_path {shown_dir}")),
+        Some("fish") => (Shell::Fish, config().join("fish/config.fish"), fish),
         _ => return PathAction::Unknown { line: export },
     };
     // rustup's own lines source cargo's default folder, so they only count when that is the one.
@@ -117,6 +123,24 @@ pub fn decide(env: &Environment<'_>, read: impl Fn(&Path) -> Option<String>) -> 
         }
     }
     PathAction::Add { shell, file, line }
+}
+
+/// `text` with a backslash before each of `special`: what keeps a meaning of its own inside double
+/// quotes. A folder named with a quote or a `$` would otherwise break the start-up file.
+fn escaped(text: &str, special: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if special.contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Whether `c` means only itself to fish outside quotes.
+fn plain(c: char) -> bool {
+    c.is_ascii_alphanumeric() || "/._+,:@%=-".contains(c)
 }
 
 /// Reads a start-up file for [`decide`]: its content when it is a regular file or a link to one.

@@ -11,7 +11,6 @@ use qframe::icons::GlyphMode;
 use qframe::prelude::*;
 use qframe::widgets::{AppearanceChange, SetupMsg};
 
-use super::WizardMsg;
 use crate::app::install_tests::{DIALOG_IN, calls, click_beside, has, settle};
 use crate::app::tests::{LANGUAGES, env, index};
 use crate::app::{Msg, Quvyta, Tab};
@@ -56,16 +55,39 @@ fn folder(root: &Path) -> Vec<String> {
     names
 }
 
-/// Goes to quvyta's own step of the wizard.
-fn to_apps_step(h: &mut Harness<Quvyta>) {
-    h.send(Msg::Setup(SetupMsg::Next));
+/// The words of the framework's `key` in the language the harness speaks now.
+fn said(h: &Harness<Quvyta>, key: &str) -> String {
+    h.env().i18n().translate(key, &[])
 }
 
-/// Finishes the wizard and lets the writing and the dialogs that follow happen.
+/// Goes to quvyta's own step of the wizard, by clicking its Next button.
+fn to_apps_step(h: &mut Harness<Quvyta>) {
+    let next = said(h, "quvyta.wizard.next");
+    h.click_text(&next);
+}
+
+/// Finishes the wizard by clicking its Finish button, and lets the writing and the dialogs that
+/// follow happen.
 fn finish(h: &mut Harness<Quvyta>) {
-    h.send(Msg::Setup(SetupMsg::Finish));
+    let finish = said(h, "quvyta.wizard.finish");
+    h.click_text(&finish);
     h.render();
     h.advance(DIALOG_IN);
+}
+
+/// Clicks the checkbox of the member whose command is `command`: its label, on the row that
+/// holds nothing else, so a mention of the command in another line is never what is clicked.
+fn click_member(h: &mut Harness<Quvyta>, command: &str) {
+    let screen = h.screen();
+    let (y, x) = screen
+        .lines()
+        .enumerate()
+        .find_map(|(y, line)| {
+            let at = line.find(command)?;
+            (line.trim() == command).then(|| (y, line[..at].chars().count()))
+        })
+        .unwrap_or_else(|| panic!("the checkbox of `{command}` is not on screen:\n{screen}"));
+    h.click(i32::try_from(x).expect("x"), i32::try_from(y).expect("y"));
 }
 
 #[test]
@@ -85,6 +107,10 @@ fn someone_who_has_used_quvyta_before_is_not_asked() {
     let root = tempfile::tempdir().expect("temp");
     fs::create_dir_all(root.path().join("config")).expect("folder");
     fs::write(root.path().join("config/launcher.conf"), "after_close = \"shell\"\n").expect("settings");
+    // And they have run this version already, so its page of what changed is not in the way.
+    fs::create_dir_all(root.path().join("data")).expect("folder");
+    fs::write(root.path().join("data/seen.toml"), format!("version = \"{}\"\n", env!("CARGO_PKG_VERSION")))
+        .expect("seen");
     let h = start(root.path(), "ID=debian\n", 80, 30);
     assert!(!h.app().setting_up(), "{}", h.screen());
     assert!(h.screen().contains("qcode"), "the app list is there at once:\n{}", h.screen());
@@ -95,9 +121,12 @@ fn closing_it_half_way_writes_nothing_at_all() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     assert_eq!(folder(root.path()), Vec::<String>::new(), "nothing is written before it is asked");
+    // The framework's own step is the framework's to test; a theme chosen there only has to be
+    // something that could have been written.
     h.send(Msg::Setup(SetupMsg::Appearance(AppearanceChange::Theme("nordic".to_owned()))));
     to_apps_step(&mut h);
-    h.send(Msg::Wizard(WizardMsg::Pick(index("code"), true)));
+    click_member(&mut h, "qcode");
+    assert!(h.app().picked[index("code")], "qcode is checked:\n{}", h.screen());
     assert_eq!(folder(root.path()), Vec::<String>::new(), "half-way through, the folder is as it was");
     // Next start: the wizard is there again, with nothing remembered.
     let again = start(root.path(), "ID=debian\n", 80, 30);
@@ -106,7 +135,7 @@ fn closing_it_half_way_writes_nothing_at_all() {
 }
 
 #[test]
-fn starting_with_the_defaults_writes_both_files_and_never_asks_again() {
+fn starting_with_the_defaults_writes_both_files_but_no_default_and_never_asks_again() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     h.click_text("Start with the defaults");
@@ -115,7 +144,8 @@ fn starting_with_the_defaults_writes_both_files_and_never_asks_again() {
     assert!(!h.app().setting_up(), "{}", h.screen());
     assert_eq!(folder(root.path()), ["launcher.conf", "quvyta.conf"]);
     let text = fs::read_to_string(root.path().join("config/launcher.conf")).expect("written");
-    assert!(text.contains("after_close = \"return\""), "{text}");
+    // A default that is written down would outlive a better default in a later version.
+    assert!(!text.contains("after_close"), "the default of what follows a member is not written:\n{text}");
     assert!(!text.contains("check_updates"), "the update notice is the shared one, not quvyta's:\n{text}");
     assert!(h.screen().contains("qcode"), "the app list has the screen:\n{}", h.screen());
     assert!(h.app().installs.dialog.is_none(), "nothing was asked to be installed");
@@ -153,9 +183,9 @@ fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
         assert!(screen.contains(command), "`{command}` is still listed:\n{screen}");
     }
     assert!(screen.contains("Arch Linux only"), "{screen}");
-    for key in ["tools", "packages"] {
+    for (key, command) in [("tools", "qtools"), ("packages", "qpac")] {
         assert!(!h.app().choosable(index(key)), "{key} cannot be chosen on Debian");
-        h.send(Msg::Wizard(WizardMsg::Pick(index(key), true)));
+        click_member(&mut h, command);
         assert!(!h.app().picked[index(key)], "{key} stays unchecked");
     }
 
@@ -163,8 +193,25 @@ fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
     let mut h = start(arch.path(), "ID=arch\n", 80, 30);
     to_apps_step(&mut h);
     assert!(!h.screen().contains("Arch Linux only"), "on Arch there is nothing to say:\n{}", h.screen());
-    h.send(Msg::Wizard(WizardMsg::Pick(index("tools"), true)));
+    click_member(&mut h, "qtools");
     assert!(h.app().picked[index("tools")], "on Arch qtools can be chosen");
+}
+
+#[test]
+fn clicking_the_faded_qtools_on_debian_changes_nothing_and_queues_nothing() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = wizard(root.path());
+    packages(root.path());
+    to_apps_step(&mut h);
+    let before = h.screen();
+    click_member(&mut h, "qtools");
+    assert!(!h.app().picked[index("tools")], "{}", h.screen());
+    assert_eq!(h.screen(), before, "not even the box looks different");
+    finish(&mut h);
+    assert!(!h.app().setting_up(), "{}", h.screen());
+    assert!(h.app().installs.dialog.is_none() && h.app().installs.queue.is_empty(), "nothing was asked for");
+    assert!(h.app().installs.running.is_none(), "nothing runs");
+    assert!(calls(root.path()).iter().all(|call| !call.starts_with("install --locked")), "nothing was installed");
 }
 
 #[test]
@@ -199,8 +246,8 @@ fn finishing_with_two_members_checked_asks_for_each_in_turn_and_queues_them() {
     packages(root.path());
     scenario(root.path(), "  Installing /x/.cargo/bin/qcode\n", 0);
     to_apps_step(&mut h);
-    h.send(Msg::Wizard(WizardMsg::Pick(index("code"), true)));
-    h.send(Msg::Wizard(WizardMsg::Pick(index("framework"), true)));
+    click_member(&mut h, "qcode");
+    click_member(&mut h, "qframe");
     finish(&mut h);
     assert!(!h.app().setting_up(), "the wizard is over:\n{}", h.screen());
     assert_eq!(folder(root.path()), ["launcher.conf", "quvyta.conf"]);
@@ -238,6 +285,8 @@ fn finishing_with_nothing_checked_lands_on_the_app_list() {
 fn the_appearance_chosen_in_the_wizard_is_what_the_application_draws() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
+    // How the framework's own step lets a language be chosen is the framework's to test; what is
+    // tested here is that quvyta carries on with the one chosen.
     h.send(Msg::Setup(SetupMsg::Appearance(AppearanceChange::Language("tr".to_owned()))));
     assert!(h.screen().contains("Uygulamalar"), "the wizard turns Turkish at once:\n{}", h.screen());
     to_apps_step(&mut h);

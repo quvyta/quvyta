@@ -27,6 +27,14 @@ fn test_machine(name: &str) -> Option<String> {
     (name == "COLORTERM").then(|| "truecolor".to_owned())
 }
 
+/// A temporary folder for one test's machine, always `/tmp/` and ten more characters, whatever
+/// `TMPDIR` names. The screens show a path outside the home folder in full, the cargo of a
+/// test root among them, so under a longer `TMPDIR` a command would wrap where these tests
+/// look for it on one line, and whether they pass would depend on the machine running them.
+pub(crate) fn temp_root() -> TempDir {
+    tempfile::Builder::new().prefix(".tmp").tempdir_in("/tmp").expect("temp")
+}
+
 /// What cargo answers on the machine of [`machine`].
 pub(super) const LIST: &str = "\
 quvyta-code v0.1.1:
@@ -60,19 +68,35 @@ pub(super) fn machine_off_path(root: &Path) -> Machine {
 /// The application on that machine, with what is installed already read. The folder lives as
 /// long as the returned guard.
 pub(super) fn harness(width: u16, height: u16) -> (TempDir, Harness<Quvyta>) {
-    let root = tempfile::tempdir().expect("temp");
+    let root = temp_root();
     let h = start(root.path(), width, height);
     (root, h)
 }
 
 /// Makes `root` a machine quvyta has been set up on: an empty `launcher.conf` is enough, since
-/// the first-run wizard opens only while quvyta has no file of its own. Without this every test
-/// of the app list would see the wizard, which is [`super::wizard::tests`]' own subject.
+/// the first-run wizard opens only while quvyta has no file of its own. The running version is
+/// kept as seen, so the page of what changed stays closed. The distribution is named
+/// too, as Arch Linux, where every member runs and none of them is held back; a root that names
+/// its own distribution before the machine is built keeps it, which is how
+/// [`super::platform_tests`] stands on another system. Without this every test of the app list
+/// would see the wizard, which is [`super::wizard::tests`]' own subject.
 pub(super) fn set_up(root: &Path) {
     let conf = root.join("config/launcher.conf");
     if !conf.exists() {
         std::fs::create_dir_all(root.join("config")).expect("folder");
         std::fs::write(&conf, "").expect("settings");
+    }
+    // This version was run here before, so its page of what changed has been seen; the page is
+    // [`super::whats_new_tests`]' own subject.
+    let seen = root.join("data/seen.toml");
+    if !seen.exists() {
+        std::fs::create_dir_all(root.join("data")).expect("folder");
+        std::fs::write(&seen, format!("version = \"{}\"\n", env!("CARGO_PKG_VERSION"))).expect("seen");
+    }
+    let os_release = root.join("etc/os-release");
+    if !os_release.exists() {
+        std::fs::create_dir_all(root.join("etc")).expect("folder");
+        std::fs::write(&os_release, "ID=arch\n").expect("os-release");
     }
 }
 
@@ -94,7 +118,7 @@ pub(super) fn harness_with_settings(settings: &str) -> (TempDir, Harness<Quvyta>
 /// [`harness_with_settings`] on a screen of `width` by `height`, for the whole Settings tab,
 /// which is longer than a screen of the usual height.
 pub(super) fn harness_with_settings_at(settings: &str, width: u16, height: u16) -> (TempDir, Harness<Quvyta>) {
-    let root = tempfile::tempdir().expect("temp");
+    let root = temp_root();
     std::fs::create_dir_all(root.path().join("config")).expect("folder");
     std::fs::write(root.path().join("config/launcher.conf"), settings).expect("settings");
     let h = start(root.path(), width, height);
@@ -121,12 +145,27 @@ pub(in crate::app) const LANGUAGES: [&str; 9] = ["en", "tr", "de", "es", "fr", "
 /// that is cut on a narrow screen and a script that is measured wrongly.
 pub(in crate::app) const LONGEST_LANGUAGES: [&str; 4] = ["en", "de", "ru", "ja"];
 
+/// The keys written in English and Turkish that the other seven languages do not have yet. Until
+/// they do, those languages show these few lines in English. This list is only ever emptied.
+/// (The apps' titles are names, the same in every language, so they are never waiting.)
+const AWAITING_TRANSLATION: &[&str] = &[];
+
 #[test]
 fn the_language_files_load_without_problems_and_every_language_is_complete() {
     let env = env();
     assert_eq!(env.diagnostics(), &[]);
     for locale in LANGUAGES {
-        assert_eq!(env.i18n().missing_keys(locale, "en"), Vec::<String>::new(), "keys missing in `{locale}`");
+        let missing = env.i18n().missing_keys(locale, "en");
+        // Only the words still waiting for their translation may be missing, and never in
+        // Turkish, which is written with the English.
+        let pending = if locale == "tr" { &[][..] } else { AWAITING_TRANSLATION };
+        let unexpected: Vec<&String> = missing.iter().filter(|key| !pending.contains(&key.as_str())).collect();
+        assert_eq!(unexpected, Vec::<&String>::new(), "keys missing in `{locale}`");
+    }
+    // The list empties as the translations arrive: a key every language has is no longer waiting.
+    for key in AWAITING_TRANSLATION {
+        let waiting = LANGUAGES.iter().any(|locale| env.i18n().missing_keys(locale, "en").iter().any(|k| k == key));
+        assert!(waiting, "`{key}` is translated everywhere now: take it out of AWAITING_TRANSLATION");
     }
     let known: Vec<String> = env.i18n().list().into_iter().map(|(code, _)| code).collect();
     for locale in LANGUAGES {
@@ -228,6 +267,7 @@ fn every_program_installs_under_its_package_name() {
         assert!(member.repository.starts_with("https://github.com/quvyta/"), "{}", member.repository);
         let expected = match member.key {
             "framework" => Status::Released,
+            "cli" => Status::Alpha,
             _ => Status::Beta,
         };
         assert_eq!(member.status(), expected, "{}", member.package);
@@ -376,7 +416,11 @@ fn narrow_ascii_screens_keep_the_rules() {
 /// `target/quvyta-review.html` in colour for a visual review; a narrow screen shows its list and
 /// then every member's page. The notices after a member closes, for a broken settings file and
 /// about PATH follow, then the Settings tab.
+///
+/// It is ignored rather than left to return early: a review only ever writes a file for a person
+/// looking at it, so a run of the gate must read it as skipped and not as passed.
 #[test]
+#[ignore = "visual review: QUVYTA_REVIEW=1 cargo test visual_review -- --ignored"]
 fn visual_review() {
     if std::env::var_os("QUVYTA_REVIEW").is_none() {
         return;
@@ -411,6 +455,7 @@ fn visual_review() {
     fragments.extend(super::path_notice::tests::review());
     fragments.extend(super::wizard::tests::review());
     fragments.extend(super::settings::tests::review());
+    fragments.extend(super::settings::font_tests::review());
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/target/quvyta-review.html");
     std::fs::write(path, qframe::runtime::html_page(&fragments)).expect("review page written");
 }
@@ -463,6 +508,8 @@ fn quvyta_itself_and_missing_members_have_nothing_to_open() {
     h.send(Msg::Select(index("quvyta")));
     assert!(!h.screen().contains("Open") && !h.screen().contains("Install"), "{}", h.screen());
     assert!(!h.screen().contains("enter"), "the footer offers nothing for enter:\n{}", h.screen());
+    // Neither of the two has an Open button to click, so these two messages stand in for the
+    // clicks nobody can make: the key that runs them is offered to nobody, and neither opens.
     h.press("enter").send(Msg::Open(index("quvyta")));
     assert!(h.handoffs().is_empty());
     h.send(Msg::Select(index("tools")));
@@ -555,6 +602,7 @@ fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
         say(match member.status() {
             Status::Released => "status.released",
             Status::Beta => "status.beta",
+            Status::Alpha => "status.alpha",
             Status::Soon => "status.soon",
         }),
     ];

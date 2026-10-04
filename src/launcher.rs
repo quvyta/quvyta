@@ -93,15 +93,6 @@ impl Launcher {
         write(path, PATH_PROMPT, "dismissed".to_owned())
     }
 
-    /// Puts quvyta's own defaults into `settings`, for the first start: the setup wizard has just
-    /// made `launcher.conf` with the shared keys, and these are the keys that are
-    /// quvyta's own. `path_prompt` is left out: not having answered is its default, and the offer
-    /// is still to be made.
-    pub(crate) fn write_defaults(settings: &mut Settings) {
-        let defaults = Self::default();
-        settings.set(AFTER_CLOSE, after_close_value(defaults.after_close).to_owned());
-    }
-
     /// Writes `after_close` to `path`, keeping every other setting as the file has it now.
     ///
     /// # Errors

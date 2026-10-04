@@ -61,6 +61,12 @@ fresh() {
 echo "cargo $*" >>"$HOME/.stub.log"
 case $1 in
     --version) echo "cargo ${FAKE_CARGO_VERSION:-1.95.0} (stub)" ;;
+    # crates.io's answer for the member that has only pre-releases; FAKE_SEARCH_FAILS=1 is a
+    # machine that cannot reach it.
+    search)
+        [ "${FAKE_SEARCH_FAILS:-}" = 1 ] && exit 101
+        [ "$2" = quvyta-cli ] && echo 'quvyta-cli = "0.1.0-alpha.2"    # A small coding agent in the terminal (alpha)'
+        ;;
     install)
         crate=$3
         case $crate in
@@ -69,6 +75,9 @@ case $1 in
             quvyta-focus) bin=qfocus ;;
             quvyta-packages) bin=qpac ;;
             quvyta-tools) bin=qtools ;;
+            quvyta-explorer) bin=qexp ;;
+            quvyta-browser) bin=qbrow ;;
+            quvyta-cli) bin=qcli ;;
             *) bin=$crate ;;
         esac
         mkdir -p "${CARGO_HOME:-$HOME/.cargo}/bin"
@@ -242,12 +251,44 @@ expect_count "$log" "cargo install --locked quvyta-code" 1
 fresh all
 run -y all
 expect_status 0
-for crate in quvyta-framework-showcase quvyta-code quvyta-focus quvyta-packages quvyta-tools quvyta quvyta-desktop; do
+for crate in quvyta-framework-showcase quvyta-code quvyta-focus quvyta-packages quvyta-tools quvyta-explorer \
+    quvyta-browser quvyta quvyta-desktop; do
     expect_logged "cargo install --locked $crate"
 done
-for command in qframe qcode qfocus qpac qtools quvyta qdesk; do
+expect_logged "cargo install --locked quvyta-cli --version 0.1.0-alpha.2"
+for command in qframe qcode qfocus qpac qtools qexp qbrow qcli quvyta qdesk; do
     expect_output "  $command "
 done
+
+# --- A member that has only pre-releases
+
+fresh alpha
+run --yes cli
+expect_status 0
+expect_logged "cargo search quvyta-cli --limit 1"
+expect_logged "cargo install --locked quvyta-cli --version 0.1.0-alpha.2"
+expect_count "$log" "cargo install --locked quvyta-cli --version 0.1.0-alpha.2" 1
+
+# Without crates.io cargo is still asked, and says itself what it could not find.
+fresh alpha-without-crates-io
+extra_env="FAKE_SEARCH_FAILS=1"
+run --yes cli
+expect_logged "cargo install --locked quvyta-cli"
+expect_not_logged "--version 0"
+
+fresh alpha-without-a-terminal
+run cli
+expect_status 1
+expect_output "  cargo install --locked quvyta-cli --version 0.1.0-alpha.2"
+expect_not_logged "cargo install"
+expect_home_untouched
+
+fresh released-members-need-no-lookup
+run --yes explorer browser
+expect_status 0
+expect_logged "cargo install --locked quvyta-explorer"
+expect_logged "cargo install --locked quvyta-browser"
+expect_not_logged "cargo search"
 
 # --- A member that is not released yet, in the copy where qdesk is one
 script=$soon_script
@@ -451,12 +492,18 @@ same_content() {
     [ "$(cat "$1"; echo .)" = "$(value "$2"; echo .)" ]
 }
 
-# Runs install.sh with only the variables the case sets. case_env holds VAR=value words and is
-# split on purpose.
+# Runs install.sh with only the variables the case sets. case_env holds one VAR=value per line
+# and is split on lines only, so a value may hold spaces.
 # shellcheck disable=SC2086
 run_path_case() {
+    saved_ifs=$IFS
+    IFS='
+'
+    set -f
     env -i HOME="$home" PATH="$path" $case_env "$shell_path" "$script" --yes code >"$home/.out" 2>&1 </dev/null
     status=$?
+    set +f
+    IFS=$saved_ifs
 }
 
 # bash fills in SHELL from the password file when it is not set, so under bash install.sh never
@@ -480,7 +527,8 @@ while [ "$case_number" -le "$case_count" ]; do
     case_env=
     for variable in SHELL=shell CARGO_HOME=cargo_home XDG_CONFIG_HOME=xdg_config_home ZDOTDIR=zdotdir; do
         if value "${variable#*=}" >/dev/null; then
-            case_env="$case_env ${variable%%=*}=$(value "${variable#*=}")"
+            case_env="$case_env
+${variable%%=*}=$(value "${variable#*=}")"
         fi
     done
     cargo_home=$(value cargo_home) && [ -n "$cargo_home" ] || cargo_home="$home/.cargo"
@@ -738,13 +786,13 @@ y
     script=$released_script
 
     fresh tty-bad-then-good
-    run_tty "9
+    run_tty "12
 code
 y
 y
 "
     expect_status 0
-    expect_output "Unknown choice: 9"
+    expect_output "Unknown choice: 12"
     expect_logged "cargo install --locked quvyta-code"
 
     fresh tty-empty-choice

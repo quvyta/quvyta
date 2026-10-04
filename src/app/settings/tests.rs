@@ -8,8 +8,7 @@ use qframe::runtime::{HandoffOutcome, Harness};
 use qframe::storage::{Family, Source};
 
 use super::super::tests::{
-    LANGUAGES, TOAST_IN, env, harness, harness_with_settings, harness_with_settings_at, line_with, machine,
-    machine_off_path,
+    LANGUAGES, TOAST_IN, env, harness, harness_with_settings_at, line_with, machine, machine_off_path,
 };
 use super::*;
 use crate::app::{PathMsg, Tab};
@@ -113,14 +112,17 @@ fn clearing_the_box_keeps_the_choice_to_quvyta_and_leaves_the_shared_file_alone(
     h.click_text("Theme");
     h.press("down").press("space").render();
     assert_eq!(h.app().preferences().theme().source, Source::App, "only here now");
-    h.send(Msg::Setting(SettingMsg::Appearance(AppearanceChange::Theme("iris".to_owned()))));
+    // A theme chosen the way a person chooses it: the row's own list, then the name in it.
+    h.click_text("Monochrome").advance(TOAST_IN);
+    h.click_text("Iris").render();
     assert_eq!(h.env().theme().id(), "iris");
     let own = launcher_conf(root.path());
     assert!(own.contains("theme = \"iris\"") && own.contains("after_close = \"shell\""), "{own}");
     assert!(quvyta_conf(root.path()).contains("theme = \"monochrome\""), "the shared file keeps its theme");
 
-    // Checking it again hands the value to the shared file and quvyta follows it once more.
-    h.send(Msg::Setting(SettingMsg::Appearance(AppearanceChange::Everywhere(qframe::storage::Shared::Theme, true))));
+    // Checking the box again hands the value to the shared file and quvyta follows it once more.
+    h.click_text("Theme");
+    h.press("down").press("space").render();
     assert!(quvyta_conf(root.path()).contains("theme = \"iris\""), "{}", quvyta_conf(root.path()));
     assert!(launcher_conf(root.path()).contains("theme = \"quvyta\""), "{}", launcher_conf(root.path()));
 }
@@ -364,7 +366,7 @@ fn turkish_reads_naturally() {
 fn narrow_screens_cut_nothing_and_put_the_path_under_the_title() {
     for locale in ["en", "tr"] {
         for width in [48, 60, 99] {
-            let root = tempfile::tempdir().expect("temp");
+            let root = crate::app::tests::temp_root();
             let mut machine = machine_off_path(root.path());
             machine.shell = Some("/bin/bash".to_owned());
             let mut h = settings_on(machine, width, 60);
@@ -428,6 +430,10 @@ pub(in crate::app) fn review() -> Vec<String> {
         println!("{name}\n{}", h.screen());
         fragments.push(h.html(&name));
     };
+    // A short screen puts quvyta's own rows below the fold and the page has no key that
+    // scrolls it, so the two shots that need one of them are taken on a screen tall enough to
+    // show it; the short and narrow ones are swept above, where they belong.
+    let whole_page = (100, 40);
     for locale in ["en", "tr"] {
         for (width, height) in [(100, 22), (48, 26), (72, 14)] {
             let (_root, mut h) = harness(width, height);
@@ -443,7 +449,7 @@ pub(in crate::app) fn review() -> Vec<String> {
             h.send(Msg::Setting(SettingMsg::AddToPath)).render();
             shot(&h, format!("settings PATH notice {locale} {width}x{height}"));
         }
-        let (_root, mut h) = harness(100, 22);
+        let (_root, mut h) = harness(whole_page.0, whole_page.1);
         h.set_locale(locale).send(Msg::Tab(Tab::Settings));
         h.click_text(if locale == "en" { "back to quvyta" } else { "quvyta'ya dön" }).advance(TOAST_IN);
         shot(&h, format!("settings select open {locale}"));
@@ -477,7 +483,7 @@ pub(in crate::app) fn review() -> Vec<String> {
             shot(&h, format!("settings following {locale} {width}x{height}"));
         }
 
-        let (root, mut h) = harness_with_settings("after_close = \"return\"\n");
+        let (root, mut h) = harness_with_settings_at("after_close = \"return\"\n", whole_page.0, whole_page.1);
         let config = root.path().join("config");
         fs::set_permissions(&config, fs::Permissions::from_mode(0o555)).expect("read-only");
         h.set_locale(locale).send(Msg::Tab(Tab::Settings));
@@ -834,4 +840,53 @@ fn a_member_file_that_cannot_be_written_says_so_and_stays_as_it_was() {
 /// The line of the narrow follow section offering the choices of its only member with any.
 fn following_choices(screen: &str) -> String {
     line_with(&screen[at(screen, "Do the applications follow")..], "Back to shared:").to_owned()
+}
+
+/// Where `text` stands on `screen`, from line `from` on, as the cell its first letter is drawn in.
+fn cell_of(screen: &str, from: usize, text: &str) -> (u16, u16) {
+    let (y, line) = screen
+        .lines()
+        .enumerate()
+        .skip(from)
+        .find(|(_, line)| line.contains(text))
+        .unwrap_or_else(|| panic!("`{text}` is missing:\n{screen}"));
+    let x = qframe::text::width(&line[..line.find(text).expect("in the line")]);
+    (x, u16::try_from(y).expect("y"))
+}
+
+#[test]
+fn the_follow_table_and_quvyta_s_own_settings_are_headed_as_the_framework_heads_the_appearance() {
+    let root = tempfile::tempdir().expect("temp");
+    let h = settings_on(member_files(root.path(), &[("code", QCODE)]), 100, 60);
+    let screen = h.screen();
+    let style = |(x, y): (u16, u16)| (h.fg(x, y), h.is_bold(x, y));
+    let heading = style(cell_of(&screen, 1, "Appearance"));
+    let follow = cell_of(&screen, 1, "Do the applications follow");
+    assert_eq!(style(follow), heading, "the follow table's title:\n{screen}");
+    // quvyta's own section comes after the follow table; its title is the name alone.
+    let own = cell_of(&screen, usize::from(follow.1) + 1, "quvyta");
+    assert_eq!(style(own), heading, "quvyta's own section's title:\n{screen}");
+}
+
+#[test]
+fn what_an_app_shares_reads_in_the_selected_row_s_own_colour() {
+    let root = tempfile::tempdir().expect("temp");
+    let mut h = settings_on(member_files(root.path(), &[("code", QCODE)]), 100, 60);
+    for _ in 0..6 {
+        if h.is_focused("following-table") {
+            break;
+        }
+        h.press("tab");
+    }
+    assert!(h.is_focused("following-table"), "tab reaches the follow table");
+    h.press("down");
+    let screen = h.screen();
+    let row = follow_line(&screen, "qcode");
+    let y = screen.lines().position(|line| line == row).expect("the row is on screen");
+    let y = u16::try_from(y).expect("y");
+    let x = |text: &str| qframe::text::width(&row[..row.find(text).expect("in the row")]);
+    // The member's own theme and what it shares, side by side on the row the keys are on: the
+    // faint word steps back on the other rows, never against the selection.
+    assert_eq!(h.fg(x("shared"), y), h.fg(x("Nordic"), y), "{screen}");
+    assert_ne!(h.fg(x("shared"), y), h.env().theme().color("muted"), "{screen}");
 }

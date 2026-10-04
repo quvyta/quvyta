@@ -11,6 +11,7 @@ tagline = "ていねいに作られたターミナルアプリ"
 [status]
 released = "公開済み"
 beta = "ベータ"
+alpha = "アルファ"
 soon = "近日公開"
 
 [row]
@@ -43,6 +44,7 @@ where = "{version}、{path}"
 unknown = "バージョン不明"
 elsewhere = "cargo 以外で入れたものなので、更新は入れた側の役目です。"
 beta = "ベータです。動きますが、画面もファイルもバージョンごとに変わることがあります。"
+alpha = "アルファ版です。意図的に小さく作った初期版で、設定もファイルもバージョンごとに変わることがあります。"
 soon = "まだ公開されていません。出るまではインストールするものがありません。"
 
 [nav]
@@ -73,6 +75,18 @@ summary = "Arch Linux で手作業になりがちな設定を一つのリスト�
 [apps.packages]
 title = "Quvyta Packages"
 summary = "何かが変わる前に、何がどう変わるかをそのまま見せる Arch Linux 向けのパッケージマネージャーです。この最初の版は pacman のパッケージを扱います。AUR、Flatpak、Snap は認識しますが、まだ管理はしません。"
+
+[apps.explorer]
+title = "Quvyta Explorer"
+summary = "ターミナルで使うファイルエクスプローラー。どの種類のファイルにもそれぞれのアイコンがあり、ファイルはデスクトップと同じプログラムで開き、アーカイブは右クリックで展開できます。新規作成、名前の変更、コピー、貼り付け、ドラッグアンドドロップ、ゴミ箱への削除もそろっています。"
+
+[apps.browser]
+title = "Quvyta Browser"
+summary = "ターミナルの中の本物のウェブブラウザ。無改造の Chromium が見えないところでページを描画し、タブもアドレスバーもボタンもターミナル側にあります。Chromium か Google Chrome が必要で、どちらもないときは Chromium のインストールを提案します。"
+
+[apps.cli]
+title = "Quvyta CLI"
+summary = "ターミナルの中の小さなコーディングエージェント。1つのフォルダを読んで、探して、編集して、実行するモデルとチャットできます。ファイルを変更する前に差分を見せ、コマンドを実行する前にコマンドを見せ、許可するまで何も動きません。"
 
 [apps.desk]
 title = "Quvyta Desktop"
@@ -110,6 +124,9 @@ cancel = "キャンセル"
 install = "インストール"
 update-title = "{command} を {from} から {to} に更新しますか？"
 update = "更新"
+update-all-title = { other = "{n} 個のアプリを更新しますか？" }
+update-line = "{command}：{from} から {to} へ"
+crates-io-all = "crates.io、各アプリのパッケージ"
 
 [checks]
 no-cargo = "Rust のパッケージツール cargo が入っていません。Quvyta アプリはそれでビルドします。"
@@ -221,10 +238,10 @@ usage = "使い方"
 name = "名前"
 list = "Quvyta アプリの一覧を開く"
 install = "これらを入れるか、一つずつ確認する"
-show = "この一員のページで開く"
+show = "このアプリのページで開く"
 help = "このヘルプを表示する"
 version = "バージョンを表示する"
-names = "名前には一員の短い名前（code）、コマンド（qcode）、パッケージ名（quvyta-code）のどれでも使えます。"
+names = "名前にはアプリの短い名前（code）、コマンド（qcode）、パッケージ名（quvyta-code）のどれでも使えます。"
 unknown-option = "{option} という選択肢はありません"
 unknown-name = "{name} という Quvyta アプリはありません"
 unknown-command = "quvyta に {command} という仕事はありません"
@@ -275,7 +292,26 @@ line-code = "コーディングエージェントを Podman や Docker の中で
 line-focus = "何に集中し、時間がどこへ行ったかを記録します。"
 line-tools = "Arch Linux の設定を一覧から、どれも元に戻せます。"
 line-packages = "変わるところを先に見せるパッケージマネージャー。"
+line-explorer = "種類ごとにアイコンがあるファイルエクスプローラー。"
+line-browser = "Chromium が描く、ターミナルの中の本物のウェブブラウザ。"
+line-cli = "変更の前に必ず聞いてくる小さなコーディングエージェント。"
 line-desk = "ターミナルの中のデスクトップ。窓もファイルも。"
 line-framework = "全員が乗っているフレームワークのショーケース。"
 arch-only = "{line}  Arch Linux のみ。"
+unix-only = "{line}  Windows では使えません。"
 soon = "{line}  まだ出ていません。"
+
+[platform]
+arch-only = "Arch Linux のみ"
+unix-only = "Windows では使えません"
+arch-only-toast = "{command} は Arch Linux でのみ動きます"
+unix-only-toast = "{command} は Windows では動きません"
+
+[whats-new]
+title = "{version} の変更点"
+forgotten = "quvyta はこれを読んだことを記録できないため、次回の起動時にもう一度表示します。"
+
+[font]
+checked = "何かをコピーする前に、ダウンロードしたファイルを quvyta に書き込まれたチェックサムと照合します。"
+registered = "新しいフォントを知らせるのはあなたのアカウントだけで、それ以外には何も伝えません。"
+undo = "元に戻すには、そのフォルダーを削除してください。"

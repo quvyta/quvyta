@@ -6,7 +6,7 @@
 
 use qframe::prelude::*;
 
-use super::installs::{Action, InstallMsg};
+use super::installs::{Also, Dialog, InstallMsg};
 use super::{Msg, Quvyta};
 use crate::ecosystem::APPS;
 use crate::updates::{self, Check, Latest};
@@ -18,7 +18,8 @@ pub enum UpdateMsg {
     Check,
     /// What a check found.
     Checked(Check),
-    /// Queues every member that has an update, in the order of the list.
+    /// Asks, in one question, whether to update every member that has an update, in the order
+    /// of the list.
     InstallAll,
 }
 
@@ -88,14 +89,27 @@ impl Quvyta {
                     }
                 }
             }
+            // Every update is asked about first, in one question, the way one member's update is:
+            // where each comes from, the versions, the exact commands, and the checks before the
+            // button can be pressed. Nothing starts before it is agreed to.
             UpdateMsg::InstallAll => {
-                let all: Vec<(usize, Action)> =
-                    self.outdated().map(|index| (index, Action::Install(self.update_to(index)))).collect();
-                if all.is_empty() {
-                    return Command::none();
+                let mut all = self.outdated().filter_map(|index| {
+                    let from = self.state(index)?.cargo_version()?.to_owned();
+                    Some(Also { index, from, to: self.update_to(index)? })
+                });
+                let Some(first) = all.next() else { return Command::none() };
+                let more: Vec<Also> = all.collect();
+                for index in std::iter::once(first.index).chain(more.iter().map(|also| also.index)) {
+                    self.installs.ended.remove(&index);
                 }
-                self.installs.queue.extend(all);
-                return self.start_next();
+                self.installs.dialog = Some(Dialog {
+                    index: first.index,
+                    version: Some(first.to),
+                    from: Some(first.from),
+                    problems: None,
+                    more,
+                });
+                return self.check();
             }
         }
         Command::none()
@@ -108,18 +122,18 @@ impl Quvyta {
         if count > 0 {
             let label = t!("updates.count", n = count);
             let install = t!("updates.install-all");
-            // Side by side when both fit the column, one above the other when not.
-            let width = qframe::text::width(&label) + qframe::text::width(&install) + 2 * BUTTON_PADDING + GAP;
-            let buttons = |ui: &mut View<'_, Msg>| {
+            // Side by side when both fit the column, one above the other when not: the row wraps,
+            // so the two decide it from the buttons the way they are drawn rather than from a
+            // second copy of the width a button takes.
+            ui.row(|ui| {
                 ui.add(Button::new(label.clone()).on_press(Msg::Updates(UpdateMsg::Check))).id("update-count");
                 let all = Msg::Updates(UpdateMsg::InstallAll);
                 ui.add(Button::new(install.clone()).variant("primary").on_press(all)).id("install-updates");
-            };
-            if width <= self.list_area_width() {
-                ui.row(buttons).gap(GAP);
-            } else {
-                ui.column(buttons).gap(1);
-            }
+            })
+            .gap(GAP)
+            .wrap(true)
+            .line_gap(1)
+            .fill_width();
         }
         let note = if self.updates.checking {
             t!("updates.checking")
@@ -139,7 +153,5 @@ impl Quvyta {
     }
 }
 
-/// The columns a button adds to its label.
-const BUTTON_PADDING: u16 = 4;
 /// The columns between the count and the button beside it.
 const GAP: u16 = 2;

@@ -9,7 +9,7 @@ use std::path::Path;
 
 use qframe::icons::GlyphMode;
 
-use super::install_tests::{DIALOG_IN, calls, confirm, has, run, settle};
+use super::install_tests::{DIALOG_IN, calls, click_beside, confirm, has, run, said, settle};
 use super::tests::{LANGUAGES, LIST, TOAST_IN, harness, index, line_with, machine};
 use super::*;
 use crate::ecosystem::tests::unreleased;
@@ -94,13 +94,24 @@ fn nothing_on_the_screen_installs_it() {
     let root = tempfile::tempdir().expect("temp");
     let app = Quvyta::new(machine(root.path()));
     packages(root.path());
+    // crates.io answers as it does for a local build, so the update count and its Install
+    // updates button are on the screen: the controls that would install something, to be tried.
+    search_scenario(root.path(), SEARCH, 0);
     let mut h = run(app, 100, 30);
+    settle(&mut h);
     h.send(Msg::Select(desk())).press("enter").advance(DIALOG_IN);
     assert!(h.app().installs.dialog.is_none(), "enter asks nothing:\n{}", h.screen());
-    h.send(Msg::Install(InstallMsg::Ask(desk()))).advance(DIALOG_IN);
-    assert!(h.app().installs.dialog.is_none(), "neither does a message:\n{}", h.screen());
+    h.press("u").advance(DIALOG_IN);
+    assert!(h.app().installs.dialog.is_none(), "nor does u:\n{}", h.screen());
+    // There is no failure on the screen, so no Retry button to press: this message stands in
+    // for the click nobody can make, and it installs nothing.
     h.send(Msg::Install(InstallMsg::Retry(desk())));
-    h.press("u").send(Msg::Updates(UpdateMsg::InstallAll));
+    let (all, cancel) = (said(&h, "updates.install-all"), said(&h, "confirm.cancel"));
+    h.click_text(&all).advance(DIALOG_IN);
+    let question = h.screen();
+    assert!(question.contains("Update qcode from 0.1.1 to 0.1.2?"), "the button asks about qcode:\n{question}");
+    assert!(!question.contains("qdesk from"), "and names no update of it:\n{question}");
+    h.click_text(&cancel);
     settle(&mut h);
     assert!(!h.app().installs.has(desk()), "nothing queued it");
     assert_eq!(installs(root.path()), 0);
@@ -146,7 +157,9 @@ fn a_local_build_is_installed_elsewhere_opens_and_is_never_updated() {
     for text in ["Update", "Remove", "9.9.9"] {
         assert!(!screen.contains(text), "`{text}` is offered:\n{screen}");
     }
-    h.click_text("Install updates");
+    h.click_text("Install updates").advance(DIALOG_IN);
+    assert!(!h.screen().contains("qdesk from"), "the question does not name qdesk:\n{}", h.screen());
+    click_beside(&mut h, "Cancel", "Update");
     settle(&mut h);
     let updates: Vec<String> =
         calls(root.path()).into_iter().filter(|call| call.starts_with("install --locked")).collect();

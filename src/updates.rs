@@ -7,7 +7,6 @@
 //! promises for every Quvyta application; `r` asks at any time, since that is someone asking. A file that cannot be read is only a cache
 //! gone missing: it is ignored and asked again.
 
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -29,9 +28,10 @@ pub(crate) const FRESH: Duration = Duration::from_secs(24 * 60 * 60);
 const CHECKED: &str = "checked";
 /// The table of the versions, by package.
 const VERSIONS: &str = "versions";
-/// What cargo is asked. Every member's package starts with `quvyta`, and twenty is room for the
-/// Quvyta apps and the crates around them that share the name.
-pub(crate) const SEARCH: [&str; 4] = ["search", "quvyta", "--limit", "20"];
+/// What cargo is asked. Every member's package starts with `quvyta`, and so do the crates
+/// around them, whose number grows with every app; crates.io answers at most a hundred at once,
+/// and a member that fell off a shorter page would never show its update.
+pub(crate) const SEARCH: [&str; 4] = ["search", "quvyta", "--limit", "100"];
 
 /// The newest version of each member's package on crates.io, and when that was asked.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -156,63 +156,11 @@ fn ask(machine: &Machine, now: u64) -> Option<Latest> {
     output.status.success().then(|| Latest::from_search(&String::from_utf8_lossy(&output.stdout), now))
 }
 
-/// Whether `candidate` is a newer version than `installed`. Versions are compared as numbers,
-/// part by part, so `0.1.10` is newer than `0.1.9`; a pre-release such as `0.2.0-beta.1` comes
-/// before its release. Anything that does not read as a version is never newer.
+/// Whether `candidate` is a newer version than `installed`. The order is the framework's, the one
+/// every Quvyta app decides an update by; anything that does not read as a version is never newer,
+/// so a garbled answer never looks like an update.
 pub(crate) fn newer(candidate: &str, installed: &str) -> bool {
-    compare(candidate, installed) == Some(Ordering::Greater)
-}
-
-/// Orders two versions as semantic versioning does; `None` when either is not a version.
-fn compare(a: &str, b: &str) -> Option<Ordering> {
-    let (a_numbers, a_pre) = parts(a)?;
-    let (b_numbers, b_pre) = parts(b)?;
-    let length = a_numbers.len().max(b_numbers.len());
-    let number = |numbers: &[u64], at: usize| numbers.get(at).copied().unwrap_or(0);
-    let by_numbers = (0..length)
-        .map(|at| number(&a_numbers, at).cmp(&number(&b_numbers, at)))
-        .find(|order| order.is_ne())
-        .unwrap_or(Ordering::Equal);
-    Some(by_numbers.then_with(|| match (a_pre, b_pre) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Greater,
-        (Some(_), None) => Ordering::Less,
-        (Some(a), Some(b)) => pre_release(a, b),
-    }))
-}
-
-/// The numbers of a version and its pre-release, without build metadata (`+…`).
-fn parts(version: &str) -> Option<(Vec<u64>, Option<&str>)> {
-    let version = version.split('+').next().unwrap_or(version);
-    let (release, pre) = match version.split_once('-') {
-        Some((release, pre)) => (release, Some(pre)),
-        None => (version, None),
-    };
-    let numbers = release.split('.').map(|part| part.parse().ok()).collect::<Option<Vec<u64>>>()?;
-    Some((numbers, pre))
-}
-
-/// Pre-releases compare part by part: numbers as numbers and before words, words by their
-/// letters, and a shorter one that the longer one starts with comes first.
-fn pre_release(a: &str, b: &str) -> Ordering {
-    let mut a = a.split('.');
-    let mut b = b.split('.');
-    loop {
-        let order = match (a.next(), b.next()) {
-            (None, None) => return Ordering::Equal,
-            (None, Some(_)) => return Ordering::Less,
-            (Some(_), None) => return Ordering::Greater,
-            (Some(a), Some(b)) => match (a.parse::<u64>(), b.parse::<u64>()) {
-                (Ok(a), Ok(b)) => a.cmp(&b),
-                (Ok(_), Err(_)) => Ordering::Less,
-                (Err(_), Ok(_)) => Ordering::Greater,
-                (Err(_), Err(_)) => a.cmp(b),
-            },
-        };
-        if order.is_ne() {
-            return order;
-        }
-    }
+    qframe::version::newer(candidate, installed)
 }
 
 #[cfg(test)]
@@ -233,12 +181,21 @@ pub(crate) mod tests {
         std::fs::read_to_string(root.join("bin/calls.log"))
             .unwrap_or_default()
             .lines()
-            .filter(|line| line.ends_with("\tsearch quvyta --limit 20"))
+            .filter(|line| line.ends_with(&format!("\t{}", SEARCH.join(" "))))
             .count()
     }
 
     const NOW: u64 = 1_790_000_000;
     const HOUR: u64 = 60 * 60;
+
+    #[test]
+    fn the_search_asks_for_the_largest_page_crates_io_gives() {
+        let limit: usize = SEARCH[3].parse().expect("a number");
+        // Every member and a crate or two around each share the name; a page this size keeps
+        // room for the ecosystem to grow to many times its size before one falls off.
+        assert_eq!(limit, 100, "crates.io's largest page");
+        assert!(crate::ecosystem::APPS.len() * 4 <= limit, "room for every member and the crates around them");
+    }
 
     #[test]
     fn only_the_quvyta_apps_packages_are_kept() {
@@ -270,15 +227,16 @@ pub(crate) mod tests {
             ("0.2.0-beta", "0.2.0-alpha.9"),
             ("0.2.0-beta.1", "0.2.0-beta"),
             ("0.2.0-rc.1", "0.2.0-1"),
-            ("0.1.1", "0.1"),
         ] {
             assert!(newer(candidate, installed), "{candidate} is newer than {installed}");
             assert!(!newer(installed, candidate), "{installed} is not newer than {candidate}");
         }
-        for (a, b) in [("0.1.2", "0.1.2"), ("0.1", "0.1.0"), ("0.1.2+build.5", "0.1.2")] {
+        for (a, b) in [("0.1.2", "0.1.2"), ("0.1.2+build.5", "0.1.2")] {
             assert!(!newer(a, b) && !newer(b, a), "{a} and {b} are the same version");
         }
-        for (a, b) in [("0.1.x", "0.1.1"), ("", "0.1.1"), ("0.1.2", "unknown")] {
+        // Three numbers make a version: a shorter one, such as the `0.1` an old cargo could
+        // print, reads as no version at all and never an update.
+        for (a, b) in [("0.1.x", "0.1.1"), ("", "0.1.1"), ("0.1.2", "unknown"), ("0.1.1", "0.1")] {
             assert!(!newer(a, b) && !newer(b, a), "{a:?} or {b:?} is not a version");
         }
     }

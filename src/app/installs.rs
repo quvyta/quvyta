@@ -43,6 +43,9 @@ pub enum InstallMsg {
         problems: Vec<Problem>,
         /// Whether another quvyta window holds the build folder.
         other_window: bool,
+        /// The version crates.io named for a member cargo installs only by its version, when
+        /// the dialog did not know it: the command it shows is then the one that runs.
+        named: Option<String>,
     },
     /// Runs the checks of the open dialog again.
     Recheck,
@@ -149,6 +152,20 @@ pub(super) struct Dialog {
     pub(super) from: Option<String>,
     /// What the checks found; `None` while they run.
     pub(super) problems: Option<Vec<Problem>>,
+    /// The other members updated with this one when Install updates asked for them all, each
+    /// with the version it has and the one it is updated to. Empty for one member's own dialog.
+    pub(super) more: Vec<Also>,
+}
+
+/// One more member a dialog updates, besides its first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Also {
+    /// The member, an index of [`APPS`].
+    pub(super) index: usize,
+    /// The version installed now.
+    pub(super) from: String,
+    /// The version it is updated to.
+    pub(super) to: String,
 }
 
 /// What a job of the queue does to its member.
@@ -271,11 +288,13 @@ impl Installs {
 }
 
 impl Quvyta {
-    /// Whether the member at `index` can be installed from here: it is not there, it is out on
-    /// crates.io, it is not quvyta itself, and it is not already on its way.
+    /// Whether the member at `index` can be installed from here: it is not there, quvyta may offer
+    /// to install it on this machine, it is out on crates.io, it is not quvyta itself, and it is
+    /// not already on its way. What quvyta may offer is [`Member::offered`], so the list, the
+    /// details and the first run cannot disagree about a member.
     pub(super) fn installable(&self, index: usize) -> bool {
         matches!(self.state(index), Some(State::Missing))
-            && APPS.get(index).is_some_and(|member| member.published() && !member.is_self())
+            && APPS.get(index).is_some_and(|member| member.offered(self.arch))
             && !self.installs.has(index)
     }
 
@@ -311,19 +330,23 @@ impl Quvyta {
             InstallMsg::Ask(index) if self.installable(index) => {
                 self.installs.ended.remove(&index);
                 let version = self.latest_version(index);
-                self.installs.dialog = Some(Dialog { index, version, from: None, problems: None });
+                self.installs.dialog = Some(Dialog { index, version, from: None, problems: None, more: Vec::new() });
                 return self.check();
             }
             InstallMsg::Ask(index) if self.updatable(index) => {
                 self.installs.ended.remove(&index);
                 let from = self.state(index).and_then(State::cargo_version).map(ToOwned::to_owned);
-                self.installs.dialog = Some(Dialog { index, version: self.update_to(index), from, problems: None });
+                self.installs.dialog =
+                    Some(Dialog { index, version: self.update_to(index), from, problems: None, more: Vec::new() });
                 return self.check();
             }
             InstallMsg::Ask(_) => {}
-            InstallMsg::Checked { index, problems, other_window } => {
+            InstallMsg::Checked { index, problems, other_window, named } => {
                 if let Some(dialog) = self.installs.dialog.as_mut().filter(|dialog| dialog.index == index) {
                     dialog.problems = Some(problems);
+                    if dialog.version.is_none() {
+                        dialog.version = named;
+                    }
                     // This window's own lock reads as taken too; only a lock it does not hold counts.
                     self.installs.other_window = other_window && self.installs.lock.is_none();
                 }
@@ -338,10 +361,29 @@ impl Quvyta {
             InstallMsg::Confirm => {
                 if let Some(dialog) = self.installs.dialog.take()
                     && dialog.problems.as_ref().is_some_and(Vec::is_empty)
-                    && if dialog.from.is_some() { self.updatable(dialog.index) } else { self.installable(dialog.index) }
                 {
-                    self.installs.queue.push_back((dialog.index, Action::Install(dialog.version)));
-                    return self.start_next();
+                    // Each member as the dialog showed it, and only while that still holds: one
+                    // that was updated or queued meanwhile is not updated twice.
+                    let first = if dialog.from.is_some() {
+                        self.updatable(dialog.index)
+                    } else {
+                        self.installable(dialog.index)
+                    };
+                    let mut agreed = Vec::new();
+                    if first {
+                        agreed.push((dialog.index, Action::Install(dialog.version)));
+                    }
+                    for also in dialog.more {
+                        if self.update_to(also.index).as_deref() == Some(also.to.as_str())
+                            && !self.installs.has(also.index)
+                        {
+                            agreed.push((also.index, Action::Install(Some(also.to))));
+                        }
+                    }
+                    if !agreed.is_empty() {
+                        self.installs.queue.extend(agreed);
+                        return self.start_next();
+                    }
                 }
             }
             InstallMsg::UpdateRust(rustup) => {
@@ -505,14 +547,26 @@ impl Quvyta {
     }
 
     /// Runs the checks of the open dialog in the background.
-    fn check(&self) -> Command<Msg> {
-        let Some(index) = self.installs.dialog.as_ref().map(|dialog| dialog.index) else { return Command::none() };
+    ///
+    /// A member cargo installs only by its version, whose version the dialog does not know yet
+    /// because the updates were never asked, has it asked here: the button waits for the checks
+    /// anyway, and the command on screen is then the whole command that runs.
+    pub(super) fn check(&self) -> Command<Msg> {
+        let Some(dialog) = self.installs.dialog.as_ref() else { return Command::none() };
+        let index = dialog.index;
+        let unnamed = dialog
+            .version
+            .is_none()
+            .then(|| APPS.get(index).and_then(|member| Job::new(&self.machine, member, None)))
+            .flatten()
+            .filter(|job| job.named_only);
         let machine = self.machine.clone();
         let mine = self.installs.lock.is_some();
         Command::perform(move || {
             let problems = checks::run(&machine);
             let other_window = !mine && install::held_elsewhere(&machine);
-            Msg::Install(InstallMsg::Checked { index, problems, other_window })
+            let named = unnamed.and_then(|job| job.newest(&|| false));
+            Msg::Install(InstallMsg::Checked { index, problems, other_window, named })
         })
     }
 
@@ -529,6 +583,9 @@ impl Quvyta {
         let Some(running) = self.installs.running.take_if(|running| running.index == index) else {
             return Command::none();
         };
+        // The stop question was about this install. Left open, it would name the next one, and a
+        // Stop pressed a moment late would end an install nobody was asked about.
+        self.installs.stop = None;
         let Some(member) = APPS.get(index) else { return Command::none() };
         let report = match &outcome {
             Outcome::Installed { version } => {

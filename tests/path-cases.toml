@@ -506,3 +506,50 @@ after = '''
 # cargo programs, added by the Quvyta installer
 export PATH="$HOME/.cargo/bin:$PATH"
 '''
+
+# --- Folders whose names mean something to a shell: quoted, so the start-up file still works
+
+[[case]]
+name = 'bash-cargo-home-with-a-quote-and-a-dollar'
+shell = '/bin/bash'
+cargo_home = '{root}/a"b$c'
+on_path = false
+file = '{home}/.bashrc'
+outcome = 'add'
+line = 'export PATH="{root}/a\"b\$c/bin:$PATH"'
+shown_file = '~/.bashrc'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+export PATH="{root}/a\"b\$c/bin:$PATH"
+'''
+
+[[case]]
+name = 'fish-cargo-home-with-a-space'
+shell = '/usr/bin/fish'
+cargo_home = '{root}/my cargo'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+outcome = 'add'
+line = 'fish_add_path "{root}/my cargo/bin"'
+shown_file = '~/.config/fish/config.fish'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+fish_add_path "{root}/my cargo/bin"
+'''
+
+[[case]]
+name = 'fish-cargo-home-in-home-with-a-space-and-a-dollar'
+shell = '/usr/bin/fish'
+cargo_home = '{home}/my $cargo'
+on_path = false
+file = '{home}/.config/fish/config.fish'
+outcome = 'add'
+line = 'fish_add_path "$HOME/my \$cargo/bin"'
+shown_file = '~/.config/fish/config.fish'
+after = '''
+
+# cargo programs, added by the Quvyta installer
+fish_add_path "$HOME/my \$cargo/bin"
+'''

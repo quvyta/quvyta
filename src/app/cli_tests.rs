@@ -13,7 +13,7 @@ use crate::cli::{self, Parsed, Start};
 use crate::install::tests::{packages, scenario};
 
 /// quvyta started as `quvyta <args>` on the machine of the list's tests, its first frames drawn.
-fn started(root: &Path, args: &[&str], width: u16) -> Harness<Quvyta> {
+pub(super) fn started(root: &Path, args: &[&str], width: u16) -> Harness<Quvyta> {
     let Parsed::Open(start) = cli::parse(args.iter().map(std::ffi::OsString::from)) else {
         panic!("{args:?} opens the screen")
     };
@@ -31,7 +31,7 @@ fn started(root: &Path, args: &[&str], width: u16) -> Harness<Quvyta> {
     h
 }
 
-fn installs_ran(root: &Path) -> usize {
+pub(super) fn installs_ran(root: &Path) -> usize {
     calls(root).iter().filter(|call| call.starts_with("install --locked")).count()
 }
 

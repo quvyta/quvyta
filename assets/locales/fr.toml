@@ -11,6 +11,7 @@ tagline = "Des applications en terminal, faites avec soin"
 [status]
 released = "Publié"
 beta = "Bêta"
+alpha = "Alpha"
 soon = "Bientôt"
 
 [row]
@@ -43,6 +44,7 @@ where = "{version}, {path}"
 unknown = "version inconnue"
 elsewhere = "Installé sans cargo : c’est à ce qui l’a installé de le tenir à jour."
 beta = "Une bêta : elle marche, mais son interface et ses fichiers peuvent encore changer d’une version à l’autre."
+alpha = "Une alpha : une version précoce, volontairement petite, dont les réglages et les fichiers peuvent encore changer d’une version à l’autre."
 soon = "Pas encore publié : il n’y a rien à installer tant qu’il n’est pas sorti."
 
 [nav]
@@ -73,6 +75,18 @@ summary = "Applique depuis une seule liste les réglages que les utilisateurs d�
 [apps.packages]
 title = "Quvyta Packages"
 summary = "Un gestionnaire de paquets pour Arch Linux qui montre exactement ce qui va changer avant que quoi que ce soit ne change. Cette première version gère les paquets de pacman ; AUR, Flatpak et Snap sont reconnus mais pas encore gérés."
+
+[apps.explorer]
+title = "Quvyta Explorer"
+summary = "Un explorateur de fichiers pour le terminal. Chaque type de fichier a sa propre icône, un fichier s’ouvre avec le programme que votre bureau utilise pour l’ouvrir, les archives s’extraient avec un clic droit, et créer, renommer, copier, coller, glisser-déposer ou supprimer dans la corbeille sont tous là."
+
+[apps.browser]
+title = "Quvyta Browser"
+summary = "Un vrai navigateur web dans le terminal : un Chromium non modifié dessine les pages hors de vue, et les onglets, la barre d’adresse et les boutons sont ceux du terminal. Il lui faut Chromium ou Google Chrome, et il propose d’installer Chromium quand aucun des deux n’est présent."
+
+[apps.cli]
+title = "Quvyta CLI"
+summary = "Un petit agent de programmation dans le terminal : discutez avec un modèle qui lit, cherche, modifie et exécute dans un dossier. Avant de modifier un fichier il montre le diff, avant d’exécuter une commande il montre la commande, et rien ne se passe tant que vous ne l’autorisez pas."
 
 [apps.desk]
 title = "Quvyta Desktop"
@@ -110,6 +124,9 @@ cancel = "Annuler"
 install = "Installer"
 update-title = "Mettre à jour {command} de {from} vers {to} ?"
 update = "Mettre à jour"
+update-all-title = { one = "Mettre à jour {n} application ?", other = "Mettre à jour {n} applications ?" }
+update-line = "{command} de {from} vers {to}"
+crates-io-all = "crates.io, le paquet de chaque application"
 
 [checks]
 no-cargo = "cargo, l’outil de paquets de Rust, n’est pas installé, et c’est avec lui que se compilent les applications Quvyta."
@@ -220,11 +237,11 @@ about = "Installe, ouvre et met à jour les applications en terminal de l’éco
 usage = "Utilisation"
 name = "NOM"
 list = "ouvre la liste des applications Quvyta"
-install = "demande d’installer ces membres, un dialogue après l’autre"
-show = "ouvre sur la page de ce membre"
+install = "demande d’installer ces applications, un dialogue après l’autre"
+show = "ouvre sur la page de cette application"
 help = "montre cette aide"
 version = "montre la version"
-names = "Un nom est le nom court d’un membre (code), sa commande (qcode) ou son paquet (quvyta-code)."
+names = "Un nom est le nom court d’une application (code), sa commande (qcode) ou son paquet (quvyta-code)."
 unknown-option = "l’option {option} n’existe pas"
 unknown-name = "aucune application Quvyta ne s’appelle {name}"
 unknown-command = "{command} n’est pas quelque chose que quvyta fait"
@@ -275,7 +292,26 @@ line-code = "Des agents de code dans des conteneurs Podman ou Docker."
 line-focus = "Note ce qui vous occupe et où votre temps est passé."
 line-tools = "Les réglages d’Arch Linux, tous réversibles."
 line-packages = "Un gestionnaire de paquets qui montre tout avant."
+line-explorer = "Un explorateur de fichiers, une icône par type."
+line-browser = "Un vrai navigateur dans le terminal, dessiné par Chromium."
+line-cli = "Un petit agent de code qui demande avant de changer."
 line-desk = "Un bureau dans le terminal : fenêtres et fichiers."
 line-framework = "La vitrine du framework sur lequel ils reposent tous."
 arch-only = "{line}  Arch Linux seulement."
+unix-only = "{line}  Pas pour Windows."
 soon = "{line}  Pas encore sorti."
+
+[platform]
+arch-only = "Arch Linux seulement"
+unix-only = "Pas pour Windows"
+arch-only-toast = "{command} ne fonctionne que sous Arch Linux"
+unix-only-toast = "{command} ne fonctionne pas sous Windows"
+
+[whats-new]
+title = "Ce qui a changé dans {version}"
+forgotten = "quvyta ne peut pas retenir que vous l'avez lu : il s'affichera de nouveau la prochaine fois."
+
+[font]
+checked = "Avant toute copie, le téléchargement est comparé à la somme de contrôle inscrite dans quvyta."
+registered = "Rien en dehors de votre propre compte n’est informé de la nouvelle police."
+undo = "Pour l’annuler, supprimez ce dossier."

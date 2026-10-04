@@ -137,10 +137,13 @@ impl Machine {
     }
 
     /// The first executable file named `name` in cargo's `bin` folder or on `PATH`. Only the file
-    /// is looked at; nothing is run.
+    /// is looked at; nothing is run. A folder named relatively is passed over: it would be found
+    /// from wherever quvyta was started, while cargo runs in the home folder, and with no `HOME`
+    /// cargo's own folder would be `.cargo` under the current one.
     pub(crate) fn find_program(&self, name: &str) -> Option<PathBuf> {
         std::iter::once(self.cargo_bin())
             .chain(self.path.iter().cloned())
+            .filter(|dir| dir.is_absolute())
             .map(|dir| dir.join(name))
             .find(|candidate| is_executable(candidate))
     }
@@ -152,10 +155,16 @@ impl Machine {
     }
 
     /// Cargo with `args`, told this machine's `CARGO_HOME` so it never falls back to its own
-    /// idea of it; `None` when there is no cargo.
+    /// idea of it, and run in the home folder; `None` when there is no cargo.
     pub(crate) fn cargo(&self, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Option<Command> {
         let mut command = Command::new(self.cargo.as_ref()?);
         command.args(args).env("CARGO_HOME", &self.cargo_home);
+        // Started inside a Rust project, cargo would obey that project's toolchain file, and
+        // rustup would fetch another toolchain just to list or search. A home folder that is
+        // not there would make the call fail instead, so then cargo runs where it is.
+        if self.home.is_dir() {
+            command.current_dir(&self.home);
+        }
         Some(command)
     }
 
@@ -264,6 +273,17 @@ mod tests {
     }
 
     #[test]
+    fn without_a_home_no_program_is_looked_for_in_the_folder_quvyta_started_in() {
+        // Tests run in the crate's folder, where `tests/fake-cargo/cargo` is an executable cargo:
+        // named relatively, from there, it would be found.
+        let vars = |name: &str| (name == "PATH").then(|| OsString::from("tests/fake-cargo"));
+        let machine = Machine::resolve(vars, None);
+        assert!(Path::new("tests/fake-cargo/cargo").is_file(), "the program the test needs");
+        assert_eq!(machine.cargo, None, "a relative PATH entry is not searched");
+        assert_eq!(machine.find_program("cargo"), None);
+    }
+
+    #[test]
     fn cargo_is_found_in_its_own_folder_before_path_and_only_when_executable() {
         let root = tempfile::tempdir().expect("temp");
         write_program(&root.path().join("bin/cargo"), 0o755);
@@ -287,6 +307,27 @@ mod tests {
         let cargo_home = command.get_envs().find(|(key, _)| *key == "CARGO_HOME").and_then(|(_, value)| value);
         assert_eq!(cargo_home, Some(machine.cargo_home.as_os_str()));
         assert_eq!(command.get_args().collect::<Vec<_>>(), ["install", "--list"]);
+    }
+
+    #[test]
+    fn every_cargo_call_runs_in_the_home_folder_whatever_folder_quvyta_started_in() {
+        // The tests run in the crate's folder, a Rust project with its own toolchain choice,
+        // exactly where quvyta must not let cargo run: rustup would fetch that toolchain.
+        let started_in = std::env::current_dir().expect("the tests run somewhere");
+        let root = tempfile::tempdir().expect("temp");
+        let machine = crate::inventory::tests::machine_with_cargo(root.path(), "", 0);
+        crate::updates::tests::search_scenario(root.path(), "", 0);
+        crate::inventory::Inventory::read(&machine);
+        crate::updates::check(&machine, true, 1_790_000_000);
+        let home = machine.home.canonicalize().expect("home");
+        assert_ne!(started_in.canonicalize().expect("start"), home);
+        let calls = std::fs::read_to_string(root.path().join("bin/calls.log")).expect("cargo was called");
+        let folder_of = |asked: &str| {
+            let line = calls.lines().find(|line| line.split('\t').nth(3).is_some_and(|args| args.starts_with(asked)));
+            line.and_then(|line| line.split('\t').nth(2)).map(PathBuf::from)
+        };
+        assert_eq!(folder_of("install --list"), Some(home.clone()), "{calls}");
+        assert_eq!(folder_of("search quvyta"), Some(home), "{calls}");
     }
 
     #[test]

@@ -7,7 +7,7 @@ use std::path::Path;
 use qframe::icons::GlyphMode;
 use tempfile::TempDir;
 
-use super::install_tests::{DIALOG_IN, calls, click_beside, has, run, settle};
+use super::install_tests::{DIALOG_IN, ask_remove, calls, click_beside, has, run, said, settle};
 use super::installs::InstallMsg;
 use super::tests::{LANGUAGES, TOAST_IN, harness, index, line_with, machine};
 use super::*;
@@ -30,9 +30,11 @@ fn uninstalls(root: &Path) -> Vec<String> {
     calls(root).into_iter().filter(|call| call.starts_with("uninstall")).collect()
 }
 
-/// Presses Remove in the question.
+/// Presses Remove in the question, in the language the screen speaks.
 fn confirm(h: &mut Harness<Quvyta>) {
-    click_beside(h, "Cancel", "Remove");
+    let cancel = said(h, "confirm.cancel");
+    let remove = said(h, "remove.confirm");
+    click_beside(h, &cancel, &remove);
 }
 
 #[test]
@@ -135,6 +137,8 @@ fn only_members_cargo_installed_can_be_removed_and_never_quvyta() {
     for key in ["focus", "tools", "quvyta"] {
         h.send(Msg::Select(index(key)));
         assert!(!h.screen().contains("Remove"), "{key}:\n{}", h.screen());
+        // The Remove button is the only way a person can ask, and for these three it is not drawn,
+        // so this message stands in for the click nobody can make: it is refused all the same.
         h.send(install(InstallMsg::AskRemove(index(key))));
         assert_eq!(h.app().installs.remove, None, "{key}");
     }
@@ -149,7 +153,11 @@ fn quvyta_installed_by_cargo_still_does_not_remove_itself() {
     std::fs::write(root.path().join("bin/list.out"), list).expect("list");
     crate::inventory::tests::installed_command(&app.machine, "quvyta");
     let mut h = run(app, 100, 30);
-    h.send(Msg::Select(index("quvyta"))).send(install(InstallMsg::AskRemove(index("quvyta"))));
+    h.send(Msg::Select(index("quvyta")));
+    assert!(!has(&h, "Remove"), "{}", h.screen());
+    // There is no Remove button for quvyta to click, so this message stands in for the click
+    // nobody can make.
+    h.send(install(InstallMsg::AskRemove(index("quvyta"))));
     assert!(!has(&h, "Remove"), "{}", h.screen());
 }
 
@@ -159,8 +167,17 @@ fn behind_an_install() -> (TempDir, Harness<Quvyta>) {
     let mut app = Quvyta::new(machine(root.path()));
     app.inventory = Some(Inventory::read(&app.machine));
     let tools = index("tools");
+    // The install and the removal behind it, each opened and agreed to on its button, sent here
+    // because the app is built before any harness runs it. What the answers return is dropped on
+    // purpose: one cargo at a time is the screen, and a harness would run both to their end.
     let _ = app.update(install(InstallMsg::Ask(tools)));
-    let _ = app.update(install(InstallMsg::Checked { index: tools, problems: Vec::new(), other_window: false }));
+    // The checks' own answer, which is no person's to give: a background task's.
+    let _ = app.update(install(InstallMsg::Checked {
+        index: tools,
+        problems: Vec::new(),
+        other_window: false,
+        named: None,
+    }));
     let _ = app.update(install(InstallMsg::Confirm));
     let _ = app.update(install(InstallMsg::AskRemove(index("code"))));
     let _ = app.update(install(InstallMsg::ConfirmRemove));
@@ -184,6 +201,8 @@ fn a_running_removal_says_so_in_the_row_and_the_details() {
     let root = tempfile::tempdir().expect("temp");
     let mut app = Quvyta::new(machine(root.path()));
     app.inventory = Some(Inventory::read(&app.machine));
+    // The removal opened and agreed to on its two buttons, sent here because the app is built
+    // before any harness runs it; what the answer returns is dropped, so cargo is still working.
     let _ = app.update(install(InstallMsg::AskRemove(index("code"))));
     let _ = app.update(install(InstallMsg::ConfirmRemove));
     let h = run(app, 100, 30);
@@ -201,7 +220,7 @@ fn turkish_removal_reads_naturally() {
     {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    click_beside(&mut h, "Vazgeç", "Kaldır");
+    confirm(&mut h);
     settle(&mut h);
     assert!(h.advance(TOAST_IN).screen().contains("qcode kaldırıldı"), "{}", h.screen());
     assert_eq!(uninstalls(root.path()), ["uninstall quvyta-code"]);
@@ -212,12 +231,13 @@ fn removal_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
     for (width, height) in [(40, 30), (48, 30), (60, 30), (100, 30)] {
         for locale in LANGUAGES {
             let (root, mut h) = harness(width, height);
-            h.set_glyph_mode(GlyphMode::Ascii).set_locale(locale).send(Msg::ShowDetail(index("code")));
+            h.set_glyph_mode(GlyphMode::Ascii).set_locale(locale);
+            h.send(Msg::ShowDetail(index("code")));
             let mut screens = vec![h.screen()];
-            h.send(install(InstallMsg::AskRemove(index("code"))));
+            ask_remove(&mut h, index("code"));
             screens.push(h.screen());
             std::fs::write(root.path().join("bin/uninstall.code"), "101").expect("scenario");
-            h.send(install(InstallMsg::ConfirmRemove));
+            confirm(&mut h);
             settle(&mut h);
             h.send(Msg::ShowDetail(index("code")));
             screens.push(h.screen());
@@ -232,7 +252,11 @@ fn removal_screens_keep_the_rules_in_ascii_and_on_narrow_screens() {
 
 /// With `QUVYTA_REVIEW=1`, writes the screens of removing in both languages, wide and narrow,
 /// to `target/quvyta-remove-review.html` in colour for a visual review.
+///
+/// Ignored like [`visual_review`](super::tests::visual_review): a review writes a file for a
+/// person to look at, and a run of the gate must read it as skipped and not as passed.
 #[test]
+#[ignore = "visual review: QUVYTA_REVIEW=1 cargo test visual_review -- --ignored"]
 fn visual_review_removal() {
     if std::env::var_os("QUVYTA_REVIEW").is_none() {
         return;
@@ -248,12 +272,12 @@ fn visual_review_removal() {
             let (root, mut h) = harness(width, height);
             h.set_locale(locale).send(Msg::ShowDetail(index("code")));
             shot(&h, format!("a member cargo installed {size}"));
-            h.send(install(InstallMsg::AskRemove(index("code")))).advance(DIALOG_IN);
+            ask_remove(&mut h, index("code"));
             shot(&h, format!("remove {size}"));
             std::fs::write(root.path().join("bin/uninstall.err"), "error: failed to remove file `qcode`\n")
                 .expect("scenario");
             std::fs::write(root.path().join("bin/uninstall.code"), "101").expect("scenario");
-            h.send(install(InstallMsg::ConfirmRemove));
+            confirm(&mut h);
             settle(&mut h);
             h.send(Msg::ShowDetail(index("code")));
             shot(&h, format!("removal failed {size}"));

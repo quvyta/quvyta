@@ -6,7 +6,7 @@
 //! drawing thread.
 
 use qframe::prelude::*;
-use qframe::widgets::{CopyValue, Toast};
+use qframe::widgets::{CopyValue, Field, Toast};
 
 use super::{Msg, Quvyta};
 use crate::ecosystem::APPS;
@@ -230,14 +230,11 @@ fn show(notice: &PathNotice, machine: &Machine, ui: &mut View<'_, Msg>) {
         ui.add(Text::new(say(why, command))).fill_width();
         ui.column(|ui| {
             if let Some(file) = file {
-                ui.add(Text::rich([
-                    Span::new(format!("{}  ", t!("path.file"))).role("faint"),
-                    Span::new(shell_path::shown(file, &machine.home)),
-                ]))
-                .fill_width();
+                let label = t!("path.file");
+                let field = Field::new(label.as_str()).label_width(qframe::text::width(&label));
+                ui.add(field.value(shell_path::shown(file, &machine.home))).fill_width();
             }
-            ui.add(Text::new(t!("path.line")).role("faint").no_wrap());
-            ui.add(CopyValue::new(line.as_str())).id("path-line");
+            ui.add(CopyValue::new(line.as_str()).labelled(t!("path.line"))).id("path-line").fill_width();
         })
         .fill_width();
         if let Stage::Failed(reason) = &notice.stage {

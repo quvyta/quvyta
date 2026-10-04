@@ -10,6 +10,7 @@ mod open;
 mod path_notice;
 mod settings;
 mod updates;
+mod whats_new;
 mod wizard;
 
 use std::collections::VecDeque;
@@ -18,9 +19,9 @@ use qframe::icons::nerd_font::Install;
 use qframe::prelude::*;
 use qframe::runtime::{HandoffOutcome, Termination};
 use qframe::storage::{Family, Preferences, Settings};
-use qframe::widgets::{Appearance, ScrollView, Setup, SetupMsg, Splitter, Tabs, Toast};
+use qframe::widgets::{Appearance, Markdown, Panel, ScrollView, Setup, SetupMsg, Splitter, Tabs, Toast};
 
-use crate::ecosystem::{APPS, Member, Status};
+use crate::ecosystem::{APPS, Member, NotHere, Status};
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
 use crate::machine::{LAUNCHER, Machine};
@@ -67,6 +68,9 @@ pub struct Quvyta {
     size: Size,
     /// On a narrow screen, whether the details have the screen instead of the list.
     detail_page: bool,
+    /// Whether the page of what changed in the running version is over the list; `true` on the
+    /// first start of a version that is not the one the data folder holds.
+    whats_new: bool,
     /// quvyta's own settings, read when it starts.
     launcher: Launcher,
     /// The same file as the framework reads it, `launcher.conf` in the shared folder: what the
@@ -98,9 +102,11 @@ pub struct Quvyta {
     setup: Option<Setup<Msg>>,
     /// Which members are checked on the wizard's own step, by index of [`APPS`].
     picked: [bool; APPS.len()],
-    /// Whether this is Arch Linux, which is where the members marked `arch_only` run. Asked only
-    /// when the wizard opens, which is the one screen that offers those members.
+    /// Whether this is Arch Linux, which is where the members marked `arch_only` run. Read once
+    /// at start, since the app list offers members on every screen and not only on the wizard's.
     arch: bool,
+    /// The Nerd Font the Settings tab offers while this machine has none.
+    font: settings::Font,
 }
 
 /// Everything that can happen.
@@ -130,6 +136,9 @@ pub enum Msg {
     },
     /// Something about installing.
     Install(InstallMsg),
+    /// The member at this index does not run on this machine, and the screen says so instead of
+    /// offering to install it.
+    NotInstallable(usize),
     /// The PATH notice.
     Path(PathMsg),
     /// Something about updates.
@@ -166,11 +175,23 @@ fn setup(machine: &Machine, i18n: &qframe::i18n::I18n) -> Option<Setup<Msg>> {
     // A machine with font folders of its own is a test or a demo: no real font is looked at, and
     // none is installed or registered.
     if let Some(dirs) = &machine.font_dirs {
-        let target = dirs.first().cloned().unwrap_or_else(|| folder.join("fonts"));
-        setup = setup.install(Install::new().target(target.join("QuvytaNerdFont")).register(false));
-        setup = setup.font_dirs(dirs.clone());
+        setup = setup.install(font_install(machine)).font_dirs(dirs.clone());
     }
     setup.needed().then_some(setup)
+}
+
+/// How a Nerd Font is installed on `machine`, the same for the wizard and the Settings tab: as the
+/// framework does it for this user, unless the machine names font folders of its own. That is a
+/// test or a demo, whose folders no terminal reads, so the font goes into the first of them and
+/// the system is not told.
+fn font_install(machine: &Machine) -> Install {
+    match &machine.font_dirs {
+        Some(dirs) => {
+            let fonts = dirs.first().cloned().unwrap_or_else(|| machine.home.join("fonts"));
+            Install::new().target(fonts.join("QuvytaNerdFont")).register(false)
+        }
+        None => Install::new(),
+    }
 }
 
 impl Quvyta {
@@ -199,9 +220,11 @@ impl Quvyta {
             },
         };
         let appearance = appearance_of(&machine, preferences);
-        let arch = setup.is_some() && crate::checks::distro(&machine) == crate::checks::Distro::Arch;
+        let arch = crate::checks::distro(&machine) == crate::checks::Distro::Arch;
+        let font = settings::Font::new(&machine, font_install(&machine));
         Self {
             setup,
+            font,
             picked: [false; APPS.len()],
             arch,
             machine,
@@ -209,6 +232,7 @@ impl Quvyta {
             selected: 0,
             size: Size::default(),
             detail_page: false,
+            whats_new: false,
             launcher: Launcher::default(),
             settings,
             appearance,
@@ -260,25 +284,39 @@ impl Quvyta {
 
     /// Opens the dialog of the next member asked for that can be installed. The ones that are
     /// there already are not installed again: the first of them is shown with its details,
-    /// where its version and any update are, and a toast names them all.
+    /// where its version and any update are, and a toast names them all. One that does not run
+    /// on this machine is neither of those: it is refused at once, with the reason the keyboard
+    /// gives.
     fn ask_next(&mut self) -> Command<Msg> {
         let mut there = Vec::new();
+        let mut nowhere = Vec::new();
         while let Some(index) = self.asked.pop_front() {
             if self.installable(index) {
                 // The dialog belongs to the list, which shows what it starts.
                 self.tab = Tab::Apps;
                 self.selected = index;
-                return Command::batch([already_installed(&there), self.install_update(InstallMsg::Ask(index))]);
+                return Command::batch([
+                    already_installed(&there),
+                    self.refused(&nowhere),
+                    self.install_update(InstallMsg::Ask(index)),
+                ]);
             }
-            there.push(index);
+            // Not installable is two different things: it is there already, or it does not run on
+            // this machine at all. Only the second one is a refusal, and it is said at once.
+            if self.not_here(index).is_some() {
+                nowhere.push(index);
+            } else {
+                there.push(index);
+            }
         }
+        let refused = self.refused(&nowhere);
         if let Some(first) = there.first().copied()
             && self.installs.dialog.is_none()
         {
             let shown = self.update(if self.wide() { Msg::Select(first) } else { Msg::ShowDetail(first) });
-            return Command::batch([already_installed(&there), shown]);
+            return Command::batch([already_installed(&there), refused, shown]);
         }
-        already_installed(&there)
+        Command::batch([already_installed(&there), refused])
     }
 
     fn wide(&self) -> bool {
@@ -313,6 +351,7 @@ impl Quvyta {
         let badge = detail::badge_width(&match member.status() {
             Status::Released => t!("status.released"),
             Status::Beta => t!("status.beta"),
+            Status::Alpha => t!("status.alpha"),
             Status::Soon => t!("status.soon"),
         });
         self.buttons_width(index).max(title).max(badge)
@@ -359,6 +398,34 @@ impl Quvyta {
         Some(Opening { program, dir: self.machine.home.clone() })
     }
 
+    /// Why the member at `index` cannot be installed from this machine, as the screen names it;
+    /// `None` when quvyta may offer to install it here.
+    fn not_here(&self, index: usize) -> Option<NotHere> {
+        APPS.get(index).and_then(|member| member.not_here(self.arch))
+    }
+
+    /// The one line that tells the member at `index` cannot be installed from here, naming it:
+    /// what the keyboard and the command line are both given. `None` when there is no reason, so
+    /// an answer that arrives for a member that turned out to be here changes nothing.
+    fn refusal(&self, index: usize) -> Option<String> {
+        let member = APPS.get(index)?;
+        Some(match self.not_here(index)? {
+            NotHere::ArchOnly => t!("platform.arch-only-toast", command = member.command),
+            NotHere::UnixOnly => t!("platform.unix-only-toast", command = member.command),
+        })
+    }
+
+    /// The one toast that tells every member of `indexes` cannot be installed from this machine,
+    /// each with its reason: the command line refuses the way the keyboard does, rather than
+    /// leaving the person to read a list that quietly does not offer what they asked for.
+    fn refused(&self, indexes: &[usize]) -> Command<Msg> {
+        let lines: Vec<String> = indexes.iter().filter_map(|index| self.refusal(*index)).collect();
+        if lines.is_empty() {
+            return Command::none();
+        }
+        Command::toast(Toast::warning(lines.join("\n")))
+    }
+
     /// Whether quvyta should step aside for good once a member it opened closes.
     fn leaves_with_member(&self) -> bool {
         self.launcher.after_close == AfterClose::Shell
@@ -381,6 +448,26 @@ impl Quvyta {
             .collect();
         Command::toast(Toast::warning(t!("launcher.problems")).body(lines.join("\n")))
     }
+
+    /// Opens the page of what changed in the running version, on the first start of a version
+    /// the data folder does not hold, and keeps that version so it opens once. The wizard has the
+    /// screen on a first start, and a changelog is no way to welcome someone.
+    fn offer_whats_new(&mut self) -> Command<Msg> {
+        if self.setting_up() {
+            // Nothing to say if this cannot be kept: the page then opens once after the wizard,
+            // with its own quiet note that it cannot remember.
+            whats_new::first_start(&self.machine).ok();
+            return Command::none();
+        }
+        let Some(kept) = whats_new::offer(&self.machine) else { return Command::none() };
+        self.whats_new = true;
+        // A version that cannot be kept opens the page at the next start as well; saying so
+        // quietly is kinder than a page that keeps coming with no reason given.
+        if kept.is_err() {
+            return Command::toast(Toast::warning(t!("whats-new.forgotten")));
+        }
+        Command::none()
+    }
 }
 
 impl App for Quvyta {
@@ -399,6 +486,7 @@ impl App for Quvyta {
             self.settings_problems(),
             self.clear_leftover(),
             updates,
+            self.offer_whats_new(),
         ])
     }
 
@@ -425,6 +513,11 @@ impl App for Quvyta {
         if self.setting_up() {
             return None;
         }
+        // The page of what changed has one way out, the Back button; the list it is over is not
+        // there to act on.
+        if self.whats_new {
+            return (name == "back").then_some(Msg::Back);
+        }
         // The app list's keys act on the list; on the Settings tab they would act on a member
         // nobody sees.
         if self.tab == Tab::Settings {
@@ -448,6 +541,12 @@ impl App for Quvyta {
                 self.detail_page = true;
             }
             Msg::Select(_) | Msg::ShowDetail(_) => {}
+            // The page of what changed is over the list and closes before anything else: while it
+            // is there, `esc` means leaving it and nothing else.
+            Msg::Back if self.whats_new => {
+                self.whats_new = false;
+                return Command::focus("apps");
+            }
             // From the settings esc goes back to the app list as it was left, a member's page
             // included; the keys go to the list when it is on screen.
             Msg::Back if self.tab == Tab::Settings => {
@@ -478,6 +577,11 @@ impl App for Quvyta {
             {
                 return self.update(Msg::Install(InstallMsg::Ask(self.selected)));
             }
+            // There is nothing to open, so nothing to answer an install with either: the reason
+            // is told and the list is left as it was.
+            Msg::Primary if self.opening(self.selected).is_none() => {
+                return self.update(Msg::NotInstallable(self.selected));
+            }
             Msg::Primary => return self.update(Msg::Open(self.selected)),
             Msg::Open(index) => {
                 if let Some(opening) = self.opening(index) {
@@ -504,6 +608,13 @@ impl App for Quvyta {
                     return Command::batch([done, self.ask_next()]);
                 }
                 return done;
+            }
+            // What a member that does not run here is told, whether the keyboard or the command
+            // line asked for it. The list keeps the member, and offers nothing.
+            Msg::NotInstallable(index) => {
+                if let Some(refusal) = self.refusal(index) {
+                    return Command::toast(Toast::warning(refusal));
+                }
             }
             Msg::Path(msg) => return self.update_path(msg),
             Msg::Updates(msg) => return self.update_update(msg),
@@ -551,6 +662,14 @@ impl App for Quvyta {
 
 impl Quvyta {
     fn body(&self, ui: &mut View<'_, Msg>) {
+        // The page of what changed is over the list, which is still there, whole, behind it. A
+        // version whose entry the changelog that ships does not have is not shown at all.
+        if self.whats_new
+            && let Some(entry) = whats_new::entry()
+        {
+            self.whats_new_page(entry, ui);
+            return;
+        }
         if self.wide() {
             Splitter::columns(self.list_column())
                 .first(|ui| {
@@ -576,29 +695,30 @@ impl Quvyta {
         .fill();
     }
 
-    /// The columns the list area has: its column beside the details, or the screen.
-    fn list_area_width(&self) -> u16 {
-        if self.wide() { self.list_column() } else { self.list_room() }
-    }
-
     fn list(&self, ui: &mut View<'_, Msg>) {
-        let compact = self.compact();
-        let items = APPS.iter().enumerate().map(|(index, member)| {
-            // A failure keeps its mark in the list until it is dismissed; the word says it too.
-            let item = if self.install_failed(index) {
-                ListItem::new(member.command).icon("error", Some("danger"))
-            } else {
-                ListItem::new(member.command).icon(member.icon, None)
-            };
-            match self.row_text(index, compact) {
-                Some(text) => item.detail(text),
-                None => item,
-            }
-        });
-        let list = List::new(items).selected(Some(self.selected)).on_select(Msg::Select);
+        let list = List::new(self.list_items(self.compact())).selected(Some(self.selected)).on_select(Msg::Select);
         // On a narrow screen a row opens the details; on a wide one they are already beside it.
         let list = if self.wide() { list } else { list.on_activate(Msg::ShowDetail) };
         ui.add(list).fill().id("apps");
+    }
+
+    /// The rows of the list, as [`List`] takes them, `compact` or not.
+    fn list_items(&self, compact: bool) -> Vec<ListItem> {
+        APPS.iter()
+            .enumerate()
+            .map(|(index, member)| {
+                // A failure keeps its mark in the list until it is dismissed; the word says it too.
+                let item = if self.install_failed(index) {
+                    ListItem::new(member.command).icon("error", Some("danger"))
+                } else {
+                    ListItem::new(member.command).icon(member.icon, None)
+                };
+                match self.row_text(index, compact) {
+                    Some(text) => item.detail(text),
+                    None => item,
+                }
+            })
+            .collect()
     }
 
     /// The width the list needs for its widest row, `compact` or not, as the list measures it:
@@ -621,7 +741,7 @@ impl Quvyta {
                 (Some(latest), _) => {
                     t!("row.update", version = state.cargo_version().unwrap_or_default(), latest = latest)
                 }
-                (None, state) => row_state(&APPS[index], state, compact),
+                (None, state) => row_state(&APPS[index], state, compact, self.not_here(index)),
             })
         })
     }
@@ -669,43 +789,80 @@ impl Quvyta {
         .fill();
     }
 
+    /// What changed in the running version: the title, the entry as the changelog that ships
+    /// writes it, and the way back. Drawn as `detail` draws the details of a member, over a
+    /// surface that answers the pointer like the key does, since a click is `esc` here too.
+    fn whats_new_page(&self, entry: &str, ui: &mut View<'_, Msg>) {
+        ui.add_with(ScrollView::new(), |ui| {
+            ui.add_with(Panel::new().selected(true).on_press(Msg::Back), |ui| {
+                ui.column(|ui| {
+                    ui.add(Button::new(t!("nav.back")).icon("arrow-left").on_press(Msg::Back)).id("back");
+                    ui.add(
+                        Text::new(t!("whats-new.title", version = env!("CARGO_PKG_VERSION"))).role("title").no_wrap(),
+                    );
+                    // The entry as it is written: the framework's document draws the marks it has.
+                    ui.add(Markdown::new(entry));
+                })
+                .gap(1)
+                .fill_width();
+            })
+            .fill_width();
+        })
+        .fill();
+    }
+
+    /// The hint bar. The key of every hint is the one the keymap binds to the action, and what the
+    /// key does is said in the label, which changes with the screen: both come from
+    /// [`KeyHints::action_labelled`], so the bar cannot name a key the keys no longer do. The
+    /// framework's own actions keep both from the keymap. What enter does is read first and goes
+    /// last when the bar narrows ([`KeyHints::action_labelled_first`]): it is the one thing on the
+    /// screen the arrows cannot say.
     fn footer(&self, ui: &mut View<'_, Msg>) {
-        let hints = if self.tab == Tab::Settings {
+        let hints = if self.whats_new {
+            // The page of what changed has one way out, so that is the only key the bar names.
+            KeyHints::new().action_labelled(Scope::App, "back", t!("hints.back"))
+        } else if self.tab == Tab::Settings {
             KeyHints::new()
                 .hint("↑↓", t!("hints.choose"))
-                .hint("esc", t!("hints.apps"))
+                .action_labelled(Scope::App, "back", t!("hints.apps"))
                 .action(Scope::Global, "focus-next")
         } else if self.wide() || self.detail_page {
             let hints = KeyHints::new();
             let hints = if self.installable(self.selected) {
-                hints.hint("enter", t!("hints.install"))
+                hints.action_labelled_first(Scope::App, "primary", t!("hints.install"))
             } else if self.opening(self.selected).is_some() {
-                hints.hint("enter", t!("hints.open"))
+                hints.action_labelled_first(Scope::App, "primary", t!("hints.open"))
             } else if self.updatable(self.selected) {
-                hints.hint("enter", t!("hints.update"))
+                hints.action_labelled_first(Scope::App, "primary", t!("hints.update"))
             } else {
                 hints
             };
             // Where enter updates already, `u` would say it twice.
             let hints = if self.updatable(self.selected) && self.opening(self.selected).is_some() {
-                hints.hint("u", t!("hints.update"))
+                hints.action_labelled_first(Scope::App, "update", t!("hints.update"))
             } else {
                 hints
             };
             let hints = if self.wide() {
                 hints.hint("↑↓", t!("hints.choose"))
             } else {
-                hints.hint("esc", t!("hints.back"))
+                hints.action_labelled(Scope::App, "back", t!("hints.back"))
             };
-            hints.action(Scope::Global, "focus-next").hint("r", t!("hints.refresh"))
+            hints.action(Scope::Global, "focus-next").action_labelled(Scope::App, "refresh", t!("hints.refresh"))
         } else {
             KeyHints::new()
-                .hint("enter", t!("hints.details"))
+                .action_labelled_first(Scope::App, "primary", t!("hints.details"))
                 .hint("↑↓", t!("hints.choose"))
-                .hint("r", t!("hints.refresh"))
+                .action_labelled(Scope::App, "refresh", t!("hints.refresh"))
         };
         ui.add(hints.action_right(Scope::Global, "quit")).fill_width();
     }
+}
+
+/// The columns the tabs of the header take, measured by the framework's own strip, so the name
+/// and the tagline are kept clear of the strip it draws, whatever air it gives each label.
+fn tabs_width(env: &qframe::env::Env, labels: &[String]) -> u16 {
+    qframe::widget::natural_size(&Tabs::<Msg>::new(labels.to_vec()), env, Size::MAX).width
 }
 
 /// What a list row says about how its member is installed: in words, never in colour alone.
@@ -719,11 +876,16 @@ fn already_installed(indexes: &[usize]) -> Command<Msg> {
 }
 
 /// `compact` leaves out quvyta's own version, which its details show anyway.
-fn row_state(member: &Member, state: &State, compact: bool) -> String {
+fn row_state(member: &Member, state: &State, compact: bool, not_here: Option<NotHere>) -> String {
     match state {
-        // Not there because it is not out yet: "not installed" would suggest installing it.
-        State::Missing if member.status() == Status::Soon => t!("row.soon"),
-        State::Missing => t!("row.missing"),
+        // Not there for a reason of its own, so never "not installed": that invites the install.
+        // A member that is not out yet keeps its own line, and one that does not run here says
+        // which platform it is for.
+        State::Missing => match not_here {
+            Some(reason) => quiet(reason),
+            None if member.status() == Status::Soon => t!("row.soon"),
+            None => t!("row.missing"),
+        },
         State::Cargo { version, .. } => version.clone(),
         State::Elsewhere { .. } => t!("row.unknown"),
         State::This { .. } if compact => t!("row.this-short"),
@@ -731,12 +893,20 @@ fn row_state(member: &Member, state: &State, compact: bool) -> String {
     }
 }
 
+/// Why a member cannot be installed from here, in the few words a list row has room for. The
+/// first run says the same claim in a whole sentence; the page and the row both say this.
+pub(in crate::app) fn quiet(reason: NotHere) -> String {
+    match reason {
+        NotHere::ArchOnly => t!("platform.arch-only"),
+        NotHere::UnixOnly => t!("platform.unix-only"),
+    }
+}
+
 impl Quvyta {
     /// The name, the tagline when there is room for it whole, and the tabs at the right.
     fn header(&self, ui: &mut View<'_, Msg>) {
         let labels = [t!("tabs.apps"), t!("tabs.settings")];
-        // Each tab pads its label with two cells on both sides; one cell parts them.
-        let tabs_width: u16 = labels.iter().map(|label| qframe::text::width(label) + 4).sum::<u16>() + 1;
+        let tabs_width = tabs_width(ui.env(), &labels);
         let tagline = format!("  {}", t!("header.tagline"));
         // The name and the tagline keep at least four cells from the tabs, so the first tab does
         // not read as the tagline's last word.
@@ -758,9 +928,15 @@ impl Quvyta {
 }
 
 #[cfg(test)]
+mod alpha_tests;
+#[cfg(test)]
 mod cli_tests;
 #[cfg(test)]
+mod framework_tests;
+#[cfg(test)]
 mod install_tests;
+#[cfg(test)]
+mod platform_tests;
 #[cfg(test)]
 mod remove_tests;
 #[cfg(test)]
@@ -768,4 +944,8 @@ mod soon_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod update_all_tests;
+#[cfg(test)]
 mod update_tests;
+#[cfg(test)]
+mod whats_new_tests;

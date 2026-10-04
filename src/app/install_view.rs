@@ -6,7 +6,7 @@ use qframe::widgets::{LogLine, LogView, ProgressBar};
 
 use super::confirm_install::problems;
 use super::installs::{Action, Ended, InstallMsg, Phase, Running};
-use super::{Msg, Quvyta};
+use super::{Msg, Quvyta, quiet};
 use crate::cargo::Failure;
 use crate::ecosystem::APPS;
 use crate::install::{self, Outcome};
@@ -98,6 +98,11 @@ impl Quvyta {
             if self.installs.other_window {
                 ui.add(Text::new(t!("install.other-window")).role("secondary")).fill_width();
             }
+        } else if let Some(reason) = self.not_here(index) {
+            // Where the Install button would be, the reason: a word where a button would be and
+            // nothing to press. Reached only when no other main action is on the page, so an
+            // install under way, a member already here and its update all keep their own.
+            ui.add(Text::new(quiet(reason)).role("secondary")).fill_width();
         }
     }
 
@@ -234,7 +239,7 @@ fn actions<M: Clone + 'static>(ui: &mut View<'_, M>, build: impl FnOnce(&mut Vie
 }
 
 /// The columns a button takes: its words with the theme's air on both sides.
-fn button_width(label: &str) -> u16 {
+pub(in crate::app) fn button_width(label: &str) -> u16 {
     qframe::text::width(label) + 4
 }
 
@@ -271,9 +276,10 @@ fn phase_label(phase: Phase) -> String {
     }
 }
 
-/// A whole percentage of `fraction`.
-fn percent(fraction: f32) -> String {
-    format!("{:.0}", (fraction * 100.0).clamp(0.0, 100.0).floor())
+/// A whole percentage of `fraction`, written the way the language on screen writes a number, as
+/// every number the framework draws is written.
+pub(in crate::app) fn percent(fraction: f32) -> String {
+    qframe::i18n::number(f64::from(fraction * 100.0).clamp(0.0, 100.0).floor(), 0)
 }
 
 /// The plain sentence for a failure.

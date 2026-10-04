@@ -10,6 +10,7 @@ tagline = "Terminal applications, made with care"
 [status]
 released = "Released"
 beta = "Beta"
+alpha = "Alpha"
 soon = "Coming soon"
 
 [row]
@@ -42,6 +43,7 @@ where = "{version}, {path}"
 unknown = "unknown version"
 elsewhere = "Installed without cargo, so whatever installed it keeps it up to date."
 beta = "A beta: it works, but its interface and files may still change between releases."
+alpha = "An alpha: an early, deliberately small version whose settings and files may still change between releases."
 soon = "Not released yet: there is nothing to install until it is out."
 
 [nav]
@@ -72,6 +74,18 @@ summary = "Applies the settings Arch Linux users usually set up by hand, from on
 [apps.packages]
 title = "Quvyta Packages"
 summary = "A package manager for Arch Linux that shows exactly what will change before anything does. This first release manages pacman's packages; the AUR, Flatpak and Snap are recognised but not managed yet."
+
+[apps.explorer]
+title = "Quvyta Explorer"
+summary = "A file explorer for the terminal. Every kind of file has an icon of its own, a file opens with the program your desktop opens it with, archives are extracted with a right click, and new, rename, copy, paste, drag and drop and delete into the trash are all there."
+
+[apps.browser]
+title = "Quvyta Browser"
+summary = "A real web browser inside the terminal: an unmodified Chromium draws the pages out of sight, and the tabs, the address bar and the buttons are the terminal's own. It needs Chromium or Google Chrome, and offers to install Chromium when neither is there."
+
+[apps.cli]
+title = "Quvyta CLI"
+summary = "A small coding agent in the terminal: chat with a model that reads, searches, edits and runs in one folder. Before it changes a file it shows the diff, before it runs a command it shows the command, and nothing happens until you allow it."
 
 [apps.desk]
 title = "Quvyta Desktop"
@@ -109,6 +123,9 @@ cancel = "Cancel"
 install = "Install"
 update-title = "Update {command} from {from} to {to}?"
 update = "Update"
+update-all-title = { one = "Update {n} app?", other = "Update {n} apps?" }
+update-line = "{command} from {from} to {to}"
+crates-io-all = "crates.io, each app's own package"
 
 [checks]
 no-cargo = "cargo, Rust's package tool, is not installed, and every Quvyta app is built with it."
@@ -219,11 +236,11 @@ about = "Installs, opens and updates the terminal applications of the Quvyta eco
 usage = "Usage"
 name = "NAME"
 list = "open the list of Quvyta apps"
-install = "ask to install these members, one dialog after another"
-show = "open on this member's page"
+install = "ask to install these apps, one dialog after another"
+show = "open on this app's page"
 help = "show this help"
 version = "show the version"
-names = "A name is a member's short name (code), its command (qcode) or its package (quvyta-code)."
+names = "A name is an app's short name (code), its command (qcode) or its package (quvyta-code)."
 unknown-option = "there is no {option} option"
 unknown-name = "there is no Quvyta app called {name}"
 unknown-command = "{command} is not something quvyta does"
@@ -274,7 +291,32 @@ line-code = "Coding agents inside Podman or Docker containers."
 line-focus = "Tracks what you focus on and where your time went."
 line-tools = "Arch Linux settings from one list, each one undoable."
 line-packages = "A package manager that shows every change first."
+line-explorer = "A file explorer with an icon for every kind of file."
+line-browser = "A real web browser in the terminal, drawn by Chromium."
+line-cli = "A small coding agent that asks before it changes anything."
 line-desk = "A desktop inside the terminal: windows and a file manager."
 line-framework = "The showcase of the framework they are all built on."
 arch-only = "{line}  Arch Linux only."
+unix-only = "{line}  Not for Windows."
 soon = "{line}  Not out yet."
+
+# Why an app cannot be installed from this machine. The first run says the same claim in a
+# whole sentence; a list row has room for these few words only.
+[platform]
+arch-only = "Arch Linux only"
+unix-only = "Not for Windows"
+# The same claim in a toast, where there is room for a sentence and the app is named.
+arch-only-toast = "{command} runs only on Arch Linux"
+unix-only-toast = "{command} does not run on Windows"
+
+# What changed in the version you now run. The entry itself is the changelog's own words, in
+# English; only the title, the way back and the note around them are said here.
+[whats-new]
+title = "What changed in {version}"
+forgotten = "quvyta cannot remember that you have read this, so it will show again next time."
+# The question before the Settings tab installs the Nerd Font symbols (app::settings).
+
+[font]
+checked = "The download is checked against the checksum written into quvyta before anything is copied."
+registered = "Nothing outside your own account is told about the new font."
+undo = "To undo it, delete that folder."

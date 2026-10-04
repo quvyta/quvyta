@@ -14,12 +14,13 @@
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
-use qframe::runtime::{Line, Process, ProcessOutcome};
+use qframe::runtime::{Keep, Line, Process, ProcessOutcome};
 use qframe::storage::{AppLock, atomic_write};
 
 use crate::cargo::{self, Failure};
-use crate::ecosystem::Member;
+use crate::ecosystem::{Member, Status};
 use crate::machine::Machine;
 
 /// The folder under the data folder that builds go to.
@@ -33,6 +34,10 @@ const LOGS: &str = "logs";
 /// The size of the terminal cargo is given. Wide enough that crate names are not cut. cargo
 /// draws its progress line on it and ends each frame with `\r`, so the frames are not lines:
 /// they arrive on their own, beside the lines, and say how far the build has got.
+/// How long asking crates.io for a version may take. A network that hangs would otherwise hold
+/// the install question, or an install that was stopped, until the connection gave up.
+pub(crate) const SEARCH_LIMIT: Duration = Duration::from_secs(60);
+
 pub const TERMINAL: (u16, u16) = (120, 30);
 
 /// One `cargo install`, with everything it needs from the machine.
@@ -42,6 +47,9 @@ pub struct Job {
     pub package: &'static str,
     /// The version to install; `None` for the latest one.
     pub version: Option<String>,
+    /// Whether the member has only pre-releases so far. cargo takes a pre-release only when its
+    /// version is named, so without a version the newest one is asked of crates.io first.
+    pub named_only: bool,
     /// The cargo program.
     pub cargo: PathBuf,
     /// Where cargo installs, told to it explicitly.
@@ -62,6 +70,7 @@ impl Job {
         Some(Self {
             package: member.package,
             version,
+            named_only: member.status() == Status::Alpha,
             cargo,
             cargo_home: machine.cargo_home.clone(),
             dir: machine.home.clone(),
@@ -98,6 +107,14 @@ impl Job {
         on_line: &mut dyn FnMut(String),
         on_frame: &mut dyn FnMut(String),
     ) -> Outcome {
+        if self.named_only && self.version.is_none() {
+            // Without the version cargo answers that nothing matches, which says nothing useful;
+            // when crates.io cannot be asked either, that answer is still the honest one.
+            if let Some(newest) = self.newest(cancel) {
+                let named = Self { version: Some(newest), ..self.clone() };
+                return named.run(cancel, on_line, on_frame);
+            }
+        }
         let mut process = Process::new(&self.cargo)
             .args(self.args())
             .dir(&self.dir)
@@ -138,6 +155,25 @@ impl Job {
             let _ = write_log(log, &lines);
         }
         outcome
+    }
+}
+
+impl Job {
+    /// The newest version crates.io has of the package, pre-releases included, as `cargo search`
+    /// names it; `None` when cargo cannot ask, when `cancel` turns true or when crates.io does
+    /// not answer within [`SEARCH_LIMIT`].
+    pub(crate) fn newest(&self, cancel: &dyn Fn() -> bool) -> Option<String> {
+        let keep = Keep::bytes(64 * 1024).limit(SEARCH_LIMIT);
+        let collected = Process::new(&self.cargo)
+            .args(["search", self.package, "--limit", "1"])
+            .dir(&self.dir)
+            .env("CARGO_HOME", &self.cargo_home)
+            .no_stdin()
+            .collect(keep, cancel)
+            .ok()?;
+        (collected.outcome == ProcessOutcome::Finished { code: Some(0) }).then_some(())?;
+        let found = cargo::parse_search(&collected.text);
+        found.into_iter().find(|found| found.package == self.package).map(|found| found.version)
     }
 }
 
@@ -378,6 +414,62 @@ pub(crate) mod tests {
         assert_eq!(pinned.log, Some(root.path().join("data/logs/qtools.log")));
     }
 
+    /// The install lines of the stand-in cargo's log, each as its arguments.
+    fn installs_called(root: &Path) -> Vec<String> {
+        let calls = std::fs::read_to_string(root.join("bin/calls.log")).unwrap_or_default();
+        calls
+            .lines()
+            .filter_map(|line| line.rsplit('\t').next())
+            .filter(|args| args.starts_with("install "))
+            .map(ToOwned::to_owned)
+            .collect()
+    }
+
+    #[test]
+    fn a_member_with_only_pre_releases_is_installed_at_the_newest_one_crates_io_names() {
+        let root = tempfile::tempdir().expect("temp");
+        let machine = machine_with_cargo(root.path(), "", 0);
+        packages(root.path());
+        scenario(root.path(), INSTALL, 0);
+        // What `cargo search quvyta-cli --limit 1` prints: the package, then its newest version,
+        // pre-releases included.
+        let answer = "quvyta-cli = \"0.1.0-alpha.2\"    # A small coding agent in the terminal (alpha)\n";
+        std::fs::write(root.path().join("bin/search.out"), answer).expect("scenario");
+        let cli = member("cli");
+        assert_eq!(cli.status(), Status::Alpha);
+
+        let (outcome, _) = run(&Job::new(&machine, cli, None).expect("cargo"));
+        assert_eq!(installs_called(root.path()), ["install --locked quvyta-cli --version 0.1.0-alpha.2"]);
+        assert_eq!(outcome, Outcome::Installed { version: Some("0.1.0-alpha.2".to_owned()) });
+        let calls = std::fs::read_to_string(root.path().join("bin/calls.log")).expect("calls");
+        assert!(calls.lines().any(|line| line.ends_with("\tsearch quvyta-cli --limit 1")), "{calls}");
+
+        // A version the dialog already knows is used as it is, with no question to crates.io.
+        std::fs::remove_file(root.path().join("bin/calls.log")).expect("reset");
+        run(&Job::new(&machine, cli, Some("0.1.0-alpha.3".to_owned())).expect("cargo"));
+        let calls = std::fs::read_to_string(root.path().join("bin/calls.log")).expect("calls");
+        assert!(!calls.contains("\tsearch "), "{calls}");
+
+        // A released member is never looked up: cargo already takes its newest version.
+        std::fs::remove_file(root.path().join("bin/calls.log")).expect("reset");
+        run(&Job::new(&machine, member("explorer"), None).expect("cargo"));
+        assert_eq!(installs_called(root.path()), ["install --locked quvyta-explorer"]);
+    }
+
+    #[test]
+    fn a_pre_release_member_crates_io_cannot_be_asked_about_still_goes_to_cargo_and_its_answer() {
+        let root = tempfile::tempdir().expect("temp");
+        let machine = machine_with_cargo(root.path(), "", 0);
+        std::fs::write(root.path().join("bin/search.code"), "101").expect("scenario");
+        let refusal = "error: could not find `quvyta-cli` in registry `crates-io` with version `*`\n";
+        std::fs::write(root.path().join("bin/install.err"), refusal).expect("scenario");
+        std::fs::write(root.path().join("bin/install.code"), "101").expect("scenario");
+        let (outcome, lines) = run(&Job::new(&machine, member("cli"), None).expect("cargo"));
+        assert_eq!(installs_called(root.path()), ["install --locked quvyta-cli"]);
+        assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
+        assert!(lines.iter().any(|line| line.contains("could not find `quvyta-cli`")), "{lines:?}");
+    }
+
     #[test]
     fn without_cargo_there_is_nothing_to_run() {
         let root = tempfile::tempdir().expect("temp");
@@ -533,6 +625,29 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn stopping_while_crates_io_is_asked_for_a_pre_release_ends_at_once_and_installs_nothing() {
+        let root = tempfile::tempdir().expect("temp");
+        let machine = machine_with_cargo(root.path(), "", 0);
+        packages(root.path());
+        scenario(root.path(), INSTALL, 0);
+        // A network that hangs: the search answers only after half a minute.
+        std::fs::write(root.path().join("bin/search.out"), "quvyta-cli = \"0.1.0-alpha.2\"\n").expect("scenario");
+        std::fs::write(root.path().join("bin/search.sleep"), "30").expect("scenario");
+        let job = Job::new(&machine, member("cli"), None).expect("cargo");
+        let started = std::time::Instant::now();
+        // Stop is pressed a moment after the install began, while the search is still waiting.
+        let stop = move || started.elapsed() > std::time::Duration::from_millis(300);
+        let outcome = job.run(&stop, &mut |_| {}, &mut |_| {});
+        assert_eq!(outcome, Outcome::Cancelled);
+        assert!(started.elapsed() < std::time::Duration::from_secs(10), "the search did not run its thirty seconds");
+        assert!(
+            installs_called(root.path()).iter().all(|call| !call.contains("--version")),
+            "no answer was waited for"
+        );
+        assert!(!machine.cargo_bin().join("qcli").exists(), "nothing was installed");
+    }
+
+    #[test]
     fn a_cargo_that_cannot_start_is_told() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
@@ -597,6 +712,7 @@ pub(crate) mod tests {
         let job = Job {
             package: member.package,
             version: None,
+            named_only: false,
             cargo,
             cargo_home: home.join(".cargo"),
             dir: home.clone(),

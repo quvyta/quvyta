@@ -13,7 +13,7 @@
 //! the queue the Apps tab uses, one after another: quvyta installs nothing without being told.
 
 use qframe::prelude::*;
-use qframe::widgets::{Checkbox, ScrollView, SetupWizard, Toast};
+use qframe::widgets::{Checkbox, ScrollView, SetupWizard};
 
 use super::{Msg, Quvyta};
 use crate::ecosystem::{APPS, Member, Status};
@@ -27,15 +27,13 @@ const LEAST_PAGE_ROWS: u16 = 8;
 
 /// Cells the app list keeps from the page's left edge, so a member's line stands under its
 /// checkbox rather than under its name.
-const LINE_INDENT: u16 = 4;
+pub(in crate::app) const LINE_INDENT: u16 = 4;
 
 /// Something on quvyta's own step of the wizard.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WizardMsg {
     /// Checks or unchecks the member at this index of [`APPS`].
     Pick(usize, bool),
-    /// quvyta's own settings were written into the file the wizard made, or why not.
-    Stored(Result<(), String>),
 }
 
 impl Quvyta {
@@ -44,11 +42,11 @@ impl Quvyta {
         self.setup.as_ref().is_some_and(qframe::widgets::Setup::needed)
     }
 
-    /// Whether the member at `index` can be chosen on the wizard's own step: it is released, it
-    /// runs on this system, and it is not quvyta itself, which is running already.
+    /// Whether the member at `index` can be chosen on the wizard's own step: the rule the app
+    /// list offers its installs by, so the first run and the list never hold a member back in one
+    /// of them and offer it in the other.
     pub(super) fn choosable(&self, index: usize) -> bool {
-        APPS.get(index)
-            .is_some_and(|member| member.published() && !member.is_self() && (!member.arch_only || self.arch))
+        APPS.get(index).is_some_and(|member| member.offered(self.arch))
     }
 
     pub(super) fn update_wizard(&mut self, msg: WizardMsg) -> Command<Msg> {
@@ -60,31 +58,25 @@ impl Quvyta {
                     *picked = on;
                 }
             }
-            WizardMsg::Stored(Ok(())) => {}
-            WizardMsg::Stored(Err(reason)) => {
-                // The appearance is already in its own file; only quvyta's own keys were lost.
-                return Command::toast(Toast::warning(t!("settings.not-saved")).body(reason));
-            }
         }
         Command::none()
     }
 
-    /// The wizard wrote both files: quvyta's own settings go in beside the shared keys, the
-    /// screen takes the appearance that was chosen, and the members that were checked start
-    /// their way through the install dialog.
+    /// The wizard wrote both files, and nothing more goes into them: quvyta's own settings keep
+    /// their defaults by not being written, so a better default in a later version reaches
+    /// everyone. The screen takes the appearance that was chosen, and the members that were
+    /// checked start their way through the install dialog.
     pub(super) fn finish_setup(&mut self) -> Command<Msg> {
         let Some(setup) = self.setup.take() else { return Command::none() };
         // The rows of the Settings tab carry on from what the wizard chose; its own Appearance
         // wrote nothing but held the values.
         self.appearance = super::appearance_of(&self.machine, setup.preferences().clone());
         self.launcher = crate::launcher::Launcher::default();
-        crate::launcher::Launcher::write_defaults(&mut self.settings);
-        let saved = self.settings.save_command(|result| Msg::Wizard(WizardMsg::Stored(result)));
         self.asked = (0..APPS.len()).filter(|index| self.picked.get(*index) == Some(&true)).collect();
         // Which members are there already is only known once cargo has answered; when it has
         // not, the first answer opens the dialogs instead.
         let asking = if self.inventory.is_some() { self.ask_next() } else { Command::none() };
-        Command::batch([saved, Command::focus("apps"), asking])
+        Command::batch([Command::focus("apps"), asking])
     }
 
     /// The wizard, while it is wanted: the framework's appearance step, then quvyta's own.
@@ -149,6 +141,7 @@ impl Quvyta {
         let line = match (member.status(), member.arch_only && !self.arch) {
             (Status::Soon, _) => t!("wizard.soon", line = line),
             (_, true) => t!("wizard.arch-only", line = line),
+            _ if !member.runs_here() => t!("wizard.unix-only", line = line),
             _ => line,
         };
         let role = if choosable { "secondary" } else { "faint" };

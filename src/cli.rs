@@ -203,10 +203,13 @@ fn usage() -> String {
         ("quvyta --help, -h".to_owned(), t!("cli.help")),
         ("quvyta --version, -V".to_owned(), t!("cli.version")),
     ];
-    let width = forms.iter().map(|(form, _)| form.chars().count()).max().unwrap_or(0);
+    // Padded by the cells a terminal draws, not by characters: a name in Chinese or Japanese
+    // takes two cells a letter, and `{:width$}` would leave its column two short.
+    let width = forms.iter().map(|(form, _)| qframe::text::width(form)).max().unwrap_or(0);
     let mut text = format!("quvyta {}\n{}\n\n{}\n", env!("CARGO_PKG_VERSION"), t!("cli.about"), t!("cli.usage"));
     for (form, what) in forms {
-        text.push_str(&format!("  {form:width$}  {what}\n"));
+        let pad = " ".repeat(usize::from(width - qframe::text::width(&form)));
+        text.push_str(&format!("  {form}{pad}  {what}\n"));
     }
     text.push('\n');
     text.push_str(&t!("cli.names"));
@@ -293,12 +296,12 @@ Installs, opens and updates the terminal applications of the Quvyta ecosystem.
 
 Usage
   quvyta                  open the list of Quvyta apps
-  quvyta install NAME...  ask to install these members, one dialog after another
-  quvyta show NAME        open on this member's page
+  quvyta install NAME...  ask to install these apps, one dialog after another
+  quvyta show NAME        open on this app's page
   quvyta --help, -h       show this help
   quvyta --version, -V    show the version
 
-A name is a member's short name (code), its command (qcode) or its package (quvyta-code).
+A name is an app's short name (code), its command (qcode) or its package (quvyta-code).
 "
         );
         assert_eq!(text, expected);
@@ -310,11 +313,31 @@ A name is a member's short name (code), its command (qcode) or its package (quvy
         let Answer::Say(text) = answer("tr", &["-h"]) else { panic!("help is said") };
         for line in [
             "Kullanım",
-            "  quvyta install AD...  bu üyeleri kurmak için sırayla onay ister",
-            "  quvyta show AD        bu üyenin sayfasını açar",
+            "  quvyta install AD...  bu uygulamaları kurmak için sırayla onay ister",
+            "  quvyta show AD        bu uygulamanın sayfasını açar",
             "paketi (quvyta-code)",
         ] {
             assert!(text.contains(line), "`{line}` is missing:\n{text}");
+        }
+    }
+
+    #[test]
+    fn help_keeps_its_column_where_a_name_takes_two_cells_a_letter() {
+        for language in ["zh-Hans", "ja"] {
+            let Answer::Say(text) = answer(language, &["--help"]) else { panic!("help is said") };
+            let forms: Vec<&str> = text.lines().filter(|line| line.starts_with("  quvyta")).collect();
+            assert_eq!(forms.len(), 5, "{text}");
+            // Where each description starts, in cells: the same column on every line.
+            let column = |line: &str| {
+                let form = line.trim_start().split("  ").next().unwrap_or_default();
+                let start = line.find(form).unwrap_or(0) + form.len();
+                let gap = line[start..].len() - line[start..].trim_start().len();
+                qframe::text::width(&line[..start + gap])
+            };
+            let first = column(forms[0]);
+            for line in &forms {
+                assert_eq!(column(line), first, "{language}: `{line}`\n{text}");
+            }
         }
     }
 

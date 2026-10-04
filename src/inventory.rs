@@ -92,8 +92,12 @@ fn state(machine: &Machine, listed: &[Installed], member: &Member) -> State {
     let by_cargo = listed.iter().find(|installed| {
         installed.package == member.package && installed.commands.iter().any(|c| c == member.command)
     });
-    // cargo's record alone is not enough: a command deleted by hand cannot be opened.
-    let by_cargo = by_cargo.filter(|_| machine.find_program(member.command).as_ref() == Some(&path));
+    // cargo's record alone is not enough: a command deleted by hand cannot be opened. And a
+    // member cargo built from a folder or a git repository is someone's own build: crates.io's
+    // version would overwrite it, so it counts as installed elsewhere, left to where it came from.
+    let by_cargo = by_cargo
+        .filter(|installed| installed.from_crates_io)
+        .filter(|_| machine.find_program(member.command).as_ref() == Some(&path));
     if member.is_self() {
         let cargo = by_cargo.map(|installed| installed.version.clone());
         return State::This { version: env!("CARGO_PKG_VERSION"), cargo };

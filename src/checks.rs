@@ -3,6 +3,9 @@
 //! rather than as a failed build minutes later.
 
 use std::path::PathBuf;
+use std::time::Duration;
+
+use qframe::runtime::{Keep, Process};
 
 use crate::machine::Machine;
 
@@ -135,23 +138,29 @@ pub fn distro(machine: &Machine) -> Distro {
     Distro::from_os_release(&text)
 }
 
+/// How long `rustc --version` may take. rustup may be fetching a toolchain behind it, and a
+/// network that hangs would hold the install question until the connection gave up.
+const RUSTC_LIMIT: Duration = Duration::from_secs(120);
+
 /// The version `rustc --version` reports, run from the home folder so that a project's own
 /// toolchain file where quvyta was started does not decide; `None` when it cannot tell.
 fn rustc_version(machine: &Machine) -> Option<String> {
     let rustc = machine.find_program("rustc")?;
-    let output = std::process::Command::new(rustc)
+    let collected = Process::new(rustc)
         .arg("--version")
-        .current_dir(&machine.home)
+        .dir(&machine.home)
         .env("CARGO_HOME", &machine.cargo_home)
-        .stdin(std::process::Stdio::null())
-        .output()
+        .no_stdin()
+        .collect(Keep::bytes(16 * 1024).limit(RUSTC_LIMIT), &|| false)
         .ok()?;
-    parse_rustc_version(&String::from_utf8_lossy(&output.stdout))
+    parse_rustc_version(&collected.text)
 }
 
-/// `1.80.1` from `rustc 1.80.1 (3f5fd8dd4 2024-08-06)`.
+/// `1.80.1` from `rustc 1.80.1 (3f5fd8dd4 2024-08-06)`. rustup may write what it is doing first,
+/// on the other stream, so the version is looked for on a line of its own.
 fn parse_rustc_version(text: &str) -> Option<String> {
-    let version = text.trim().strip_prefix("rustc ")?.split_whitespace().next()?;
+    let line = text.lines().find_map(|line| line.trim().strip_prefix("rustc "))?;
+    let version = line.split_whitespace().next()?;
     numbers(version).map(|_| version.to_owned())
 }
 
@@ -257,6 +266,9 @@ mod tests {
     fn versions_are_compared_by_their_numbers() {
         assert_eq!(parse_rustc_version("rustc 1.95.0 (29483883e 2026-08-07)\n").as_deref(), Some("1.95.0"));
         assert_eq!(parse_rustc_version("cargo 1.95.0"), None);
+        // rustup's own words come first, on the other stream, when it fetches the toolchain.
+        let fetched = "info: syncing channel updates for 'stable-x86_64-unknown-linux-gnu'\nrustc 1.95.0 (29483883e 2026-08-07)\n";
+        assert_eq!(parse_rustc_version(fetched).as_deref(), Some("1.95.0"));
         assert!(new_enough("1.95.0") && new_enough("1.100.0") && new_enough("2.0.0"));
         assert!(!new_enough("1.94.1") && !new_enough("1.9.0"));
     }

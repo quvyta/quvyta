@@ -11,6 +11,7 @@ tagline = "用心打造的终端应用"
 [status]
 released = "已发布"
 beta = "测试版"
+alpha = "内测版"
 soon = "即将推出"
 
 [row]
@@ -43,6 +44,7 @@ where = "{version}，{path}"
 unknown = "版本未知"
 elsewhere = "不是用 cargo 装的，所以由装它的那一方负责更新。"
 beta = "测试版：可以用，但界面和文件在版本之间还可能改动。"
+alpha = "内测版：早期版本，特意做得小巧，设置和文件在版本之间还可能改动。"
 soon = "尚未发布：在它出来之前没有可装的东西。"
 
 [nav]
@@ -73,6 +75,18 @@ summary = "把 Arch Linux 用户平时手动做的设置集中到一张清单里
 [apps.packages]
 title = "Quvyta Packages"
 summary = "为 Arch Linux 写的包管理器，在动手之前把要改的东西原原本本摆出来。第一个版本管理 pacman 的软件包；AUR、Flatpak 和 Snap 能认出来，但还不归它管。"
+
+[apps.explorer]
+title = "Quvyta Explorer"
+summary = "终端里的文件管理器。每种文件都有自己的图标，文件用你桌面上打开它的程序打开，压缩包右键即可解压，新建、重命名、复制、粘贴、拖放以及删除到回收站一应俱全。"
+
+[apps.browser]
+title = "Quvyta Browser"
+summary = "终端里的真正网页浏览器：未经改动的 Chromium 在看不见的地方渲染页面，标签页、地址栏和按钮都由终端自己绘制。它需要 Chromium 或 Google Chrome，两者都没有时会提议安装 Chromium。"
+
+[apps.cli]
+title = "Quvyta CLI"
+summary = "终端里的小型编程智能体：与一个在同一个文件夹里读取、搜索、编辑和运行的模型对话。改动文件前它会先显示 diff，运行命令前它会先显示命令，在你允许之前什么都不会发生。"
 
 [apps.desk]
 title = "Quvyta Desktop"
@@ -110,6 +124,9 @@ cancel = "取消"
 install = "安装"
 update-title = "把 {command} 从 {from} 更新到 {to} 吗？"
 update = "更新"
+update-all-title = { other = "更新 {n} 个应用吗？" }
+update-line = "{command}：从 {from} 到 {to}"
+crates-io-all = "crates.io，各应用自己的包"
 
 [checks]
 no-cargo = "Rust 的包工具 cargo 没有安装，而 Quvyta 应用都是用它编译的。"
@@ -220,11 +237,11 @@ about = "安装、打开并更新 Quvyta 生态中的终端应用。"
 usage = "用法"
 name = "名字"
 list = "打开 Quvyta 应用列表"
-install = "逐个询问是否安装这些成员"
-show = "直接打开这个成员的页面"
+install = "逐个询问是否安装这些应用"
+show = "直接打开这个应用的页面"
 help = "显示这份帮助"
 version = "显示版本"
-names = "名字可以是成员的简称（code）、命令（qcode）或软件包名（quvyta-code）。"
+names = "名字可以是应用的简称（code）、命令（qcode）或软件包名（quvyta-code）。"
 unknown-option = "没有 {option} 这个选项"
 unknown-name = "没有名为 {name} 的 Quvyta 应用"
 unknown-command = "quvyta 不做 {command} 这件事"
@@ -275,7 +292,26 @@ line-code = "在 Podman 或 Docker 容器里运行编程助手。"
 line-focus = "记下你在专注什么，时间都花到哪儿去了。"
 line-tools = "Arch Linux 的设置集中一张清单，每一项都能撤销。"
 line-packages = "先把每一处改动摆出来的包管理器。"
+line-explorer = "文件管理器，每种文件都有自己的图标。"
+line-browser = "终端里的真正网页浏览器，由 Chromium 渲染。"
+line-cli = "小型编程智能体，改动任何东西之前都会先询问。"
 line-desk = "终端里的桌面：窗口和文件管理器。"
 line-framework = "它们共同依托的那个框架的展示厅。"
 arch-only = "{line}  仅限 Arch Linux。"
+unix-only = "{line}  不适用于 Windows。"
 soon = "{line}  还没出。"
+
+[platform]
+arch-only = "仅限 Arch Linux"
+unix-only = "不适用于 Windows"
+arch-only-toast = "{command} 仅在 Arch Linux 上运行"
+unix-only-toast = "{command} 无法在 Windows 上运行"
+
+[whats-new]
+title = "{version} 版本的变化"
+forgotten = "quvyta 无法记住你已读过此页，下次启动时会再次显示。"
+
+[font]
+checked = "复制任何东西之前，下载的文件会先与写在 quvyta 里的校验和核对。"
+registered = "新字体只告知你自己的账户，不涉及账户之外的任何地方。"
+undo = "要撤销，删除那个文件夹即可。"
