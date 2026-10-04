@@ -26,7 +26,7 @@ const LINKERS: [&str; 3] = ["cc", "gcc", "clang"];
 /// The folders and programs of one machine, as quvyta sees them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Machine {
-    /// The user's home folder; members open in it.
+    /// The user's home folder; apps open in it.
     pub home: PathBuf,
     /// Cargo's folder: `CARGO_HOME`, or `~/.cargo`.
     pub cargo_home: PathBuf,
@@ -37,13 +37,13 @@ pub struct Machine {
     pub cargo: Option<PathBuf>,
     /// quvyta's settings file, `launcher.conf`, when the platform names a settings folder.
     pub launcher_conf: Option<PathBuf>,
-    /// The shared settings folder, which removing a member leaves alone; `None` when the
+    /// The shared settings folder, which removing an app leaves alone; `None` when the
     /// platform names none.
     pub settings_dir: Option<PathBuf>,
-    /// The folder the members' settings files are read from when it is not the framework's own
+    /// The folder the apps' settings files are read from when it is not the framework's own
     /// layout: a test root keeps them inside itself, the way it keeps `launcher.conf`. `None`
     /// leaves the framework to say where each file is.
-    pub member_settings: Option<PathBuf>,
+    pub app_settings: Option<PathBuf>,
     /// quvyta's data folder, which holds the build folder of installs and their logs; `None`
     /// when the platform names none.
     pub data_dir: Option<PathBuf>,
@@ -88,17 +88,17 @@ impl Machine {
         Self {
             data_dir: Some(root.join("data")),
             settings_dir: Some(root.join("config")),
-            member_settings: Some(root.join("config")),
+            app_settings: Some(root.join("config")),
             os_release: root.join("etc/os-release"),
             font_dirs: Some(vec![root.join("fonts")]),
             ..Self::resolve(lookup, Some(root.join("config/launcher.conf")))
         }
     }
 
-    /// The settings file of the member whose settings id is `id`, as the framework lays out the
+    /// The settings file of the app whose settings id is `id`, as the framework lays out the
     /// shared folder on this platform; `None` when the platform names no settings folder.
-    pub(crate) fn member_conf(&self, id: &str) -> Option<PathBuf> {
-        match &self.member_settings {
+    pub(crate) fn app_conf(&self, id: &str) -> Option<PathBuf> {
+        match &self.app_settings {
             // A test root mirrors the framework's `<folder>/<id>.conf`, as it does for
             // `launcher.conf`.
             Some(folder) => Some(folder.join(format!("{id}.conf"))),
@@ -119,7 +119,7 @@ impl Machine {
             cargo: None,
             launcher_conf,
             settings_dir: None,
-            member_settings: None,
+            app_settings: None,
             data_dir: None,
             os_release: PathBuf::from("/etc/os-release"),
             font_dirs: None,

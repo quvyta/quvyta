@@ -1,4 +1,4 @@
-//! Which members have a newer version on crates.io.
+//! Which apps have a newer version on crates.io.
 //!
 //! One `cargo search quvyta` brings every Quvyta app at once, with no network library of our
 //! own: cargo already knows how to reach crates.io. The answer is kept in `latest.toml` in the
@@ -22,18 +22,18 @@ use crate::machine::Machine;
 /// The file in the data folder that keeps the last answer.
 const FILE: &str = "latest.toml";
 /// How long an answer is used before crates.io is asked again: a day, as the shared update
-/// notice says of every member.
+/// notice says of every app.
 pub(crate) const FRESH: Duration = Duration::from_secs(24 * 60 * 60);
 /// The key of the time the answer came, in seconds since 1970.
 const CHECKED: &str = "checked";
 /// The table of the versions, by package.
 const VERSIONS: &str = "versions";
-/// What cargo is asked. Every member's package starts with `quvyta`, and so do the crates
+/// What cargo is asked. Every app's package starts with `quvyta`, and so do the crates
 /// around them, whose number grows with every app; crates.io answers at most a hundred at once,
-/// and a member that fell off a shorter page would never show its update.
+/// and an app that fell off a shorter page would never show its update.
 pub(crate) const SEARCH: [&str; 4] = ["search", "quvyta", "--limit", "100"];
 
-/// The newest version of each member's package on crates.io, and when that was asked.
+/// The newest version of each app's package on crates.io, and when that was asked.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Latest {
     /// When crates.io answered, in seconds since 1970.
@@ -43,12 +43,12 @@ pub struct Latest {
 
 impl Latest {
     /// The answer of `cargo search`, `text`, at `checked`, keeping only the packages of the
-    /// released Quvyta apps: another crate whose name starts the same way, or a member still
+    /// released Quvyta apps: another crate whose name starts the same way, or an app still
     /// to come, is none of quvyta's business.
     pub fn from_search(text: &str, checked: u64) -> Self {
         let versions = parse_search(text)
             .into_iter()
-            .filter(|found| APPS.iter().any(|member| member.published() && member.package == found.package))
+            .filter(|found| APPS.iter().any(|app| app.published() && app.package == found.package))
             .map(|found| (found.package, found.version))
             .collect();
         Self { checked, versions }
@@ -191,10 +191,10 @@ pub(crate) mod tests {
     #[test]
     fn the_search_asks_for_the_largest_page_crates_io_gives() {
         let limit: usize = SEARCH[3].parse().expect("a number");
-        // Every member and a crate or two around each share the name; a page this size keeps
+        // Every app and a crate or two around each share the name; a page this size keeps
         // room for the ecosystem to grow to many times its size before one falls off.
         assert_eq!(limit, 100, "crates.io's largest page");
-        assert!(crate::ecosystem::APPS.len() * 4 <= limit, "room for every member and the crates around them");
+        assert!(crate::ecosystem::APPS.len() * 4 <= limit, "room for every app and the crates around them");
     }
 
     #[test]
@@ -202,13 +202,13 @@ pub(crate) mod tests {
         let latest = Latest::from_search(SEARCH_OUT, NOW);
         assert_eq!(latest.version("quvyta-code"), Some("0.1.1"));
         assert_eq!(latest.version("quvyta-framework-showcase"), Some("0.1.5"));
-        assert_eq!(latest.version("quvyta-framework"), None, "the library is not a member");
+        assert_eq!(latest.version("quvyta-framework"), None, "the library is not an app");
         assert_eq!(latest.version("quvyta-packages-core"), None);
         assert_eq!(latest.checked, NOW);
     }
 
     #[test]
-    fn a_crate_named_like_a_member_still_to_come_is_not_kept() {
+    fn a_crate_named_like_an_app_still_to_come_is_not_kept() {
         let _soon = crate::ecosystem::tests::unreleased("desk");
         let latest = Latest::from_search(&format!("{SEARCH_OUT}quvyta-desktop = \"0.0.1\"\n"), NOW);
         assert_eq!(latest.version("quvyta-desktop"), None);

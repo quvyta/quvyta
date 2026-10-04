@@ -1,6 +1,6 @@
-//! A member that does not run on this machine: still on the list, saying why it cannot be
+//! An app that does not run on this machine: still on the list, saying why it cannot be
 //! installed from here, and offered no way to install it — from the keyboard, from the mouse and
-//! from the command line. On Arch Linux, and on the platform a member is built for, nothing
+//! from the command line. On Arch Linux, and on the platform an app is built for, nothing
 //! changes.
 //!
 //! Every test stands in a temporary root and names the distribution in `root/etc/os-release`
@@ -44,7 +44,7 @@ fn cargo_calls(root: &Path, first: &str) -> Vec<String> {
 }
 
 #[test]
-fn a_member_that_only_runs_on_arch_linux_is_not_offered_elsewhere() {
+fn an_app_that_only_runs_on_arch_linux_is_not_offered_elsewhere() {
     let (root, mut h) = debian(100, 30);
     let screen = h.screen();
     println!("{screen}");
@@ -68,7 +68,7 @@ fn a_member_that_only_runs_on_arch_linux_is_not_offered_elsewhere() {
 fn the_same_machine_offers_them_on_arch_linux() {
     let (root, _debian) = debian(100, 30);
     // The very same folder, named Arch Linux now: the distribution is the only thing that
-    // changed, and the members that cannot run anywhere else are offered again.
+    // changed, and the apps that cannot run anywhere else are offered again.
     distro(root.path(), "arch");
     let mut h = start(root.path(), 100, 30);
     let screen = h.screen();
@@ -83,7 +83,7 @@ fn the_same_machine_offers_them_on_arch_linux() {
 }
 
 #[test]
-fn a_member_that_cannot_run_here_has_no_install_button() {
+fn an_app_that_cannot_run_here_has_no_install_button() {
     let (root, mut h) = debian(48, 30);
     h.press("down").press("down").press("enter");
     let screen = h.screen();
@@ -107,16 +107,16 @@ fn the_command_line_does_not_ask_to_install_it_either() {
     let screen = h.screen();
     assert!(!has(&h, "Install qtools?"), "{}", screen);
     assert!(h.app().installs.dialog.is_none(), "no question opens:\n{screen}");
-    assert!(screen.contains("qtools runs only on Arch Linux"), "the reason is told, naming the member:\n{screen}");
+    assert!(screen.contains("qtools runs only on Arch Linux"), "the reason is told, naming the app:\n{screen}");
     assert_eq!(installs_ran(root.path()), 0, "nothing is installed");
 }
 
 #[test]
-fn a_member_that_is_already_installed_can_still_be_opened_and_removed() {
+fn an_app_that_is_already_installed_can_still_be_opened_and_removed() {
     let root = tempfile::tempdir().expect("temp");
     distro(root.path(), "debian");
     let app = Quvyta::new(machine(root.path()));
-    // cargo put qtools on this machine, so quvyta is looking at a member it did not offer.
+    // cargo put qtools on this machine, so quvyta is looking at an app it did not offer.
     std::fs::write(root.path().join("bin/list.out"), format!("{LIST}quvyta-tools v0.1.2:\n    qtools\n"))
         .expect("list");
     let qtools = installed_command(&app.machine, "qtools");
@@ -141,7 +141,7 @@ fn a_member_that_is_already_installed_can_still_be_opened_and_removed() {
 }
 
 #[test]
-fn a_member_installed_on_this_machine_is_still_updated() {
+fn an_app_installed_on_this_machine_is_still_updated() {
     let root = tempfile::tempdir().expect("temp");
     distro(root.path(), "debian");
     let app = Quvyta::new(machine(root.path()));
@@ -184,11 +184,11 @@ fn the_words_are_the_wizard_s_words_where_the_wizard_has_them() {
         assert!(!row.contains(&missing), "{locale}: `{missing}` invites the install:\n{row}");
 
         // The same claim on the first start, where the wizard has a whole sentence: its line is the
-        // member's own words with the claim after them, so the claim is these words and a period.
+        // app's own words with the claim after them, so the claim is these words and a period.
         let first = tempfile::tempdir().expect("temp");
         distro(first.path(), "debian");
         // A first start has no `launcher.conf`, so the machine is built without one. The screen is
-        // wide enough for the claim to stay on the member's own line, so what is compared here is
+        // wide enough for the claim to stay on the app's own line, so what is compared here is
         // the words and not where a language happened to wrap them.
         let mut wizard = run(Quvyta::new(machine_with_cargo(first.path(), "", 0)), 100, 30);
         wizard.set_locale(locale);
@@ -206,14 +206,14 @@ fn the_words_are_the_wizard_s_words_where_the_wizard_has_them() {
 }
 
 #[test]
-fn an_unbuilt_member_on_this_platform_is_also_told_why() {
+fn an_unbuilt_app_on_this_platform_is_also_told_why() {
     // The case cannot happen where the tests run, so the rule is pinned against this platform's
-    // own answer rather than against a machine that has one of these members built for it.
+    // own answer rather than against a machine that has one of these apps built for it.
     for arch in [false, true] {
         for key in ["explorer", "browser", "cli"] {
-            let member = APPS.iter().find(|member| member.key == key).expect("a member");
-            let (reason, offered) = (member.not_here(arch), member.offered(arch));
-            if member.runs_here() {
+            let app = APPS.iter().find(|app| app.key == key).expect("an app");
+            let (reason, offered) = (app.not_here(arch), app.offered(arch));
+            if app.runs_here() {
                 assert_eq!(reason, None, "{key} is built for this platform, so nothing is in the way");
                 assert!(offered, "{key} is offered where it is built");
             } else {
@@ -238,7 +238,7 @@ fn narrow_screens_and_ascii_keep_the_rules_for_these_rows() {
         let said = line_with(&screen, &short);
         assert!(!said.contains('…'), "the reason is not cut short in {locale}:\n{screen}");
 
-        // And on the member's own page, where the Install button would be.
+        // And on the app's own page, where the Install button would be.
         h.press("enter");
         let screen = h.screen();
         let said = line_with(&screen, &short);

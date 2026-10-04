@@ -293,7 +293,7 @@ fn the_update_dialog_names_both_versions_and_updates() {
 }
 
 #[test]
-fn u_asks_to_update_the_selected_member() {
+fn u_asks_to_update_the_selected_app() {
     let (_root, mut h) = updating();
     assert!(has(&h, "u  update"), "{}", h.screen());
     h.press("u");
@@ -321,7 +321,7 @@ fn a_failed_update_is_tried_again_at_the_new_version() {
 }
 
 /// The cells a person reaches for where the Update button would stand beside Open, had the
-/// member an update: the ground the details leave there, which must answer nothing at all.
+/// app an update: the ground the details leave there, which must answer nothing at all.
 fn where_update_would_be(h: &mut Harness<Quvyta>) {
     let screen = h.screen();
     let (y, x) = screen
@@ -339,7 +339,7 @@ fn where_update_would_be(h: &mut Harness<Quvyta>) {
 }
 
 #[test]
-fn members_installed_elsewhere_get_no_update() {
+fn apps_installed_elsewhere_get_no_update() {
     let (_root, mut h) = updating();
     h.send(Msg::Select(index("focus")));
     let screen = h.screen();
@@ -466,7 +466,7 @@ fn visual_review_updates() {
             h.set_locale(locale);
             shot(&h, format!("updates {size}"));
             h.send(Msg::ShowDetail(index("code")));
-            shot(&h, format!("a member with an update {size}"));
+            shot(&h, format!("an app with an update {size}"));
             h.press("u").advance(DIALOG_IN);
             shot(&h, format!("update dialog {size}"));
             let root = tempfile::tempdir().expect("temp");

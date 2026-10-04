@@ -154,7 +154,7 @@ fn esc_and_the_back_button_bring_the_list_back_as_it_was() {
     assert!(has(&with_esc, "What changed in"), "{}", with_esc.screen());
     with_esc.press("esc");
     let list = with_esc.screen();
-    assert!(line_with(&list, "qcode").contains('▌'), "the member that was selected is the one again:\n{list}");
+    assert!(line_with(&list, "qcode").contains('▌'), "the app that was selected is the one again:\n{list}");
     assert!(list.contains("2 updates") && list.contains("Install updates"), "the line under it is there:\n{list}");
 
     // The same machine again, at the older version once more, left with the button this time. The
@@ -341,7 +341,9 @@ fn a_file_that_cannot_be_written_says_so_quietly() {
 
 #[test]
 fn a_long_entry_scrolls_on_a_short_terminal() {
-    for (width, height) in [(80, 12), (40, 20)] {
+    // The entry is the running version's, whatever its length, so the terminals are narrow and
+    // short: an entry of a few lines still runs past them.
+    for (width, height) in [(50, 8), (40, 8)] {
         let (_root, mut h) = page(OLDER, width, height);
         let entry = entry();
         let start = shown(&h);

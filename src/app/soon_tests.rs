@@ -1,9 +1,9 @@
-//! A member that is not released yet: listed with what it will be, never installed or updated
+//! An app that is not released yet: listed with what it will be, never installed or updated
 //! from quvyta, and opened like any other when a build of it is already on the machine.
 //!
-//! Every member is out today, so each test here makes qdesk one still to come for as long as it
+//! Every app is out today, so each test here makes qdesk one still to come for as long as it
 //! runs ([`unreleased`]); qdesk has a page, words in every language and a local build to stand in
-//! with, which is what the next member still to come will have.
+//! with, which is what the next app still to come will have.
 
 use std::path::Path;
 
@@ -21,7 +21,7 @@ fn desk() -> usize {
     index("desk")
 }
 
-/// What crates.io answers when something named like the member is there after all: a newer
+/// What crates.io answers when something named like the app is there after all: a newer
 /// version than the local build, and qcode's update beside it.
 const SEARCH: &str = "\
 quvyta-code = \"0.1.2\"

@@ -1,6 +1,6 @@
-//! The install queue as the screen keeps it: the dialog that asks first, the member being
+//! The install queue as the screen keeps it: the dialog that asks first, the app being
 //! installed with its progress and log, the ones waiting, and how the last install of each
-//! member ended.
+//! app ended.
 //!
 //! One install runs at a time: two builds at once would take twice the machine and wait for
 //! each other on cargo's own lock anyway, and a queue tells the user honestly what happens next.
@@ -24,7 +24,7 @@ use crate::install::{self, Claim, Job, Outcome, Removal};
 use crate::inventory::State;
 
 /// Lines of cargo's output kept for the details and the copied log; far more than an install
-/// of any member writes.
+/// of any app writes.
 const LOG_LINES: usize = 20_000;
 
 /// How often a window waiting for another one looks whether the build folder is free.
@@ -33,17 +33,17 @@ const WAIT: Duration = Duration::from_secs(3);
 /// Everything that happens to installs.
 #[derive(Debug, Clone)]
 pub enum InstallMsg {
-    /// Opens the install dialog for the member at this index.
+    /// Opens the install dialog for the app at this index.
     Ask(usize),
-    /// What the checks found for the member of the dialog, and whether another window installs.
+    /// What the checks found for the app of the dialog, and whether another window installs.
     Checked {
-        /// The member.
+        /// The app.
         index: usize,
         /// What is in the way; empty when the install can go ahead.
         problems: Vec<Problem>,
         /// Whether another quvyta window holds the build folder.
         other_window: bool,
-        /// The version crates.io named for a member cargo installs only by its version, when
+        /// The version crates.io named for an app cargo installs only by its version, when
         /// the dialog did not know it: the command it shows is then the one that runs.
         named: Option<String>,
     },
@@ -51,7 +51,7 @@ pub enum InstallMsg {
     Recheck,
     /// Closes the dialog without installing.
     Close,
-    /// Puts the member of the dialog in the queue.
+    /// Puts the app of the dialog in the queue.
     Confirm,
     /// Hands the terminal to rustup to bring Rust up to date.
     UpdateRust(PathBuf),
@@ -62,21 +62,21 @@ pub enum InstallMsg {
     RunFix(Problem),
     /// That line has ended.
     FixRan(HandoffOutcome),
-    /// A line cargo wrote while installing the member at this index.
+    /// A line cargo wrote while installing the app at this index.
     Line(usize, String),
-    /// A frame of cargo's progress line, which it redraws in place, while installing the member
+    /// A frame of cargo's progress line, which it redraws in place, while installing the app
     /// at this index. It says where the build is and belongs in no log.
     Frame(usize, String),
-    /// The install of the member at this index ended.
+    /// The install of the app at this index ended.
     Finished {
-        /// The member.
+        /// The app.
         index: usize,
         /// How it ended.
         outcome: Outcome,
         /// What the checks find after a failure they explain, for its fix.
         problems: Vec<Problem>,
     },
-    /// The task of the member at this index started, progressed or ended.
+    /// The task of the app at this index started, progressed or ended.
     Event(usize, TaskEvent),
     /// Asks whether to stop the running install.
     AskStop,
@@ -86,7 +86,7 @@ pub enum InstallMsg {
     KeepRunning,
     /// Stops the running install, and the queue too when that was chosen.
     Stop,
-    /// Takes the member at this index out of the queue.
+    /// Takes the app at this index out of the queue.
     Dequeue(usize),
     /// Asks whether to quit while an install runs.
     AskQuit,
@@ -94,17 +94,17 @@ pub enum InstallMsg {
     Quit,
     /// Shows or hides cargo's own output.
     ToggleDetails,
-    /// Copies the whole log of the member at this index.
+    /// Copies the whole log of the app at this index.
     CopyLog(usize),
-    /// Clears the failure of the member at this index.
+    /// Clears the failure of the app at this index.
     Dismiss(usize),
-    /// Tries the member at this index again.
+    /// Tries the app at this index again.
     Retry(usize),
-    /// Asks whether to remove the member at this index.
+    /// Asks whether to remove the app at this index.
     AskRemove(usize),
     /// Closes the remove question without removing.
-    KeepMember,
-    /// Puts the removal of the member of the question in the queue.
+    KeepApp,
+    /// Puts the removal of the app of the question in the queue.
     ConfirmRemove,
     /// Whether another window held the build folder when quvyta started.
     Leftover(bool),
@@ -119,13 +119,13 @@ pub enum InstallMsg {
 pub(super) struct Installs {
     /// The dialog, while it is open.
     pub(super) dialog: Option<Dialog>,
-    /// Members waiting, in order, with what is to be done to each.
+    /// Apps waiting, in order, with what is to be done to each.
     pub(super) queue: VecDeque<(usize, Action)>,
-    /// The member the remove question is about, while it is open.
+    /// The app the remove question is about, while it is open.
     pub(super) remove: Option<usize>,
     /// The install running now.
     pub(super) running: Option<Running>,
-    /// How the last install of a member ended, while that is worth showing.
+    /// How the last install of an app ended, while that is worth showing.
     pub(super) ended: BTreeMap<usize, Ended>,
     /// The build folder, held while the queue has work.
     lock: Option<AppLock>,
@@ -141,10 +141,10 @@ pub(super) struct Installs {
     pub(super) details: bool,
 }
 
-/// The install dialog of one member.
+/// The install dialog of one app.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Dialog {
-    /// The member, an index of [`APPS`].
+    /// The app, an index of [`APPS`].
     pub(super) index: usize,
     /// The version to install; `None` for the latest on crates.io.
     pub(super) version: Option<String>,
@@ -152,15 +152,15 @@ pub(super) struct Dialog {
     pub(super) from: Option<String>,
     /// What the checks found; `None` while they run.
     pub(super) problems: Option<Vec<Problem>>,
-    /// The other members updated with this one when Install updates asked for them all, each
-    /// with the version it has and the one it is updated to. Empty for one member's own dialog.
+    /// The other apps updated with this one when Install updates asked for them all, each
+    /// with the version it has and the one it is updated to. Empty for one app's own dialog.
     pub(super) more: Vec<Also>,
 }
 
-/// One more member a dialog updates, besides its first.
+/// One more app a dialog updates, besides its first.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Also {
-    /// The member, an index of [`APPS`].
+    /// The app, an index of [`APPS`].
     pub(super) index: usize,
     /// The version installed now.
     pub(super) from: String,
@@ -168,7 +168,7 @@ pub(super) struct Also {
     pub(super) to: String,
 }
 
-/// What a job of the queue does to its member.
+/// What a job of the queue does to its app.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Action {
     /// `cargo install`, at this version, or the latest one when `None`. An update is an install
@@ -181,7 +181,7 @@ pub(super) enum Action {
 /// The install that runs.
 #[derive(Debug)]
 pub(super) struct Running {
-    /// The member, an index of [`APPS`].
+    /// The app, an index of [`APPS`].
     pub(super) index: usize,
     /// What is done to it.
     pub(super) action: Action,
@@ -246,7 +246,7 @@ impl Progress {
     }
 }
 
-/// How the last install of a member ended.
+/// How the last install of an app ended.
 #[derive(Debug, Clone)]
 pub(super) enum Ended {
     /// It failed.
@@ -270,43 +270,43 @@ impl Installs {
         self.running.is_some() || !self.queue.is_empty()
     }
 
-    /// Whether the member at `index` runs or waits.
+    /// Whether the app at `index` runs or waits.
     pub(super) fn has(&self, index: usize) -> bool {
         self.running.as_ref().is_some_and(|running| running.index == index)
             || self.queue.iter().any(|(queued, _)| *queued == index)
     }
 
-    /// Whether the member at `index` waits in the queue.
+    /// Whether the app at `index` waits in the queue.
     pub(super) fn is_queued(&self, index: usize) -> bool {
         self.queue.iter().any(|(queued, _)| *queued == index)
     }
 
-    /// The install of the member at `index`, when it runs.
+    /// The install of the app at `index`, when it runs.
     pub(super) fn running(&self, index: usize) -> Option<&Running> {
         self.running.as_ref().filter(|running| running.index == index)
     }
 }
 
 impl Quvyta {
-    /// Whether the member at `index` can be installed from here: it is not there, quvyta may offer
+    /// Whether the app at `index` can be installed from here: it is not there, quvyta may offer
     /// to install it on this machine, it is out on crates.io, it is not quvyta itself, and it is
-    /// not already on its way. What quvyta may offer is [`Member::offered`], so the list, the
-    /// details and the first run cannot disagree about a member.
+    /// not already on its way. What quvyta may offer is [`QuvytaApp::offered`], so the list, the
+    /// details and the first run cannot disagree about an app.
     pub(super) fn installable(&self, index: usize) -> bool {
         matches!(self.state(index), Some(State::Missing))
-            && APPS.get(index).is_some_and(|member| member.offered(self.arch))
+            && APPS.get(index).is_some_and(|app| app.offered(self.arch))
             && !self.installs.has(index)
     }
 
-    /// Whether the member at `index` can be removed from here: cargo installed it, so cargo can
+    /// Whether the app at `index` can be removed from here: cargo installed it, so cargo can
     /// remove it, and it is not quvyta, which does not remove itself from under its own feet.
     pub(super) fn removable(&self, index: usize) -> bool {
         matches!(self.state(index), Some(State::Cargo { .. }))
-            && APPS.get(index).is_some_and(|member| !member.is_self())
+            && APPS.get(index).is_some_and(|app| !app.is_self())
             && !self.installs.has(index)
     }
 
-    /// Whether `action` can be queued for the member at `index` as things are now.
+    /// Whether `action` can be queued for the app at `index` as things are now.
     fn can(&self, index: usize, action: &Action) -> bool {
         match action {
             Action::Install(_) => self.installable(index) || self.updatable(index),
@@ -362,7 +362,7 @@ impl Quvyta {
                 if let Some(dialog) = self.installs.dialog.take()
                     && dialog.problems.as_ref().is_some_and(Vec::is_empty)
                 {
-                    // Each member as the dialog showed it, and only while that still holds: one
+                    // Each app as the dialog showed it, and only while that still holds: one
                     // that was updated or queued meanwhile is not updated twice.
                     let first = if dialog.from.is_some() {
                         self.updatable(dialog.index)
@@ -517,7 +517,7 @@ impl Quvyta {
                 self.installs.remove = Some(index);
             }
             InstallMsg::AskRemove(_) => {}
-            InstallMsg::KeepMember => self.installs.remove = None,
+            InstallMsg::KeepApp => self.installs.remove = None,
             InstallMsg::ConfirmRemove => {
                 if let Some(index) = self.installs.remove.take().filter(|index| self.removable(*index)) {
                     self.installs.queue.push_back((index, Action::Remove));
@@ -548,7 +548,7 @@ impl Quvyta {
 
     /// Runs the checks of the open dialog in the background.
     ///
-    /// A member cargo installs only by its version, whose version the dialog does not know yet
+    /// An app cargo installs only by its version, whose version the dialog does not know yet
     /// because the updates were never asked, has it asked here: the button waits for the checks
     /// anyway, and the command on screen is then the whole command that runs.
     pub(super) fn check(&self) -> Command<Msg> {
@@ -557,7 +557,7 @@ impl Quvyta {
         let unnamed = dialog
             .version
             .is_none()
-            .then(|| APPS.get(index).and_then(|member| Job::new(&self.machine, member, None)))
+            .then(|| APPS.get(index).and_then(|app| Job::new(&self.machine, app, None)))
             .flatten()
             .filter(|job| job.named_only);
         let machine = self.machine.clone();
@@ -570,7 +570,7 @@ impl Quvyta {
         })
     }
 
-    /// The whole log of the member at `index`: of the install running or of its failure.
+    /// The whole log of the app at `index`: of the install running or of its failure.
     pub(super) fn log(&self, index: usize) -> Option<&LogBuffer> {
         match (self.installs.running(index), self.installs.ended.get(&index)) {
             (Some(running), _) => Some(&running.log),
@@ -586,23 +586,23 @@ impl Quvyta {
         // The stop question was about this install. Left open, it would name the next one, and a
         // Stop pressed a moment late would end an install nobody was asked about.
         self.installs.stop = None;
-        let Some(member) = APPS.get(index) else { return Command::none() };
+        let Some(app) = APPS.get(index) else { return Command::none() };
         let report = match &outcome {
             Outcome::Installed { version } => {
                 let toast = match version {
-                    Some(version) => t!("install.done", command = member.command, version = version.as_str()),
-                    None => t!("install.done-unknown", command = member.command),
+                    Some(version) => t!("install.done", command = app.command, version = version.as_str()),
+                    None => t!("install.done-unknown", command = app.command),
                 };
                 let mut toast = Toast::success(toast).key("installed");
                 // cargo replaced quvyta's file; the process running is still the old one.
-                if member.is_self() {
+                if app.is_self() {
                     toast = toast.body(t!("install.next-time"));
                 }
                 // Installed is not yet startable by name when cargo's folder is not on PATH.
                 Command::batch([Command::toast(toast), self.read_inventory(), self.check_path(Some(index))])
             }
             Outcome::Removed => Command::batch([
-                Command::toast(Toast::success(t!("remove.done", command = member.command)).key("removed")),
+                Command::toast(Toast::success(t!("remove.done", command = app.command)).key("removed")),
                 self.read_inventory(),
             ]),
             Outcome::Cancelled => {
@@ -618,7 +618,7 @@ impl Quvyta {
         Command::batch([report, self.start_next()])
     }
 
-    /// Starts the next member of the queue once nothing runs, taking the build folder first;
+    /// Starts the next app of the queue once nothing runs, taking the build folder first;
     /// deletes the folder once the queue is empty.
     pub(super) fn start_next(&mut self) -> Command<Msg> {
         if self.installs.running.is_some() || self.installs.waiting.is_some() {
@@ -638,12 +638,12 @@ impl Quvyta {
             }
         }
         self.installs.queue.pop_front();
-        let member = &APPS[index];
+        let app = &APPS[index];
         let task = match &action {
             Action::Install(version) => {
-                Job::new(&self.machine, member, version.clone()).map(|job| self.install_task(index, job))
+                Job::new(&self.machine, app, version.clone()).map(|job| self.install_task(index, job))
             }
-            Action::Remove => Removal::new(&self.machine, member).map(|removal| remove_task(index, removal)),
+            Action::Remove => Removal::new(&self.machine, app).map(|removal| remove_task(index, removal)),
         };
         let Some(task) = task else {
             // The checks found cargo; it went away since.
@@ -662,7 +662,7 @@ impl Quvyta {
         Command::task(task)
     }
 
-    /// The background task of installing the member at `index` with `job`.
+    /// The background task of installing the app at `index` with `job`.
     fn install_task(&self, index: usize, job: Job) -> Task<Msg> {
         let machine = self.machine.clone();
         Task::new(APPS[index].command, move |cx| {
@@ -735,7 +735,7 @@ impl Quvyta {
     }
 }
 
-/// The background task of removing the member at `index` with `removal`.
+/// The background task of removing the app at `index` with `removal`.
 fn remove_task(index: usize, removal: Removal) -> Task<Msg> {
     Task::new(APPS[index].command, move |cx| {
         let outcome =

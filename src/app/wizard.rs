@@ -6,17 +6,17 @@
 //! the buttons and the two files; nothing at all is written until Finish, so a quvyta closed
 //! half-way leaves the settings folder exactly as it was and the wizard comes again next start.
 //!
-//! quvyta's step is the list of Quvyta apps as checkboxes, nothing checked. A member that runs on
+//! quvyta's step is the list of Quvyta apps as checkboxes, nothing checked. An app that runs on
 //! Arch Linux only is faint and cannot be checked on another system, and so is one that is not
 //! released yet; the distribution comes from the same place the install checks read it
-//! ([`crate::checks::distro`]). On Finish the checked members go through the install dialog and
+//! ([`crate::checks::distro`]). On Finish the checked apps go through the install dialog and
 //! the queue the Apps tab uses, one after another: quvyta installs nothing without being told.
 
 use qframe::prelude::*;
 use qframe::widgets::{Checkbox, ScrollView, SetupWizard};
 
 use super::{Msg, Quvyta};
-use crate::ecosystem::{APPS, Member, Status};
+use crate::ecosystem::{APPS, QuvytaApp, Status};
 
 /// Rows the wizard takes around its page: the padding, the name, the blank line under it, the
 /// steps, the blank lines around the page and the row of buttons.
@@ -25,14 +25,14 @@ const AROUND_PAGE: u16 = 8;
 /// The fewest rows the page keeps, however short the terminal is.
 const LEAST_PAGE_ROWS: u16 = 8;
 
-/// Cells the app list keeps from the page's left edge, so a member's line stands under its
+/// Cells the app list keeps from the page's left edge, so an app's line stands under its
 /// checkbox rather than under its name.
 pub(in crate::app) const LINE_INDENT: u16 = 4;
 
 /// Something on quvyta's own step of the wizard.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WizardMsg {
-    /// Checks or unchecks the member at this index of [`APPS`].
+    /// Checks or unchecks the app at this index of [`APPS`].
     Pick(usize, bool),
 }
 
@@ -42,11 +42,11 @@ impl Quvyta {
         self.setup.as_ref().is_some_and(qframe::widgets::Setup::needed)
     }
 
-    /// Whether the member at `index` can be chosen on the wizard's own step: the rule the app
-    /// list offers its installs by, so the first run and the list never hold a member back in one
+    /// Whether the app at `index` can be chosen on the wizard's own step: the rule the app
+    /// list offers its installs by, so the first run and the list never hold an app back in one
     /// of them and offer it in the other.
     pub(super) fn choosable(&self, index: usize) -> bool {
-        APPS.get(index).is_some_and(|member| member.offered(self.arch))
+        APPS.get(index).is_some_and(|app| app.offered(self.arch))
     }
 
     pub(super) fn update_wizard(&mut self, msg: WizardMsg) -> Command<Msg> {
@@ -64,7 +64,7 @@ impl Quvyta {
 
     /// The wizard wrote both files, and nothing more goes into them: quvyta's own settings keep
     /// their defaults by not being written, so a better default in a later version reaches
-    /// everyone. The screen takes the appearance that was chosen, and the members that were
+    /// everyone. The screen takes the appearance that was chosen, and the apps that were
     /// checked start their way through the install dialog.
     pub(super) fn finish_setup(&mut self) -> Command<Msg> {
         let Some(setup) = self.setup.take() else { return Command::none() };
@@ -73,7 +73,7 @@ impl Quvyta {
         self.appearance = super::appearance_of(&self.machine, setup.preferences().clone());
         self.launcher = crate::launcher::Launcher::default();
         self.asked = (0..APPS.len()).filter(|index| self.picked.get(*index) == Some(&true)).collect();
-        // Which members are there already is only known once cargo has answered; when it has
+        // Which apps are there already is only known once cargo has answered; when it has
         // not, the first answer opens the dialogs instead.
         let asking = if self.inventory.is_some() { self.ask_next() } else { Command::none() };
         Command::batch([Command::focus("apps"), asking])
@@ -114,34 +114,34 @@ impl Quvyta {
         ui.add(Text::new(t!("wizard.apps-intro")).role("secondary")).fill_width();
         ui.spacer().height(Length::Cells(1));
         let page = |ui: &mut View<'_, Msg>| {
-            for (index, member) in APPS.iter().enumerate() {
+            for (index, app) in APPS.iter().enumerate() {
                 // quvyta is the program asking; it is not one of the choices.
-                if member.is_self() {
+                if app.is_self() {
                     continue;
                 }
-                self.app_row(index, member, ui);
+                self.app_row(index, app, ui);
             }
         };
-        // Six members with a line each outgrow a short screen; the page scrolls rather than
+        // Six apps with a line each outgrow a short screen; the page scrolls rather than
         // cutting the last of them off.
         ui.add_with(ScrollView::new(), page).fill().id("wizard-apps");
     }
 
-    /// One member: its checkbox and, under it, the one line that says what it is and why it
+    /// One app: its checkbox and, under it, the one line that says what it is and why it
     /// cannot be chosen when it cannot.
-    fn app_row(&self, index: usize, member: &Member, ui: &mut View<'_, Msg>) {
+    fn app_row(&self, index: usize, app: &QuvytaApp, ui: &mut View<'_, Msg>) {
         let choosable = self.choosable(index);
         let checked = self.picked.get(index) == Some(&true);
         let box_ = Checkbox::new(checked)
-            .label(member.command)
+            .label(app.command)
             .disabled(!choosable)
             .on_toggle(move |on| Msg::Wizard(WizardMsg::Pick(index, on)));
-        ui.add(box_).id(format!("wizard-{}", member.key));
-        let line = t!(&format!("wizard.line-{}", member.key));
-        let line = match (member.status(), member.arch_only && !self.arch) {
+        ui.add(box_).id(format!("wizard-{}", app.key));
+        let line = t!(&format!("wizard.line-{}", app.key));
+        let line = match (app.status(), app.arch_only && !self.arch) {
             (Status::Soon, _) => t!("wizard.soon", line = line),
             (_, true) => t!("wizard.arch-only", line = line),
-            _ if !member.runs_here() => t!("wizard.unix-only", line = line),
+            _ if !app.runs_here() => t!("wizard.unix-only", line = line),
             _ => line,
         };
         let role = if choosable { "secondary" } else { "faint" };

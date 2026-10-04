@@ -17,8 +17,8 @@ fn main() -> ExitCode {
     }
     let app = Quvyta::new(Machine::from_env());
     let app = match answer {
-        Answer::Start(Start::Install(members)) => app.asking(members),
-        Answer::Start(Start::Show(member)) => app.showing(member),
+        Answer::Start(Start::Install(apps)) => app.asking(apps),
+        Answer::Start(Start::Show(entry)) => app.showing(entry),
         _ => app,
     };
     // The shared language, theme and icons are in force from the first frame, and

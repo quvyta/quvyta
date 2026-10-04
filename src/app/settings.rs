@@ -21,7 +21,7 @@ use qframe::widgets::{
 };
 
 use super::confirm_install::field;
-use super::follow::{self, Following, MemberFollowing};
+use super::follow::{self, AppFollowing, Following};
 use super::path_notice::PathReach;
 use super::{Msg, Quvyta};
 use crate::ecosystem::APPS;
@@ -35,7 +35,7 @@ const SECTION: u16 = 76;
 /// From this many columns up the file's path stands to the right of the section title; below it
 /// goes under the title.
 const WIDE: u16 = 100;
-/// The order of the choices after a member closes, as the select lists them.
+/// The order of the choices after an app closes, as the select lists them.
 const AFTER_CLOSE: [AfterClose; 2] = [AfterClose::Return, AfterClose::Shell];
 
 /// The width of the bar a running font install shows in place of its button: wide enough to be
@@ -82,7 +82,7 @@ fn font_installed(machine: &Machine) -> bool {
 /// A setting and its new value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {
-    /// What happens when a member opened from quvyta closes.
+    /// What happens when an app opened from quvyta closes.
     AfterClose(AfterClose),
 }
 
@@ -102,13 +102,13 @@ pub enum SettingMsg {
     AddToPath,
     /// A change on the appearance rows every Quvyta app shares.
     Appearance(AppearanceChange),
-    /// How each installed member follows the shared values, read from their files.
-    Followed(Vec<MemberFollowing>),
+    /// How each installed app follows the shared values, read from their files.
+    Followed(Vec<AppFollowing>),
     /// Moves the keys to this row of the follow table.
     FollowSelect(usize),
-    /// Puts the member at this index of [`APPS`] back on the shared value of the key.
+    /// Puts the app at this index of [`APPS`] back on the shared value of the key.
     Follow(usize, Shared),
-    /// The member's file was written, or why not.
+    /// The app's file was written, or why not.
     Follows(Result<(), String>),
     /// Opens the question before installing the Nerd Font.
     FontAsk,
@@ -198,24 +198,24 @@ impl Quvyta {
         }
     }
 
-    /// Reads, in the background, how each installed member follows the shared values. Nothing is read
+    /// Reads, in the background, how each installed app follows the shared values. Nothing is read
     /// before cargo has said what is installed: until then the table would list no one, which
     /// reads as "nothing is installed".
     pub(super) fn read_following(&self) -> Command<Msg> {
         let Some(inventory) = &self.inventory else { return Command::none() };
         // quvyta's own following is the boxes under the appearance rows.
-        let members: Vec<usize> = (0..APPS.len())
+        let apps: Vec<usize> = (0..APPS.len())
             .filter(|index| matches!(inventory.state(*index), State::Cargo { .. } | State::Elsewhere { .. }))
             .collect();
         let machine = self.machine.clone();
-        Command::perform(move || Msg::Setting(SettingMsg::Followed(follow::read(&machine, &members))))
+        Command::perform(move || Msg::Setting(SettingMsg::Followed(follow::read(&machine, &apps))))
     }
 
-    /// Keeps what was read and tells, once, why a member's file could not be read.
-    fn followed(&mut self, following: Vec<MemberFollowing>) -> Command<Msg> {
+    /// Keeps what was read and tells, once, why an app's file could not be read.
+    fn followed(&mut self, following: Vec<AppFollowing>) -> Command<Msg> {
         let reasons: Vec<String> = following
             .iter()
-            .filter_map(|member| match &member.following {
+            .filter_map(|app| match &app.following {
                 Following::Unreadable(reasons) => Some(reasons.iter().cloned()),
                 _ => None,
             })
@@ -269,7 +269,7 @@ impl Quvyta {
 
     /// The appearance every Quvyta application shows the same way: language, theme and icons with
     /// their boxes, then reduced motion and the pillar, and the shared update notice. The rows
-    /// are the framework's; quvyta adds none of its own, so a member's settings and quvyta's read
+    /// are the framework's; quvyta adds none of its own, so an app's settings and quvyta's read
     /// alike.
     fn appearance_settings<'v>(&self, ui: &'v mut View<'_, Msg>) -> NodeMut<'v, Msg> {
         SettingsList::show(ui, |list| {
@@ -277,7 +277,7 @@ impl Quvyta {
             self.appearance.section(list, message);
             self.font_row(list);
             // quvyta asks crates.io at start, so it shows the shared switch for that, in the
-            // framework's words: the same one every member that asks shows.
+            // framework's words: the same one every app that asks shows.
             self.appearance.updates(list, message);
         })
     }
@@ -376,8 +376,8 @@ impl Quvyta {
         });
     }
 
-    /// Whether each installed member follows the shared language, theme, icons and reduced motion:
-    /// a table where its columns fit, one line per member where they do not. Nothing is drawn
+    /// Whether each installed app follows the shared language, theme, icons and reduced motion:
+    /// a table where its columns fit, one line per app where they do not. Nothing is drawn
     /// before what is installed is known.
     fn following_section(&self, width: u16, ui: &mut View<'_, Msg>) {
         let Some(following) = &self.following else { return };
@@ -390,7 +390,7 @@ impl Quvyta {
             }
             // The table only where all its columns fit: four shared keys and a long language name
             // in some languages do not, even on a wide screen, and a column that scrolls sideways
-            // hides a member's own value.
+            // hides an app's own value.
             if self.size.width >= WIDE && table_need(following, &words) <= width {
                 self.following_table(following, &words, width, ui);
             } else {
@@ -402,15 +402,15 @@ impl Quvyta {
         .id("following");
     }
 
-    /// The follow table: a member per row, a shared key per column.
-    fn following_table(&self, following: &[MemberFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
+    /// The follow table: an app per row, a shared key per column.
+    fn following_table(&self, following: &[AppFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
         let columns = std::iter::once(Column::new(String::new()).width(ColumnWidth::Fit))
             .chain(words.keys.iter().map(|(_, name)| Column::new(name.clone()).width(ColumnWidth::Fit)));
         let rows: Vec<TableRow> = following
             .iter()
-            .map(|member| {
-                let command = TableCell::new(APPS[member.index].command);
-                let cells = table_cells(member, words).into_iter().map(|(text, faint)| {
+            .map(|app| {
+                let command = TableCell::new(APPS[app.index].command);
+                let cells = table_cells(app, words).into_iter().map(|(text, faint)| {
                     let cell = TableCell::new(text);
                     if faint { cell.role("faint") } else { cell }
                 });
@@ -421,7 +421,7 @@ impl Quvyta {
         // enter and a click open; a row that shares everything, or cannot be read, opens nothing.
         let menus: Vec<Vec<ContextItem<Msg>>> = following
             .iter()
-            .map(|member| follow_choices(member).map(|(key, msg)| ContextItem::new(follow_label(key), msg)).collect())
+            .map(|app| follow_choices(app).map(|(key, msg)| ContextItem::new(follow_label(key), msg)).collect())
             .collect();
         let select = |row: usize| Msg::Setting(SettingMsg::FollowSelect(row));
         let table = Table::new(columns, rows)
@@ -507,24 +507,24 @@ impl Quvyta {
     }
 }
 
-/// The choices that put one of `member`'s own keys back on the shared value, one per key it
-/// does not share, with the message each sends. None for a member that shares everything, has
+/// The choices that put one of `app`'s own keys back on the shared value, one per key it
+/// does not share, with the message each sends. None for an app that shares everything, has
 /// not been opened, or has a file quvyta could not read and so never writes.
-fn follow_choices(member: &MemberFollowing) -> impl Iterator<Item = (Shared, Msg)> + '_ {
-    let values = match &member.following {
+fn follow_choices(app: &AppFollowing) -> impl Iterator<Item = (Shared, Msg)> + '_ {
+    let values = match &app.following {
         Following::Keys(values) => values.as_slice(),
         Following::NotOpened | Following::Unreadable(_) => &[],
     };
     values
         .iter()
         .filter(|(_, own)| own.is_some())
-        .map(|(key, _)| (*key, Msg::Setting(SettingMsg::Follow(member.index, *key))))
+        .map(|(key, _)| (*key, Msg::Setting(SettingMsg::Follow(app.index, *key))))
 }
 
-/// The follow table's cells of `member` after its name, one per shared key, each with whether it
+/// The follow table's cells of `app` after its name, one per shared key, each with whether it
 /// is drawn faint.
-fn table_cells(member: &MemberFollowing, words: &Words) -> Vec<(String, bool)> {
-    match &member.following {
+fn table_cells(app: &AppFollowing, words: &Words) -> Vec<(String, bool)> {
+    match &app.following {
         // One word for the row: it has no values to spread over the columns.
         Following::NotOpened => std::iter::once((t!("settings.follow-not-opened"), true))
             .chain(std::iter::repeat_with(|| (String::new(), false)))
@@ -548,13 +548,13 @@ fn table_cells(member: &MemberFollowing, words: &Words) -> Vec<(String, bool)> {
 /// table sizes a column that fits its content: its widest cell and one cell more, or its title,
 /// with two cells between columns, and a few cells for the selection mark and the section's
 /// sides.
-fn table_need(following: &[MemberFollowing], words: &Words) -> u16 {
+fn table_need(following: &[AppFollowing], words: &Words) -> u16 {
     let width = |text: &str| qframe::text::width(text);
     let mut columns: Vec<u16> =
         std::iter::once(0).chain(words.keys.iter().map(|(_, name)| width(name).saturating_sub(1))).collect();
-    for member in following {
-        let cells: Vec<u16> = std::iter::once(width(APPS[member.index].command))
-            .chain(table_cells(member, words).iter().map(|(text, _)| width(text)))
+    for app in following {
+        let cells: Vec<u16> = std::iter::once(width(APPS[app.index].command))
+            .chain(table_cells(app, words).iter().map(|(text, _)| width(text)))
             .collect();
         for (column, cell) in columns.iter_mut().zip(cells) {
             *column = (*column).max(cell);
@@ -569,17 +569,16 @@ fn follow_label(key: Shared) -> String {
     follow::SHOWN.iter().find(|(shown, ..)| *shown == key).map_or_else(|| key.key().to_owned(), |(.., label)| t!(label))
 }
 
-/// One line per member for a narrow screen: its command, then only the keys it does not share
-/// with the others, or that it shares them all. When a member's own keys do not fit on one line
+/// One line per app for a narrow screen: its command, then only the keys it does not share
+/// with the others, or that it shares them all. When an app's own keys do not fit on one line
 /// in `width` cells, each takes a line of its own under the first, so a line never breaks inside
 /// a value.
-fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
-    let name_width =
-        following.iter().map(|member| qframe::text::width(APPS[member.index].command)).max().unwrap_or(0) + 2;
+fn following_lines(following: &[AppFollowing], words: &Words, width: u16, ui: &mut View<'_, Msg>) {
+    let name_width = following.iter().map(|app| qframe::text::width(APPS[app.index].command)).max().unwrap_or(0) + 2;
     // The section's sides and the name column leave this much for the keys.
     let room = width.saturating_sub(4 + name_width);
-    for member in following {
-        let (text, own) = match &member.following {
+    for app in following {
+        let (text, own) = match &app.following {
             Following::NotOpened => (t!("settings.follow-not-opened"), false),
             Following::Unreadable(_) => (t!("settings.follow-unreadable"), false),
             Following::Keys(values) => {
@@ -601,15 +600,15 @@ fn following_lines(following: &[MemberFollowing], words: &Words, width: u16, ui:
             }
         };
         ui.row(|ui| {
-            ui.add(Text::new(APPS[member.index].command).no_wrap()).width(Length::Cells(name_width));
+            ui.add(Text::new(APPS[app.index].command).no_wrap()).width(Length::Cells(name_width));
             // A long language name wraps under itself rather than being cut.
             let text = Text::new(text);
             ui.add(if own { text } else { text.role("faint") }).fill_width();
         })
         .padding(Padding::symmetric(0, 2));
-        // The table's menu is not there on a narrow screen, so its choices stand under the member
+        // The table's menu is not there on a narrow screen, so its choices stand under the app
         // as buttons, moving to the next line when they do not fit.
-        let choices: Vec<(Shared, Msg)> = follow_choices(member).collect();
+        let choices: Vec<(Shared, Msg)> = follow_choices(app).collect();
         if !choices.is_empty() {
             ui.row(|ui| {
                 ui.add(Text::new(t!("settings.follow-narrow")).role("faint").no_wrap());
@@ -656,7 +655,7 @@ impl Words {
 
     /// `value` of `key` as the appearance rows would name it: a language in its own name, a
     /// theme's name, an icon set's name. A value this quvyta does not know, such as a theme a
-    /// newer member brought, is shown as it is written.
+    /// newer app brought, is shown as it is written.
     fn value(&self, key: Shared, value: &str) -> String {
         let named = |names: &[(String, String)]| names.iter().find(|(id, _)| id == value).map(|(_, name)| name.clone());
         // Compared, not matched: a shared setting the framework adds later is shown as written.

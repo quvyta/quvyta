@@ -20,7 +20,7 @@ use crate::machine::Machine;
 
 /// A machine in `root` with cargo and a C linker, where no Quvyta app is installed and
 /// quvyta has no settings file: the machine of a first start. `distro` is what
-/// `/etc/os-release` says, which decides whether the members that run on Arch Linux only can be
+/// `/etc/os-release` says, which decides whether the apps that run on Arch Linux only can be
 /// chosen.
 fn machine(root: &Path, distro: &str) -> Machine {
     let mut machine = machine_with_cargo(root, "", 0);
@@ -75,9 +75,9 @@ fn finish(h: &mut Harness<Quvyta>) {
     h.advance(DIALOG_IN);
 }
 
-/// Clicks the checkbox of the member whose command is `command`: its label, on the row that
+/// Clicks the checkbox of the app whose command is `command`: its label, on the row that
 /// holds nothing else, so a mention of the command in another line is never what is clicked.
-fn click_member(h: &mut Harness<Quvyta>, command: &str) {
+fn click_app(h: &mut Harness<Quvyta>, command: &str) {
     let screen = h.screen();
     let (y, x) = screen
         .lines()
@@ -125,7 +125,7 @@ fn closing_it_half_way_writes_nothing_at_all() {
     // something that could have been written.
     h.send(Msg::Setup(SetupMsg::Appearance(AppearanceChange::Theme("nordic".to_owned()))));
     to_apps_step(&mut h);
-    click_member(&mut h, "qcode");
+    click_app(&mut h, "qcode");
     assert!(h.app().picked[index("code")], "qcode is checked:\n{}", h.screen());
     assert_eq!(folder(root.path()), Vec::<String>::new(), "half-way through, the folder is as it was");
     // Next start: the wizard is there again, with nothing remembered.
@@ -145,7 +145,7 @@ fn starting_with_the_defaults_writes_both_files_but_no_default_and_never_asks_ag
     assert_eq!(folder(root.path()), ["launcher.conf", "quvyta.conf"]);
     let text = fs::read_to_string(root.path().join("config/launcher.conf")).expect("written");
     // A default that is written down would outlive a better default in a later version.
-    assert!(!text.contains("after_close"), "the default of what follows a member is not written:\n{text}");
+    assert!(!text.contains("after_close"), "the default of what follows an app is not written:\n{text}");
     assert!(!text.contains("check_updates"), "the update notice is the shared one, not quvyta's:\n{text}");
     assert!(h.screen().contains("qcode"), "the app list has the screen:\n{}", h.screen());
     assert!(h.app().installs.dialog.is_none(), "nothing was asked to be installed");
@@ -154,7 +154,7 @@ fn starting_with_the_defaults_writes_both_files_but_no_default_and_never_asks_ag
 }
 
 #[test]
-fn the_apps_step_says_what_each_member_is_and_checks_nothing_by_itself() {
+fn the_apps_step_says_what_each_app_is_and_checks_nothing_by_itself() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     to_apps_step(&mut h);
@@ -169,12 +169,12 @@ fn the_apps_step_says_what_each_member_is_and_checks_nothing_by_itself() {
         assert!(screen.contains(command) && screen.contains(line), "`{command}` is missing:\n{screen}");
     }
     assert!(!screen.lines().any(|line| line.trim() == "quvyta"), "quvyta is not one of the choices:\n{screen}");
-    assert!(screen.contains("qframe"), "every member is on the page at once:\n{screen}");
+    assert!(screen.contains("qframe"), "every app is on the page at once:\n{screen}");
     assert!(!h.app().picked.iter().any(|picked| *picked), "nothing is checked to begin with");
 }
 
 #[test]
-fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
+fn an_app_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     to_apps_step(&mut h);
@@ -185,7 +185,7 @@ fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
     assert!(screen.contains("Arch Linux only"), "{screen}");
     for (key, command) in [("tools", "qtools"), ("packages", "qpac")] {
         assert!(!h.app().choosable(index(key)), "{key} cannot be chosen on Debian");
-        click_member(&mut h, command);
+        click_app(&mut h, command);
         assert!(!h.app().picked[index(key)], "{key} stays unchecked");
     }
 
@@ -193,7 +193,7 @@ fn a_member_that_only_runs_on_arch_linux_cannot_be_checked_elsewhere() {
     let mut h = start(arch.path(), "ID=arch\n", 80, 30);
     to_apps_step(&mut h);
     assert!(!h.screen().contains("Arch Linux only"), "on Arch there is nothing to say:\n{}", h.screen());
-    click_member(&mut h, "qtools");
+    click_app(&mut h, "qtools");
     assert!(h.app().picked[index("tools")], "on Arch qtools can be chosen");
 }
 
@@ -204,7 +204,7 @@ fn clicking_the_faded_qtools_on_debian_changes_nothing_and_queues_nothing() {
     packages(root.path());
     to_apps_step(&mut h);
     let before = h.screen();
-    click_member(&mut h, "qtools");
+    click_app(&mut h, "qtools");
     assert!(!h.app().picked[index("tools")], "{}", h.screen());
     assert_eq!(h.screen(), before, "not even the box looks different");
     finish(&mut h);
@@ -215,7 +215,7 @@ fn clicking_the_faded_qtools_on_debian_changes_nothing_and_queues_nothing() {
 }
 
 #[test]
-fn a_member_that_is_not_out_yet_cannot_be_checked_at_all() {
+fn an_app_that_is_not_out_yet_cannot_be_checked_at_all() {
     let _soon = crate::ecosystem::tests::unreleased("desk");
     for distro in ["ID=debian\n", "ID=arch\n"] {
         let root = tempfile::tempdir().expect("temp");
@@ -240,18 +240,18 @@ fn qdesk_is_out_so_it_can_be_checked() {
 }
 
 #[test]
-fn finishing_with_two_members_checked_asks_for_each_in_turn_and_queues_them() {
+fn finishing_with_two_apps_checked_asks_for_each_in_turn_and_queues_them() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());
     packages(root.path());
     scenario(root.path(), "  Installing /x/.cargo/bin/qcode\n", 0);
     to_apps_step(&mut h);
-    click_member(&mut h, "qcode");
-    click_member(&mut h, "qframe");
+    click_app(&mut h, "qcode");
+    click_app(&mut h, "qframe");
     finish(&mut h);
     assert!(!h.app().setting_up(), "the wizard is over:\n{}", h.screen());
     assert_eq!(folder(root.path()), ["launcher.conf", "quvyta.conf"]);
-    // The first dialog is the first member of the list that was checked; nothing is installed
+    // The first dialog is the first app of the list that was checked; nothing is installed
     // until it is agreed to.
     assert!(has(&h, "Install qcode?"), "{}", h.screen());
     assert_eq!(h.app().selected, index("code"));
@@ -302,7 +302,7 @@ fn the_appearance_chosen_in_the_wizard_is_what_the_application_draws() {
 
 #[test]
 fn turkish_reads_naturally() {
-    // With a member still to come, so its line is read too.
+    // With an app still to come, so its line is read too.
     let _soon = crate::ecosystem::tests::unreleased("desk");
     let root = tempfile::tempdir().expect("temp");
     let mut h = wizard(root.path());

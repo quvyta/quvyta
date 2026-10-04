@@ -1,11 +1,11 @@
 //! What quvyta keeps of the framework's numbers and keys must stay the framework's own.
 //!
-//! The split between the list and the details, the room a member's details need, the width of
-//! the tabs in the header and the room a member's line has under a checkbox are measured from
+//! The split between the list and the details, the room an app's details need, the width of
+//! the tabs in the header and the room an app's line has under a checkbox are measured from
 //! `update` and `action`, where the environment and with it the icon set is out of reach, so
 //! quvyta keeps its own arithmetic instead of asking the widget. The keys in the hint bar, on
 //! the other hand, can be asked: they come from the keymap the runtime loaded, and the share a
-//! row carries while a member installs is a number the framework writes in the language on
+//! row carries while an app installs is a number the framework writes in the language on
 //! screen.
 //!
 //! Every test here draws the framework's own widget, or rebinds a key, and compares. When the
@@ -99,7 +99,7 @@ fn the_footer_names_the_keys_the_keymap_binds() {
         assert!(!h.screen().contains(&format!("enter  {open}")), "the bar has changed with the tab:\n{}", h.screen());
     }
     // The same screen with the keys somewhere else: the bar follows the keymap, and the key the
-    // bar names is the one that opens the member.
+    // bar names is the one that opens the app.
     let root = tempfile::tempdir().expect("temp");
     let app = Quvyta::new(machine(root.path()));
     let keys = "[app]\nprimary = \"f2\"\nback = \"esc\"\nrefresh = \"f3\"\nupdate = \"f4\"\n";
@@ -177,7 +177,7 @@ fn a_badge_is_wider_than_its_words_by_its_padding_and_its_dot() {
 }
 
 /// The line under a checkbox in the wizard starts where the checkbox's own label starts, so a
-/// member's words stand under its box and not under its name.
+/// app's words stand under its box and not under its name.
 #[test]
 fn the_wizard_line_under_a_checkbox_starts_where_its_label_does() {
     let h = alone(40, 3, |ui| {
@@ -199,7 +199,7 @@ fn the_list_column_is_the_width_the_widest_row_needs() {
     let items = app.list_items(compact);
     // Drawn alone, the list takes exactly the width it asks for, and every row's state ends one
     // cell before its right edge, where the row keeps a spare cell for the slide.
-    let detail = app.row_text(0, compact).expect("a row says how its member is installed");
+    let detail = app.row_text(0, compact).expect("a row says how its app is installed");
     let drawn = alone(200, 20, {
         let items = items.clone();
         move |ui| {
@@ -221,7 +221,7 @@ fn the_list_column_is_the_width_the_widest_row_needs() {
     }
 }
 
-/// What crates.io answers, with an update waiting for two members.
+/// What crates.io answers, with an update waiting for two apps.
 fn search() -> String {
     format!(
         "quvyta-code = \"0.1.2\"\nquvyta-tools = \"0.1.2\"\nquvyta-framework-showcase = \"0.1.5\"\nquvyta = \"{}\"\n",
@@ -298,7 +298,7 @@ fn the_buttons_under_the_list_stay_beside_each_other_exactly_while_they_fit() {
     }
 }
 
-/// The share a row carries while a member installs is written the way the language on screen
+/// The share a row carries while an app installs is written the way the language on screen
 /// writes a number, which is the one way every number the framework draws is written. A whole
 /// number has no decimal point to place, so both ends of this link write the same characters in
 /// every language quvyta has; what is pinned here is the value, and where it is written.
@@ -324,13 +324,13 @@ fn the_share_of_a_running_install_is_the_frameworks_own_number() {
     }
 }
 
-/// quvyta is where the ecosystem's members are found, so a member the framework lists is one
-/// quvyta lists, installs and opens. The test the members are known by runs the other way only.
+/// quvyta is where the ecosystem's apps are found, so an app the framework lists is one
+/// quvyta lists, installs and opens. The test the apps are known by runs the other way only.
 #[test]
-fn a_member_the_framework_lists_is_one_quvyta_lists() {
-    for known in qframe::storage::MEMBERS {
-        let listed = APPS.iter().find(|member| member.package == known.package);
-        let listed = listed.unwrap_or_else(|| panic!("`{}` is a member the framework lists", known.package));
+fn an_app_the_framework_lists_is_one_quvyta_lists() {
+    for known in crate::ecosystem::FRAMEWORK_APPS {
+        let listed = APPS.iter().find(|app| app.package == known.package);
+        let listed = listed.unwrap_or_else(|| panic!("`{}` is an app the framework lists", known.package));
         assert_eq!(listed.key, known.id, "{}: quvyta and the framework call it different things", known.package);
         assert_eq!(listed.command, known.command, "{}", known.package);
     }

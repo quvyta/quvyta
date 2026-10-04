@@ -17,7 +17,7 @@ shell_path=$(command -v "$shell") || { echo "no $shell to test with" >&2; exit 1
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# Every member is out today, so the cases about one that is not run a copy of the script in which
+# Every app is out today, so the cases about one that is not run a copy of the script in which
 # qdesk is still to come: the same script with only its soon= line changed.
 released_script=$script
 soon_script="$work/install-soon.sh"
@@ -61,7 +61,7 @@ fresh() {
 echo "cargo $*" >>"$HOME/.stub.log"
 case $1 in
     --version) echo "cargo ${FAKE_CARGO_VERSION:-1.95.0} (stub)" ;;
-    # crates.io's answer for the member that has only pre-releases; FAKE_SEARCH_FAILS=1 is a
+    # crates.io's answer for the app that has only pre-releases; FAKE_SEARCH_FAILS=1 is a
     # machine that cannot reach it.
     search)
         [ "${FAKE_SEARCH_FAILS:-}" = 1 ] && exit 101
@@ -260,7 +260,7 @@ for command in qframe qcode qfocus qpac qtools qexp qbrow qcli quvyta qdesk; do
     expect_output "  $command "
 done
 
-# --- A member that has only pre-releases
+# --- An app that has only pre-releases
 
 fresh alpha
 run --yes cli
@@ -283,14 +283,14 @@ expect_output "  cargo install --locked quvyta-cli --version 0.1.0-alpha.2"
 expect_not_logged "cargo install"
 expect_home_untouched
 
-fresh released-members-need-no-lookup
+fresh released-apps-need-no-lookup
 run --yes explorer browser
 expect_status 0
 expect_logged "cargo install --locked quvyta-explorer"
 expect_logged "cargo install --locked quvyta-browser"
 expect_not_logged "cargo search"
 
-# --- A member that is not released yet, in the copy where qdesk is one
+# --- An app that is not released yet, in the copy where qdesk is one
 script=$soon_script
 
 fresh soon-help
@@ -301,7 +301,7 @@ fresh soon-all
 run -y all
 expect_status 0
 expect_logged "cargo install --locked quvyta-code"
-# all is every member that can be installed, and qdesk is not one of them here.
+# all is every app that can be installed, and qdesk is not one of them here.
 expect_not_logged "quvyta-desktop"
 expect_not_logged "qdesk"
 
@@ -704,7 +704,7 @@ run
 expect_status 1
 expect_output "packages   qpac"
 expect_output "Arch Linux only, not for macOS"
-[ "$(grep -c 'Arch Linux only, not for macOS' "$home/.out")" = 2 ] || fail "not exactly two members marked"
+[ "$(grep -c 'Arch Linux only, not for macOS' "$home/.out")" = 2 ] || fail "not exactly two apps marked"
 expect_not_logged "cargo"
 
 fresh_mac mac-arch-only-named
@@ -735,7 +735,7 @@ fresh linux-list-has-no-mark
 run
 expect_status 1
 if grep -qF "not for macOS" "$home/.out"; then
-    fail "Linux list marks members as not for macOS"
+    fail "Linux list marks apps as not for macOS"
 fi
 
 fresh linux-empty-shell-unknown

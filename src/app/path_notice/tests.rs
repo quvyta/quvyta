@@ -135,11 +135,11 @@ fn add_appends_the_installer_s_three_lines_and_says_so() {
 }
 
 #[test]
-fn after_an_install_the_notice_names_the_member() {
+fn after_an_install_the_notice_names_the_app() {
     let root = tempfile::tempdir().expect("temp");
     let machine = machine(root.path(), "/usr/bin/fish");
     let action = shell_path::decide(&machine.shell_env(), shell_path::read_file);
-    let tools = APPS.iter().position(|member| member.key == "tools").expect("qtools");
+    let tools = APPS.iter().position(|app| app.key == "tools").expect("qtools");
     let mut h = start(machine);
     h.send(Msg::Path(PathMsg::Checked { installed: Some(tools), action, asked: false }));
     assert!(h.screen().contains("For qtools to open when you type its name in a"), "{}", h.screen());

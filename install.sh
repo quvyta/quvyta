@@ -14,19 +14,19 @@
 
 set -u
 
-# Every member published crates for, at least this Rust.
+# Every app published crates for, at least this Rust.
 min_rust_major=1
 min_rust_minor=95
 
 names="framework code focus packages tools explorer browser cli quvyta desk"
 
-# Members that are not released yet: there is nothing on crates.io to install. Naming one says so
+# Apps that are not released yet: there is nothing on crates.io to install. Naming one says so
 # and installs nothing for it; they are left out of all and out of the picker's numbers.
-# Every member is out today. A new one that is not goes here by name, and in two more places:
+# Every app is out today. A new one that is not goes here by name, and in two more places:
 # Soon = $true in install.ps1's list, and Status::Soon in src/ecosystem.rs.
 soon=""
 
-# Members released only as pre-releases so far, such as 0.1.0-alpha.2. cargo installs a
+# Apps released only as pre-releases so far, such as 0.1.0-alpha.2. cargo installs a
 # pre-release only when its version is named, so the newest one is asked of crates.io first.
 # The day one has a full release, take it out of this line and set its Status::Alpha in
 # src/ecosystem.rs to Status::Beta.
@@ -58,7 +58,7 @@ command_of() {
 
 about() {
     case $1 in
-        framework) echo "the showcase of the framework every member is built on" ;;
+        framework) echo "the showcase of the framework every Quvyta app is built on" ;;
         code) echo "coding agents inside Podman or Docker containers" ;;
         focus) echo "tracks what you focus on and where your time went" ;;
         packages) echo "a package manager for Arch Linux that shows every change first" ;;
@@ -71,7 +71,7 @@ about() {
     esac
 }
 
-# Whether a member is one of the names above that cannot be installed yet.
+# Whether an app is one of the names above that cannot be installed yet.
 unreleased() {
     case " $soon " in
         *" $1 "*) return 0 ;;
@@ -79,7 +79,7 @@ unreleased() {
     return 1
 }
 
-# The arguments cargo installs a member with. A pre-release member gets the newest version
+# The arguments cargo installs an app with. A pre-release app gets the newest version
 # crates.io names; when crates.io cannot be asked, cargo is left to say what it could not find.
 install_args() {
     crate=$(crate_of "$1")
@@ -94,12 +94,12 @@ install_args() {
     echo "install --locked $crate"
 }
 
-# The one line a person sees for a member that is not out yet, in the words quvyta itself uses.
+# The one line a person sees for an app that is not out yet, in the words quvyta itself uses.
 say_soon() {
     say "$(command_of "$1") is not released yet, so it cannot be installed; quvyta's own list shows it as coming soon."
 }
 
-# Members that only run on Arch Linux; they are not built on macOS.
+# Apps that only run on Arch Linux; they are not built on macOS.
 arch_only() {
     case $1 in
         packages | tools) return 0 ;;
@@ -111,7 +111,7 @@ on_mac() {
     [ "$os" = Darwin ]
 }
 
-# Whether a member can be installed on this system.
+# Whether an app can be installed on this system.
 supported() {
     ! { on_mac && arch_only "$1"; }
 }
@@ -247,7 +247,7 @@ list_apps() {
     number=1
     for name in $names; do
         text=$(about "$name")
-        # A member still to come has no number: the picker installs, and this cannot be installed.
+        # An app still to come has no number: the picker installs, and this cannot be installed.
         if unreleased "$name"; then
             printf '     %-10s %-8s %s\n' "$name" "$(command_of "$name")" "$text; coming soon, not released yet"
             continue
@@ -300,7 +300,7 @@ pick() {
     list_apps
     if ! have_tty; then
         say ""
-        say "There is no terminal to choose on. Name the members instead, for example:"
+        say "There is no terminal to choose on. Name the apps instead, for example:"
         say "  curl -fsSL https://raw.githubusercontent.com/quvyta/quvyta/main/install.sh | sh -s -- code focus"
         return 1
     fi
@@ -317,7 +317,7 @@ pick() {
     done
 }
 
-# Leaves out of $chosen the members this system cannot run, saying so for each.
+# Leaves out of $chosen the apps this system cannot run, saying so for each.
 drop_unsupported() {
     kept=
     for name in $chosen; do

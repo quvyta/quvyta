@@ -1,4 +1,4 @@
-//! Updates as the screen keeps them: the newest versions crates.io named, which members they
+//! Updates as the screen keeps them: the newest versions crates.io named, which apps they
 //! make out of date, and the line under the list that counts them.
 //!
 //! Being up to date says nothing: no "everything is up to date" line, silence is the answer.
@@ -18,7 +18,7 @@ pub enum UpdateMsg {
     Check,
     /// What a check found.
     Checked(Check),
-    /// Asks, in one question, whether to update every member that has an update, in the order
+    /// Asks, in one question, whether to update every app that has an update, in the order
     /// of the list.
     InstallAll,
 }
@@ -42,28 +42,28 @@ impl Quvyta {
         Command::perform(move || Msg::Updates(UpdateMsg::Checked(updates::check(&machine, again, updates::now()))))
     }
 
-    /// The newest version of the member at `index` on crates.io, when known: what an install
-    /// pins, so the version the dialog shows is the one installed. A member not released yet has
-    /// none, whatever crates.io says: a crate under its name is not the member.
+    /// The newest version of the app at `index` on crates.io, when known: what an install
+    /// pins, so the version the dialog shows is the one installed. An app not released yet has
+    /// none, whatever crates.io says: a crate under its name is not the app.
     pub(super) fn latest_version(&self, index: usize) -> Option<String> {
-        let member = APPS.get(index).filter(|member| member.published())?;
-        Some(self.updates.latest.as_ref()?.version(member.package)?.to_owned())
+        let app = APPS.get(index).filter(|app| app.published())?;
+        Some(self.updates.latest.as_ref()?.version(app.package)?.to_owned())
     }
 
-    /// The newer version the member at `index` can be updated to: one cargo installed, with a
-    /// newer version on crates.io. Members installed some other way are left to what installed
+    /// The newer version the app at `index` can be updated to: one cargo installed, with a
+    /// newer version on crates.io. Apps installed some other way are left to what installed
     /// them.
     pub(super) fn update_to(&self, index: usize) -> Option<String> {
         let installed = self.state(index)?.cargo_version()?;
         self.latest_version(index).filter(|latest| updates::newer(latest, installed))
     }
 
-    /// Whether the member at `index` has an update that is not on its way yet.
+    /// Whether the app at `index` has an update that is not on its way yet.
     pub(super) fn updatable(&self, index: usize) -> bool {
         self.update_to(index).is_some() && !self.installs.has(index)
     }
 
-    /// The members with an update not on its way yet, in the order of the list.
+    /// The apps with an update not on its way yet, in the order of the list.
     fn outdated(&self) -> impl Iterator<Item = usize> + '_ {
         (0..APPS.len()).filter(|index| self.updatable(*index))
     }
@@ -89,7 +89,7 @@ impl Quvyta {
                     }
                 }
             }
-            // Every update is asked about first, in one question, the way one member's update is:
+            // Every update is asked about first, in one question, the way one app's update is:
             // where each comes from, the versions, the exact commands, and the checks before the
             // button can be pressed. Nothing starts before it is agreed to.
             UpdateMsg::InstallAll => {
@@ -147,7 +147,7 @@ impl Quvyta {
         ui.add(Text::new(note).role("faint")).padding(indent).fill_width();
     }
 
-    /// Asks for an update of the member at `index`, when it has one.
+    /// Asks for an update of the app at `index`, when it has one.
     pub(super) fn ask_update(&self, index: usize) -> Option<Msg> {
         self.updatable(index).then_some(Msg::Install(InstallMsg::Ask(index)))
     }

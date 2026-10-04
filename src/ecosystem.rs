@@ -1,8 +1,11 @@
 //! The Quvyta apps this program lists, opens and will install.
 
-use qframe::storage::MEMBERS;
+// The framework's own list of the ecosystem, under the word quvyta uses for what it holds: the
+// name it carries there is the framework's to change, not ours, so quvyta's own word is used here
+// and everywhere else.
+pub(crate) use qframe::storage::MEMBERS as FRAMEWORK_APPS;
 
-/// How settled a member is.
+/// How settled an app is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     /// Released, with an interface that is expected to stay.
@@ -18,7 +21,7 @@ pub enum Status {
     Soon,
 }
 
-/// Why a member cannot be installed from the machine quvyta runs on, though it is on the list.
+/// Why an app cannot be installed from the machine quvyta runs on, though it is on the list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotHere {
     /// It runs on Arch Linux only.
@@ -29,7 +32,7 @@ pub enum NotHere {
 
 /// A Quvyta app. Names and descriptions live in the language files under `apps.<key>`.
 #[derive(Debug)]
-pub struct Member {
+pub struct QuvytaApp {
     /// The segment of its language keys.
     pub key: &'static str,
     /// The package name on crates.io.
@@ -40,7 +43,7 @@ pub struct Member {
     pub icon: &'static str,
     /// Where the source lives.
     pub repository: &'static str,
-    /// The line that adds its library to a project, for the member that shows off a library.
+    /// The line that adds its library to a project, for the app that shows off a library.
     pub library: Option<&'static str>,
     /// Whether it only runs on Arch Linux, as `install.sh` and `install.ps1` also know it: on
     /// another system it is listed, and told apart, but not offered for installing.
@@ -48,24 +51,24 @@ pub struct Member {
     /// Whether it is built for Linux and macOS only, as `install.ps1` also knows it: on Windows
     /// it is listed, and told apart, but not offered for installing.
     pub unix_only: bool,
-    /// How settled it is. quvyta reads it through `Member::status()`, which a test can answer
+    /// How settled it is. quvyta reads it through `QuvytaApp::status()`, which a test can answer
     /// otherwise.
     pub status: Status,
 }
 
-impl Member {
-    /// Whether this member is the program that is running.
+impl QuvytaApp {
+    /// Whether this app is the program that is running.
     pub(crate) fn is_self(&self) -> bool {
         self.package == env!("CARGO_PKG_NAME")
     }
 
     /// The id its settings file goes under in the shared settings folder, `<id>.conf`, as the
-    /// framework's list of Quvyta apps gives it: the id the member itself asks the framework for,
+    /// framework's list of Quvyta apps gives it: the id the app itself asks the framework for,
     /// which is not always its key. qdesk's file is `desktop.conf`, the showcase's `showcase.conf`
     /// and quvyta's `launcher.conf`, since `quvyta.conf` is the file every Quvyta app shares. Taken
     /// from the framework rather than kept here, so the two cannot drift apart.
     pub(crate) fn settings_id(&self) -> &'static str {
-        MEMBERS.iter().find(|member| member.package == self.package).map_or(self.key, |member| member.settings_id)
+        FRAMEWORK_APPS.iter().find(|app| app.package == self.package).map_or(self.key, |app| app.settings_id)
     }
 
     /// How settled it is: its `status` field, except in a test that made it one still to come
@@ -88,10 +91,10 @@ impl Member {
         !self.unix_only || cfg!(unix)
     }
 
-    /// Why this member cannot be installed from a machine that is Arch Linux when `arch` says so,
-    /// or `None` when there is nothing in the way. A member not out yet has no reason here: it is
+    /// Why this app cannot be installed from a machine that is Arch Linux when `arch` says so,
+    /// or `None` when there is nothing in the way. An app not out yet has no reason here: it is
     /// the wizard's own line, and it is about quvyta rather than about the platform. The order is
-    /// the wizard's, so one member never says two different things about itself.
+    /// the wizard's, so one app never says two different things about itself.
     pub(crate) fn not_here(&self, arch: bool) -> Option<NotHere> {
         if !self.published() {
             return None;
@@ -102,21 +105,21 @@ impl Member {
         (!self.runs_here()).then_some(NotHere::UnixOnly)
     }
 
-    /// Whether quvyta may offer to install this member from a machine that is Arch Linux when
+    /// Whether quvyta may offer to install this app from a machine that is Arch Linux when
     /// `arch` says so: it is out on crates.io, it is not quvyta itself, and it runs here. The one
-    /// rule the list, the details, the first-run wizard and the command line all ask, so a member
+    /// rule the list, the details, the first-run wizard and the command line all ask, so an app
     /// cannot be offered in one of them and held back in another.
     pub(crate) fn offered(&self, arch: bool) -> bool {
         self.published() && !self.is_self() && self.not_here(arch).is_none()
     }
 }
 
-/// Every member, in the order they are listed: the applications, the ones still to come after
+/// Every app, in the order they are listed: the applications, the ones still to come after
 /// the ones that can be installed, then the framework and quvyta itself, which are about the
 /// ecosystem rather than apps to work in. The framework library is not a program, so its
 /// showcase stands for it and carries its `cargo add` line.
-pub const APPS: [Member; 10] = [
-    Member {
+pub const APPS: [QuvytaApp; 10] = [
+    QuvytaApp {
         key: "code",
         package: "quvyta-code",
         command: "qcode",
@@ -127,7 +130,7 @@ pub const APPS: [Member; 10] = [
         unix_only: false,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "focus",
         package: "quvyta-focus",
         command: "qfocus",
@@ -138,7 +141,7 @@ pub const APPS: [Member; 10] = [
         unix_only: false,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "tools",
         package: "quvyta-tools",
         command: "qtools",
@@ -149,7 +152,7 @@ pub const APPS: [Member; 10] = [
         unix_only: false,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "packages",
         package: "quvyta-packages",
         command: "qpac",
@@ -160,7 +163,7 @@ pub const APPS: [Member; 10] = [
         unix_only: false,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "explorer",
         package: "quvyta-explorer",
         command: "qexp",
@@ -171,7 +174,7 @@ pub const APPS: [Member; 10] = [
         unix_only: true,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "browser",
         package: "quvyta-browser",
         command: "qbrow",
@@ -182,7 +185,7 @@ pub const APPS: [Member; 10] = [
         unix_only: true,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "cli",
         package: "quvyta-cli",
         command: "qcli",
@@ -193,7 +196,7 @@ pub const APPS: [Member; 10] = [
         unix_only: true,
         status: Status::Alpha,
     },
-    Member {
+    QuvytaApp {
         key: "desk",
         package: "quvyta-desktop",
         command: "qdesk",
@@ -206,7 +209,7 @@ pub const APPS: [Member; 10] = [
         unix_only: false,
         status: Status::Beta,
     },
-    Member {
+    QuvytaApp {
         key: "framework",
         package: "quvyta-framework-showcase",
         command: "qframe",
@@ -217,7 +220,7 @@ pub const APPS: [Member; 10] = [
         unix_only: false,
         status: Status::Released,
     },
-    Member {
+    QuvytaApp {
         key: "quvyta",
         package: "quvyta",
         command: "quvyta",
@@ -234,24 +237,24 @@ pub const APPS: [Member; 10] = [
 pub(crate) mod tests {
     use std::cell::Cell;
 
-    use super::{APPS, MEMBERS, NotHere, Status};
+    use super::{APPS, FRAMEWORK_APPS, NotHere, Status};
 
     thread_local! {
-        /// The key of the member the running test treats as not released yet.
+        /// The key of the app the running test treats as not released yet.
         static UNRELEASED: Cell<Option<&'static str>> = const { Cell::new(None) };
     }
 
-    /// While the returned guard lives, the member `key` is one still to come on this thread,
-    /// whatever its real status: every member is out today, and what quvyta does with one that is
+    /// While the returned guard lives, the app `key` is one still to come on this thread,
+    /// whatever its real status: every app is out today, and what quvyta does with one that is
     /// not has to stay tested for the next one. The screen's work runs on the test's thread in
     /// the harness, so everything the screen asks sees it.
     pub(crate) fn unreleased(key: &'static str) -> Unreleased {
-        assert!(APPS.iter().any(|member| member.key == key), "`{key}` is not a member");
+        assert!(APPS.iter().any(|app| app.key == key), "`{key}` is not an app");
         UNRELEASED.with(|cell| cell.set(Some(key)));
         Unreleased
     }
 
-    /// Puts the member back as it really is when dropped.
+    /// Puts the app back as it really is when dropped.
     pub(crate) struct Unreleased;
 
     impl Drop for Unreleased {
@@ -265,40 +268,35 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_member_is_still_to_come_only_while_a_test_says_so() {
-        let desk = APPS.iter().find(|member| member.key == "desk").expect("qdesk is listed");
+    fn an_app_is_still_to_come_only_while_a_test_says_so() {
+        let desk = APPS.iter().find(|app| app.key == "desk").expect("qdesk is listed");
         assert_eq!(desk.status(), Status::Beta);
         {
             let _soon = unreleased("desk");
             assert_eq!(desk.status(), Status::Soon);
             assert!(!desk.published());
-            let code = APPS.iter().find(|member| member.key == "code").expect("qcode is listed");
-            assert!(code.published(), "only the member named");
+            let code = APPS.iter().find(|app| app.key == "code").expect("qcode is listed");
+            assert!(code.published(), "only the app named");
         }
         assert!(desk.published(), "the guard puts it back");
     }
 
     #[test]
-    fn every_member_is_one_the_framework_knows_and_keeps_its_settings_where_the_framework_says() {
-        for member in &APPS {
-            let known = MEMBERS.iter().find(|known| known.package == member.package);
-            let known = known.unwrap_or_else(|| panic!("the framework does not list `{}`", member.package));
-            assert_eq!(
-                (member.command, member.settings_id()),
-                (known.command, known.settings_id),
-                "{}",
-                member.package
-            );
+    fn every_app_is_one_the_framework_knows_and_keeps_its_settings_where_the_framework_says() {
+        for app in &APPS {
+            let known = FRAMEWORK_APPS.iter().find(|known| known.package == app.package);
+            let known = known.unwrap_or_else(|| panic!("the framework does not list `{}`", app.package));
+            assert_eq!((app.command, app.settings_id()), (known.command, known.settings_id), "{}", app.package);
         }
-        let desk = APPS.iter().find(|member| member.command == "qdesk").expect("qdesk is listed");
+        let desk = APPS.iter().find(|app| app.command == "qdesk").expect("qdesk is listed");
         assert_eq!(desk.settings_id(), "desktop", "qdesk keeps its settings in desktop.conf");
     }
 
     #[test]
-    fn a_member_is_offered_only_where_it_runs() {
-        let member = |key: &str| APPS.iter().find(|member| member.key == key).expect("a member");
+    fn an_app_is_offered_only_where_it_runs() {
+        let app = |key: &str| APPS.iter().find(|app| app.key == key).expect("an app");
         // The whole table, written out: offered on Arch Linux, offered anywhere else. Nothing here
-        // is worked out from the fields, so a member whose `arch_only` or `unix_only` changes is
+        // is worked out from the fields, so an app whose `arch_only` or `unix_only` changes is
         // caught in this test rather than on somebody's screen.
         for (key, (on_arch, elsewhere)) in [
             ("code", (true, true)),
@@ -312,21 +310,21 @@ pub(crate) mod tests {
             ("framework", (true, true)),
             ("quvyta", (false, false)),
         ] {
-            assert_eq!(member(key).offered(true), on_arch, "{key} on Arch Linux");
-            assert_eq!(member(key).offered(false), elsewhere, "{key} on another system");
+            assert_eq!(app(key).offered(true), on_arch, "{key} on Arch Linux");
+            assert_eq!(app(key).offered(false), elsewhere, "{key} on another system");
         }
         // The two reasons, named as the list and the details name them.
         for arch in [false, true] {
-            assert_eq!(member("tools").not_here(arch), (!arch).then_some(NotHere::ArchOnly), "qtools");
-            assert_eq!(member("packages").not_here(arch), (!arch).then_some(NotHere::ArchOnly), "qpac");
-            assert_eq!(member("explorer").not_here(arch), None, "qexp is built where the tests run");
-            assert_eq!(member("code").not_here(arch), None, "qcode runs everywhere");
+            assert_eq!(app("tools").not_here(arch), (!arch).then_some(NotHere::ArchOnly), "qtools");
+            assert_eq!(app("packages").not_here(arch), (!arch).then_some(NotHere::ArchOnly), "qpac");
+            assert_eq!(app("explorer").not_here(arch), None, "qexp is built where the tests run");
+            assert_eq!(app("code").not_here(arch), None, "qcode runs everywhere");
         }
         // Not out yet is quvyta's own line, not a platform's, so it is never a reason here.
         let _soon = unreleased("desk");
         for arch in [false, true] {
-            assert_eq!(member("desk").not_here(arch), None, "qdesk is not out yet, not anywhere");
-            assert!(!member("desk").offered(arch), "and there is nothing to install");
+            assert_eq!(app("desk").not_here(arch), None, "qdesk is not out yet, not anywhere");
+            assert!(!app("desk").offered(arch), "and there is nothing to install");
         }
     }
 
@@ -335,22 +333,21 @@ pub(crate) mod tests {
         // The wizard's own rule, as it stood before the list had one of its own: kept here so the
         // two cannot drift apart by a field changing in one place only.
         for arch in [false, true] {
-            for member in &APPS {
-                let wizard =
-                    member.published() && !member.is_self() && (!member.arch_only || arch) && member.runs_here();
-                assert_eq!(member.offered(arch), wizard, "{}", member.package);
+            for app in &APPS {
+                let wizard = app.published() && !app.is_self() && (!app.arch_only || arch) && app.runs_here();
+                assert_eq!(app.offered(arch), wizard, "{}", app.package);
             }
         }
     }
 
     #[test]
-    fn every_member_has_a_settings_file_of_its_own_and_quvyta_s_is_launcher_conf() {
-        let ids: Vec<&str> = APPS.iter().map(super::Member::settings_id).collect();
+    fn every_app_has_a_settings_file_of_its_own_and_quvyta_s_is_launcher_conf() {
+        let ids: Vec<&str> = APPS.iter().map(super::QuvytaApp::settings_id).collect();
         for (index, id) in ids.iter().enumerate() {
-            assert!(!ids[..index].contains(id), "`{id}` is the settings id of two members");
+            assert!(!ids[..index].contains(id), "`{id}` is the settings id of two apps");
             assert_ne!(*id, "quvyta", "`quvyta.conf` is the file every Quvyta app shares");
         }
-        let quvyta = APPS.iter().find(|member| member.is_self()).expect("quvyta is listed");
+        let quvyta = APPS.iter().find(|app| app.is_self()).expect("quvyta is listed");
         assert_eq!(quvyta.settings_id(), crate::machine::LAUNCHER);
     }
 }

@@ -294,15 +294,15 @@ Assert-NotLogged 'quvyta-tools'
 Assert-Output 'Skipping packages (qpac): it runs on Arch Linux only.'
 Assert-Output 'Skipping tools (qtools): it runs on Arch Linux only.'
 # Built for Linux and macOS only, so left out on Windows the same way.
-foreach ($member in @(@('explorer', 'qexp', 'quvyta-explorer'), @('browser', 'qbrow', 'quvyta-browser'), @('cli', 'qcli', 'quvyta-cli'))) {
-    Assert-NotLogged $member[2]
-    Assert-Output "Skipping $($member[0]) ($($member[1])): it runs on Linux and macOS only."
+foreach ($app in @(@('explorer', 'qexp', 'quvyta-explorer'), @('browser', 'qbrow', 'quvyta-browser'), @('cli', 'qcli', 'quvyta-cli'))) {
+    Assert-NotLogged $app[2]
+    Assert-Output "Skipping $($app[0]) ($($app[1])): it runs on Linux and macOS only."
 }
 
-# --- A member that is not released yet
+# --- An app that is not released yet
 #
-# Every member is out today, so these cases run with the installer's own list changed in one
-# place: qdesk marked Soon, as a member still to come would be.
+# Every app is out today, so these cases run with the installer's own list changed in one
+# place: qdesk marked Soon, as an app still to come would be.
 $script:RealApps = ${function:Get-QuvytaApps}
 function Get-QuvytaApps {
     & $script:RealApps | ForEach-Object {
@@ -315,7 +315,7 @@ New-Case 'soon-all'
 Invoke-Case @('-Yes', 'all')
 Assert-Status 0
 Assert-Logged 'cargo install --locked quvyta-code'
-# all is every member that can be installed, and qdesk is not one of them here.
+# all is every app that can be installed, and qdesk is not one of them here.
 Assert-NotLogged 'quvyta-desktop'
 Assert-NotLogged 'qdesk'
 

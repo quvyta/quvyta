@@ -1,18 +1,18 @@
-//! The details of one member: what it is, how it is installed and where it comes from.
+//! The details of one app: what it is, how it is installed and where it comes from.
 
 use qframe::prelude::*;
 use qframe::widgets::{Badge, CopyValue};
 
 use super::Msg;
-use crate::ecosystem::{Member, Status};
+use crate::ecosystem::{QuvytaApp, Status};
 use crate::inventory::State;
 use crate::machine::Machine;
 
-/// Draws the details of `member`, installed as `state` says; `None` while that is not known yet.
+/// Draws the details of `app`, installed as `state` says; `None` while that is not known yet.
 /// `latest` is the newer version it can be updated to. `main` draws the main part under how it
 /// is installed: its buttons, or an install under way. `room` is the columns the heading has.
 pub(super) fn show(
-    member: &Member,
+    app: &QuvytaApp,
     state: Option<&State>,
     latest: Option<&str>,
     main: impl FnOnce(&mut View<'_, Msg>),
@@ -20,9 +20,9 @@ pub(super) fn show(
     room: u16,
     ui: &mut View<'_, Msg>,
 ) {
-    let text = |field: &str| t!(&format!("apps.{}.{field}", member.key));
+    let text = |field: &str| t!(&format!("apps.{}.{field}", app.key));
     let title = text("title");
-    let (status, variant) = match member.status() {
+    let (status, variant) = match app.status() {
         Status::Released => (t!("status.released"), "success"),
         Status::Beta => (t!("status.beta"), "info"),
         // A warning: it works, but it is early enough that trying it is a choice to make.
@@ -49,9 +49,9 @@ pub(super) fn show(
     // Package and command sit on one quiet line under the title and wrap on narrow screens.
     let names = [
         Span::new(format!("{}  ", t!("detail.package"))).role("faint"),
-        Span::new(member.package),
+        Span::new(app.package),
         Span::new(format!("    {}  ", t!("detail.command"))).role("faint"),
-        Span::new(member.command),
+        Span::new(app.command),
     ];
     ui.add(Text::rich(names)).fill_width();
     ui.add(Text::new(text("summary"))).fill_width();
@@ -71,13 +71,13 @@ pub(super) fn show(
     }
     main(ui);
 
-    if let Some(library) = member.library {
+    if let Some(library) = app.library {
         ui.add(Text::new(text("library"))).fill_width();
         copyable(ui, t!("detail.add"), library, "library");
     }
     // Copyable values go under their label so a narrow screen never cuts them short.
-    copyable(ui, t!("detail.source"), member.repository, "source");
-    match member.status() {
+    copyable(ui, t!("detail.source"), app.repository, "source");
+    match app.status() {
         Status::Beta => {
             ui.add(Text::new(t!("detail.beta")).role("secondary")).fill_width();
         }

@@ -1,7 +1,7 @@
 //! quvyta's own settings, in `launcher.conf`:
 //!
 //! ```toml
-//! # What happens when a member opened from quvyta closes: "return" to quvyta, or "shell" to
+//! # What happens when an app opened from quvyta closes: "return" to quvyta, or "shell" to
 //! # quit quvyta too and go back to the shell it was started from.
 //! after_close = "return"
 //! # Whether quvyta offers to put cargo's folder on PATH: "ask", or "dismissed" once the user
@@ -14,7 +14,7 @@
 //! `check_updates` line is handed over to it once, by [`hand_over_check_updates`].
 //!
 //! The appearance of quvyta itself is not read here: `language`, `theme` and `icons` are the
-//! shared keys, resolved for every member alike by the framework, and the Settings tab
+//! shared keys, resolved for every app alike by the framework, and the Settings tab
 //! writes them where the box under each row says. Written in this file they hold for quvyta
 //! alone; written as `"quvyta"` they follow the shared file.
 
@@ -24,7 +24,7 @@ use std::path::Path;
 use qframe::diagnostics::Diagnostic;
 use qframe::storage::{Family, Schema, Setting, Settings};
 
-/// The key saying what happens after a member closes.
+/// The key saying what happens after an app closes.
 const AFTER_CLOSE: &str = "after_close";
 /// The key saying whether quvyta offers to put cargo's folder on `PATH`.
 const PATH_PROMPT: &str = "path_prompt";
@@ -32,7 +32,7 @@ const PATH_PROMPT: &str = "path_prompt";
 /// had one switch for that; still known, so a file holding it is not a broken file.
 const CHECK_UPDATES: &str = "check_updates";
 
-/// What happens when a member opened from quvyta closes.
+/// What happens when an app opened from quvyta closes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AfterClose {
     /// quvyta comes back.
@@ -55,7 +55,7 @@ pub enum PathPrompt {
 /// The settings of `launcher.conf`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Launcher {
-    /// What happens when a member closes.
+    /// What happens when an app closes.
     pub after_close: AfterClose,
     /// Whether the PATH offer is made.
     pub path_prompt: PathPrompt,
@@ -69,7 +69,7 @@ impl Launcher {
     /// broken one gives the defaults for what is broken and says what is wrong.
     ///
     /// The shared keys are not here: they are resolved together with every other
-    /// member's, from the shared file.
+    /// app's, from the shared file.
     pub(crate) fn from_settings(settings: &Settings) -> Self {
         let after_close = match settings.get::<String>(AFTER_CLOSE).as_deref() {
             Some("shell") => AfterClose::Shell,
@@ -124,7 +124,7 @@ fn after_close_value(after_close: AfterClose) -> &'static str {
 /// quvyta's own settings, read from `launcher.conf` at `path`, or kept in memory when the
 /// platform names no settings folder.
 ///
-/// They are marked a member of the ecosystem, so `"quvyta"` under `language`, `theme` or `icons`
+/// They are marked an app of the ecosystem, so `"quvyta"` under `language`, `theme` or `icons`
 /// means "follow the shared value" instead of being an unknown theme or language.
 pub(crate) fn open(path: Option<&Path>) -> Settings {
     let settings = match path {
@@ -140,7 +140,7 @@ pub(crate) fn open(path: Option<&Path>) -> Settings {
 /// Until 0.2.9 quvyta had a switch of its own for asking crates.io at start; now every Quvyta
 /// application reads the one shared switch. Someone who turned quvyta's off asked for no
 /// question at start, so `false` turns the shared one off too: the quieter choice is kept, and it
-/// can be turned back on in any member's settings. `true` was the default and says nothing, so
+/// can be turned back on in any app's settings. `true` was the default and says nothing, so
 /// the shared switch is left as it is. A broken file is left alone, as quvyta never rewrites a
 /// file it could not read whole; so is a file without the line.
 ///

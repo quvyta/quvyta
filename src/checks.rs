@@ -131,7 +131,7 @@ pub fn run(machine: &Machine) -> Vec<Problem> {
 }
 
 /// The distribution this machine runs, from the file that names it. The one place the question is
-/// answered: the linker command of a failed install and the members that run on Arch Linux only
+/// answered: the linker command of a failed install and the apps that run on Arch Linux only
 /// both read it here.
 pub fn distro(machine: &Machine) -> Distro {
     let text = std::fs::read_to_string(&machine.os_release).unwrap_or_default();

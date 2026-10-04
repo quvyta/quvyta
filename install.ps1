@@ -16,15 +16,15 @@
 function Get-QuvytaApps {
     # The same names, crates and commands as install.sh; a test keeps the two in step.
     #
-    # Soon marks a member that is not released yet: there is nothing on crates.io to install.
+    # Soon marks an app that is not released yet: there is nothing on crates.io to install.
     # Naming it says so and installs nothing for it; it is left out of all and out of the picker's
-    # numbers. Every member is out today; a new one that is not gets Soon = $true on its line here,
+    # numbers. Every app is out today; a new one that is not gets Soon = $true on its line here,
     # its name on the soon= line in install.sh, and Status::Soon in src/ecosystem.rs.
     #
-    # UnixOnly marks a member built for Linux and macOS only: it is listed, but never installed on
+    # UnixOnly marks an app built for Linux and macOS only: it is listed, but never installed on
     # Windows.
     @(
-        [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'the showcase of the framework every member is built on' }
+        [pscustomobject]@{ Name = 'framework'; Crate = 'quvyta-framework-showcase'; Command = 'qframe'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'the showcase of the framework every Quvyta app is built on' }
         [pscustomobject]@{ Name = 'code'; Crate = 'quvyta-code'; Command = 'qcode'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'coding agents inside Podman or Docker containers' }
         [pscustomobject]@{ Name = 'focus'; Crate = 'quvyta-focus'; Command = 'qfocus'; ArchOnly = $false; UnixOnly = $false; Soon = $false; About = 'tracks what you focus on and where your time went' }
         [pscustomobject]@{ Name = 'packages'; Crate = 'quvyta-packages'; Command = 'qpac'; ArchOnly = $true; UnixOnly = $false; Soon = $false; About = 'a package manager for Arch Linux that shows every change first' }
@@ -37,15 +37,15 @@ function Get-QuvytaApps {
     )
 }
 
-# The members that can be installed today, which is what all and the picker's numbers offer.
+# The apps that can be installed today, which is what all and the picker's numbers offer.
 function Get-QuvytaInstallable {
     @(Get-QuvytaApps | Where-Object { -not $_.Soon })
 }
 
-function Get-QuvytaMember {
+function Get-QuvytaApp {
     param([string]$Name)
-    foreach ($member in Get-QuvytaApps) {
-        if ($member.Name -eq $Name) { return $member }
+    foreach ($app in Get-QuvytaApps) {
+        if ($app.Name -eq $Name) { return $app }
     }
     return $null
 }
@@ -90,10 +90,10 @@ console runs it; -Yes does not, and the answer is no by default.
 '@
 }
 
-# The one line a person sees for a member that is not out yet, in the words quvyta itself uses.
+# The one line a person sees for an app that is not out yet, in the words quvyta itself uses.
 function Write-QuvytaSoon {
     param([string]$Name)
-    $command = (Get-QuvytaMember $Name).Command
+    $command = (Get-QuvytaApp $Name).Command
     Write-QuvytaLine "$command is not released yet, so it cannot be installed; quvyta's own list shows it as coming soon."
 }
 
@@ -160,7 +160,7 @@ function Read-QuvytaCommandLine {
         if ($word -in @('-Yes', '--yes', '-y')) { $State.Yes = $true; continue }
         if ($word -in @('-Help', '--help', '-h', '-?')) { $State.Help = $true; continue }
         if ($word -eq 'all') {
-            foreach ($member in Get-QuvytaInstallable) { Add-QuvytaChoice $State $member.Name }
+            foreach ($app in Get-QuvytaInstallable) { Add-QuvytaChoice $State $app.Name }
             continue
         }
         if ($word.StartsWith('-')) {
@@ -168,7 +168,7 @@ function Read-QuvytaCommandLine {
             Write-QuvytaLine 'Run with -Help to see the options.'
             return 2
         }
-        $named = Get-QuvytaMember $word
+        $named = Get-QuvytaApp $word
         if ($named) {
             if ($named.Soon) {
                 if ($State.Soon -notcontains $named.Name) { $State.Soon += $named.Name }
@@ -186,16 +186,16 @@ function Read-QuvytaCommandLine {
 
 function Write-QuvytaApps {
     $number = 1
-    foreach ($member in Get-QuvytaApps) {
-        $about = $member.About
-        # A member still to come has no number: the picker installs, and this cannot be installed.
-        if ($member.Soon) {
-            Write-QuvytaLine ('     {0,-10} {1,-8} {2}' -f $member.Name, $member.Command, "$about; coming soon, not released yet")
+    foreach ($app in Get-QuvytaApps) {
+        $about = $app.About
+        # An app still to come has no number: the picker installs, and this cannot be installed.
+        if ($app.Soon) {
+            Write-QuvytaLine ('     {0,-10} {1,-8} {2}' -f $app.Name, $app.Command, "$about; coming soon, not released yet")
             continue
         }
-        if ($member.ArchOnly) { $about = "$about; Arch Linux only, not for Windows" }
-        elseif ($member.UnixOnly) { $about = "$about; Linux and macOS only, not for Windows" }
-        Write-QuvytaLine ('  {0}  {1,-10} {2,-8} {3}' -f $number, $member.Name, $member.Command, $about)
+        if ($app.ArchOnly) { $about = "$about; Arch Linux only, not for Windows" }
+        elseif ($app.UnixOnly) { $about = "$about; Linux and macOS only, not for Windows" }
+        Write-QuvytaLine ('  {0}  {1,-10} {2,-8} {3}' -f $number, $app.Name, $app.Command, $about)
         $number++
     }
 }
@@ -207,7 +207,7 @@ function Read-QuvytaPick {
     $installable = Get-QuvytaInstallable
     foreach ($word in @($Reply -split '[\s,]+' | Where-Object { $_ })) {
         if ($word -eq 'all') {
-            foreach ($member in $installable) { Add-QuvytaChoice $State $member.Name }
+            foreach ($app in $installable) { Add-QuvytaChoice $State $app.Name }
         } elseif ($word -match '^[0-9]+$') {
             $number = [int]$word
             if ($number -lt 1 -or $number -gt $installable.Count) {
@@ -215,8 +215,8 @@ function Read-QuvytaPick {
                 return $false
             }
             Add-QuvytaChoice $State $installable[$number - 1].Name
-        } elseif (Get-QuvytaMember $word) {
-            if ((Get-QuvytaMember $word).Soon) {
+        } elseif (Get-QuvytaApp $word) {
+            if ((Get-QuvytaApp $word).Soon) {
                 Write-QuvytaSoon $word
             } else {
                 Add-QuvytaChoice $State $word
@@ -229,13 +229,13 @@ function Read-QuvytaPick {
     return $true
 }
 
-function Select-QuvytaMember {
+function Select-QuvytaApp {
     param($State)
     Write-QuvytaLine 'The Quvyta apps:'
     Write-QuvytaApps
     if (-not $State.Console) {
         Write-QuvytaLine ''
-        Write-QuvytaLine 'There is no console to choose on. Name the members instead, for example:'
+        Write-QuvytaLine 'There is no console to choose on. Name the apps instead, for example:'
         Write-QuvytaLine '  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/quvyta/quvyta/main/install.ps1))) code focus -Yes'
         return $false
     }
@@ -250,16 +250,16 @@ function Select-QuvytaMember {
     }
 }
 
-# Leaves out the members that do not run on Windows, saying so for each.
+# Leaves out the apps that do not run on Windows, saying so for each.
 function Select-QuvytaSupported {
     param($State)
     $kept = @()
     foreach ($name in $State.Chosen) {
-        $member = Get-QuvytaMember $name
-        if ($member.ArchOnly) {
-            Write-QuvytaLine "Skipping $name ($($member.Command)): it runs on Arch Linux only."
-        } elseif ($member.UnixOnly) {
-            Write-QuvytaLine "Skipping $name ($($member.Command)): it runs on Linux and macOS only."
+        $app = Get-QuvytaApp $name
+        if ($app.ArchOnly) {
+            Write-QuvytaLine "Skipping $name ($($app.Command)): it runs on Arch Linux only."
+        } elseif ($app.UnixOnly) {
+            Write-QuvytaLine "Skipping $name ($($app.Command)): it runs on Linux and macOS only."
         } else {
             $kept += $name
         }
@@ -491,8 +491,8 @@ function Install-QuvytaChosen {
     Write-QuvytaLine ''
     Write-QuvytaLine "These will be built from crates.io and installed into $($State.BinDir):"
     foreach ($name in $State.Chosen) {
-        $member = Get-QuvytaMember $name
-        Write-QuvytaLine ('  {0,-27} command {1}' -f $member.Crate, $member.Command)
+        $app = Get-QuvytaApp $name
+        Write-QuvytaLine ('  {0,-27} command {1}' -f $app.Crate, $app.Command)
     }
     Write-QuvytaLine 'Building takes a few minutes for each.'
     switch (Confirm-QuvytaStep $State 'Install them now?') {
@@ -504,14 +504,14 @@ function Install-QuvytaChosen {
         default {
             Write-QuvytaLine 'There is no console to ask on, so nothing was installed. Run with -Yes, or yourself:'
             foreach ($name in $State.Chosen) {
-                Write-QuvytaLine "  cargo install --locked $((Get-QuvytaMember $name).Crate)"
+                Write-QuvytaLine "  cargo install --locked $((Get-QuvytaApp $name).Crate)"
             }
             return $false
         }
     }
     $cargo = Find-QuvytaProgram 'cargo.exe'
     foreach ($name in $State.Chosen) {
-        $crate = (Get-QuvytaMember $name).Crate
+        $crate = (Get-QuvytaApp $name).Crate
         Write-QuvytaLine ''
         Write-QuvytaLine "Installing $crate..."
         if ((Invoke-QuvytaNative $cargo @('install', '--locked', $crate)) -eq 0) {
@@ -639,8 +639,8 @@ function Write-QuvytaSummary {
     if ($State.Installed.Count -gt 0) {
         Write-QuvytaLine 'Installed:'
         foreach ($name in $State.Installed) {
-            $member = Get-QuvytaMember $name
-            Write-QuvytaLine ('  {0,-8} {1}' -f $member.Command, $member.About)
+            $app = Get-QuvytaApp $name
+            Write-QuvytaLine ('  {0,-8} {1}' -f $app.Command, $app.About)
         }
     }
     if ($State.Failed.Count -gt 0) {
@@ -651,7 +651,7 @@ function Write-QuvytaSummary {
             'on-path' { Write-QuvytaLine 'Run a command above by its name to start it.' }
             'next-terminal' { Write-QuvytaLine 'Open a new terminal, then run a command above by its name.' }
             default {
-                $first = (Get-QuvytaMember $State.Installed[0]).Command
+                $first = (Get-QuvytaApp $State.Installed[0]).Command
                 Write-QuvytaLine "Until the folder is on PATH, start them by their full path, such as $(Join-Path $State.BinDir "$first.exe")."
             }
         }
@@ -687,7 +687,7 @@ function Invoke-QuvytaUnixInstaller {
     return Invoke-QuvytaNative $sh (@('-c', 'curl -fsSL $0 | sh -s -- $@', $url) + $forward)
 }
 
-# Runs the whole installer and returns its exit code: 0 done, 1 not done or a member failed,
+# Runs the whole installer and returns its exit code: 0 done, 1 not done or an app failed,
 # 2 an unknown name or option.
 function Invoke-QuvytaInstall {
     param([object[]]$Arguments)
@@ -708,7 +708,7 @@ function Invoke-QuvytaInstall {
         StartPath = [string]$env:PATH
         PathState = 'on-path'
         Console = $false
-        # Every member published crates for, at least this Rust.
+        # Every app published crates for, at least this Rust.
         MinMajor = 1
         MinMinor = 95
     }
@@ -727,7 +727,7 @@ function Invoke-QuvytaInstall {
         if ($State.Chosen.Count -eq 0) { return 1 }
     }
     if ($State.Chosen.Count -eq 0) {
-        if (-not (Select-QuvytaMember $State)) { return 1 }
+        if (-not (Select-QuvytaApp $State)) { return 1 }
     }
     if (-not (Select-QuvytaSupported $State)) { return 1 }
     if (-not (Install-QuvytaRust $State)) { return 1 }

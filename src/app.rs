@@ -1,4 +1,4 @@
-//! The screen: the Quvyta apps as a list and the chosen member's details beside it, or on a page of
+//! The screen: the Quvyta apps as a list and the chosen app's details beside it, or on a page of
 //! their own when the terminal is narrow.
 
 mod confirm_install;
@@ -21,11 +21,11 @@ use qframe::runtime::{HandoffOutcome, Termination};
 use qframe::storage::{Family, Preferences, Settings};
 use qframe::widgets::{Appearance, Markdown, Panel, ScrollView, Setup, SetupMsg, Splitter, Tabs, Toast};
 
-use crate::ecosystem::{APPS, Member, NotHere, Status};
+use crate::ecosystem::{APPS, NotHere, QuvytaApp, Status};
 use crate::inventory::{Inventory, State};
 use crate::launcher::{AfterClose, Launcher};
 use crate::machine::{LAUNCHER, Machine};
-pub use follow::{Following, MemberFollowing};
+pub use follow::{AppFollowing, Following};
 pub use installs::InstallMsg;
 use installs::Installs;
 use open::Opening;
@@ -47,7 +47,7 @@ const LIST_MIN: u16 = 24;
 /// The tabs in the header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
-    /// The Quvyta apps: the list and the chosen member's details.
+    /// The Quvyta apps: the list and the chosen app's details.
     #[default]
     Apps,
     /// quvyta's own settings.
@@ -63,7 +63,7 @@ pub struct Quvyta {
     machine: Machine,
     /// What is installed; `None` until cargo has answered.
     inventory: Option<Inventory>,
-    /// The member shown, an index of [`APPS`].
+    /// The app shown, an index of [`APPS`].
     selected: usize,
     size: Size,
     /// On a narrow screen, whether the details have the screen instead of the list.
@@ -80,30 +80,30 @@ pub struct Quvyta {
     appearance: Appearance,
     /// Installs running, waiting and ended.
     installs: Installs,
-    /// What the detail area says about starting members by name; `None` when there is nothing
+    /// What the detail area says about starting apps by name; `None` when there is nothing
     /// to say.
     path_notice: Option<PathNotice>,
     /// The newest versions on crates.io and how the last check went.
     updates: Updates,
-    /// Members the command line asked to install whose dialog has not opened yet, in order.
+    /// Apps the command line asked to install whose dialog has not opened yet, in order.
     asked: VecDeque<usize>,
     /// The tab shown.
     tab: Tab,
-    /// How each installed member follows the shared settings, in the order of [`APPS`];
+    /// How each installed app follows the shared settings, in the order of [`APPS`];
     /// `None` until it has been read, which waits for what is installed.
-    following: Option<Vec<follow::MemberFollowing>>,
+    following: Option<Vec<follow::AppFollowing>>,
     /// The row of the follow table the keys are on.
     following_selected: Option<usize>,
-    /// The reasons members' files could not be read that were already told, so reading them again
+    /// The reasons apps' files could not be read that were already told, so reading them again
     /// does not tell them twice.
     unreadable_told: Vec<String>,
     /// The first-run wizard, while quvyta has no settings file of its own; `None` once it is
     /// over, and from the start for someone who has quvyta's file already.
     setup: Option<Setup<Msg>>,
-    /// Which members are checked on the wizard's own step, by index of [`APPS`].
+    /// Which apps are checked on the wizard's own step, by index of [`APPS`].
     picked: [bool; APPS.len()],
-    /// Whether this is Arch Linux, which is where the members marked `arch_only` run. Read once
-    /// at start, since the app list offers members on every screen and not only on the wizard's.
+    /// Whether this is Arch Linux, which is where the apps marked `arch_only` run. Read once
+    /// at start, since the app list offers apps on every screen and not only on the wizard's.
     arch: bool,
     /// The Nerd Font the Settings tab offers while this machine has none.
     font: settings::Font,
@@ -114,29 +114,29 @@ pub struct Quvyta {
 pub enum Msg {
     /// The terminal has this size now.
     Resized(Size),
-    /// Selects the member at this index of [`APPS`].
+    /// Selects the app at this index of [`APPS`].
     Select(usize),
-    /// On a narrow screen, shows the details of the member at this index.
+    /// On a narrow screen, shows the details of the app at this index.
     ShowDetail(usize),
     /// Leaves the narrow details for the list.
     Back,
     /// What is installed, read in the background.
     Inventory(Inventory),
-    /// Runs the main button of the member shown: opens it when it is installed, asks to install
+    /// Runs the main button of the app shown: opens it when it is installed, asks to install
     /// it when it is not.
     Primary,
-    /// Opens the member at this index.
+    /// Opens the app at this index.
     Open(usize),
-    /// The member at `index` closed and quvyta has the screen back.
+    /// The app at `index` closed and quvyta has the screen back.
     Closed {
-        /// The member, an index of [`APPS`].
+        /// The app, an index of [`APPS`].
         index: usize,
         /// How it ended.
         outcome: HandoffOutcome,
     },
     /// Something about installing.
     Install(InstallMsg),
-    /// The member at this index does not run on this machine, and the screen says so instead of
+    /// The app at this index does not run on this machine, and the screen says so instead of
     /// offering to install it.
     NotInstallable(usize),
     /// The PATH notice.
@@ -247,16 +247,16 @@ impl Quvyta {
         }
     }
 
-    /// Opens on the install dialogs of `members`, indexes of [`APPS`], one after another, as
-    /// soon as it is known which of them are installed. A member not released yet is left out:
+    /// Opens on the install dialogs of `apps`, indexes of [`APPS`], one after another, as
+    /// soon as it is known which of them are installed. An app not released yet is left out:
     /// it has no dialog, and it is not there already either.
     #[must_use]
-    pub fn asking(mut self, members: Vec<usize>) -> Self {
-        self.asked = members.into_iter().filter(|index| APPS.get(*index).is_some_and(Member::published)).collect();
+    pub fn asking(mut self, apps: Vec<usize>) -> Self {
+        self.asked = apps.into_iter().filter(|index| APPS.get(*index).is_some_and(QuvytaApp::published)).collect();
         self
     }
 
-    /// Opens on the page of the member at `index` of [`APPS`]: selected in the list with its
+    /// Opens on the page of the app at `index` of [`APPS`]: selected in the list with its
     /// details beside it, or on a narrow screen its details alone, as a first `enter` shows them,
     /// with `esc` back to the list. The size is not known yet, so the page is chosen for both.
     #[must_use]
@@ -282,7 +282,7 @@ impl Quvyta {
         &self.settings
     }
 
-    /// Opens the dialog of the next member asked for that can be installed. The ones that are
+    /// Opens the dialog of the next app asked for that can be installed. The ones that are
     /// there already are not installed again: the first of them is shown with its details,
     /// where its version and any update are, and a toast names them all. One that does not run
     /// on this machine is neither of those: it is refused at once, with the reason the keyboard
@@ -325,7 +325,7 @@ impl Quvyta {
 
     /// The columns the details need so nothing in them is cut, with the air around them.
     ///
-    /// It is the widest any Quvyta app asks for and not the chosen member's own need: a need
+    /// It is the widest any Quvyta app asks for and not the chosen app's own need: a need
     /// that changed with the selection would move the split while walking down the list.
     ///
     /// `wide` asks for this from `update` and `action` as well as from the view, where the
@@ -342,13 +342,13 @@ impl Quvyta {
         DETAIL_MIN.max(widest.max(install_view::running_row_width()) + 4)
     }
 
-    /// The widest line the details of the member at `index` cannot break: its buttons in a row,
+    /// The widest line the details of the app at `index` cannot break: its buttons in a row,
     /// its title, or its badge. The title and the badge stand alone because `detail::show` puts
     /// the badge on its own line when they do not fit beside each other.
     fn detail_content(&self, index: usize) -> u16 {
-        let member = &APPS[index];
-        let title = qframe::text::width(&t!(&format!("apps.{}.title", member.key)));
-        let badge = detail::badge_width(&match member.status() {
+        let app = &APPS[index];
+        let title = qframe::text::width(&t!(&format!("apps.{}.title", app.key)));
+        let badge = detail::badge_width(&match app.status() {
             Status::Released => t!("status.released"),
             Status::Beta => t!("status.beta"),
             Status::Alpha => t!("status.alpha"),
@@ -357,7 +357,7 @@ impl Quvyta {
         self.buttons_width(index).max(title).max(badge)
     }
 
-    /// The columns the buttons of the member at `index` take, as `main_action` lays them out:
+    /// The columns the buttons of the app at `index` take, as `main_action` lays them out:
     /// each label with the button's air around it, and two cells between neighbours. The spacer
     /// that holds Remove apart is a neighbour of its own, so it costs two cells even when it is
     /// squeezed to nothing.
@@ -392,30 +392,30 @@ impl Quvyta {
         self.inventory.as_ref().map(|inventory| inventory.state(index))
     }
 
-    /// How the member at `index` would be opened; `None` when it cannot be.
+    /// How the app at `index` would be opened; `None` when it cannot be.
     fn opening(&self, index: usize) -> Option<Opening> {
         let program = self.state(index)?.program()?.clone();
         Some(Opening { program, dir: self.machine.home.clone() })
     }
 
-    /// Why the member at `index` cannot be installed from this machine, as the screen names it;
+    /// Why the app at `index` cannot be installed from this machine, as the screen names it;
     /// `None` when quvyta may offer to install it here.
     fn not_here(&self, index: usize) -> Option<NotHere> {
-        APPS.get(index).and_then(|member| member.not_here(self.arch))
+        APPS.get(index).and_then(|app| app.not_here(self.arch))
     }
 
-    /// The one line that tells the member at `index` cannot be installed from here, naming it:
+    /// The one line that tells the app at `index` cannot be installed from here, naming it:
     /// what the keyboard and the command line are both given. `None` when there is no reason, so
-    /// an answer that arrives for a member that turned out to be here changes nothing.
+    /// an answer that arrives for an app that turned out to be here changes nothing.
     fn refusal(&self, index: usize) -> Option<String> {
-        let member = APPS.get(index)?;
+        let app = APPS.get(index)?;
         Some(match self.not_here(index)? {
-            NotHere::ArchOnly => t!("platform.arch-only-toast", command = member.command),
-            NotHere::UnixOnly => t!("platform.unix-only-toast", command = member.command),
+            NotHere::ArchOnly => t!("platform.arch-only-toast", command = app.command),
+            NotHere::UnixOnly => t!("platform.unix-only-toast", command = app.command),
         })
     }
 
-    /// The one toast that tells every member of `indexes` cannot be installed from this machine,
+    /// The one toast that tells every app of `indexes` cannot be installed from this machine,
     /// each with its reason: the command line refuses the way the keyboard does, rather than
     /// leaving the person to read a list that quietly does not offer what they asked for.
     fn refused(&self, indexes: &[usize]) -> Command<Msg> {
@@ -426,8 +426,8 @@ impl Quvyta {
         Command::toast(Toast::warning(lines.join("\n")))
     }
 
-    /// Whether quvyta should step aside for good once a member it opened closes.
-    fn leaves_with_member(&self) -> bool {
+    /// Whether quvyta should step aside for good once an app it opened closes.
+    fn leaves_with_app(&self) -> bool {
         self.launcher.after_close == AfterClose::Shell
     }
 
@@ -475,7 +475,7 @@ impl App for Quvyta {
 
     fn init(&mut self) -> Command<Msg> {
         self.launcher = Launcher::from_settings(&self.settings);
-        // The shared update notice: turned off in any member, nothing asks crates.io unasked;
+        // The shared update notice: turned off in any app, nothing asks crates.io unasked;
         // `r` still does, since that is someone asking.
         let updates = if self.preferences().update_notice() { self.check_updates(false) } else { Command::none() };
         // On the first start the wizard has the screen, so the appearance rows take the keys.
@@ -518,7 +518,7 @@ impl App for Quvyta {
         if self.whats_new {
             return (name == "back").then_some(Msg::Back);
         }
-        // The app list's keys act on the list; on the Settings tab they would act on a member
+        // The app list's keys act on the list; on the Settings tab they would act on an app
         // nobody sees.
         if self.tab == Tab::Settings {
             return (name == "back").then_some(Msg::Back);
@@ -547,7 +547,7 @@ impl App for Quvyta {
                 self.whats_new = false;
                 return Command::focus("apps");
             }
-            // From the settings esc goes back to the app list as it was left, a member's page
+            // From the settings esc goes back to the app list as it was left, an app's page
             // included; the keys go to the list when it is on screen.
             Msg::Back if self.tab == Tab::Settings => {
                 self.tab = Tab::Apps;
@@ -561,7 +561,7 @@ impl App for Quvyta {
             }
             Msg::Inventory(inventory) => {
                 let first = self.inventory.replace(inventory).is_none();
-                // What is installed decides which members the follow table lists.
+                // What is installed decides which apps the follow table lists.
                 let following = self.read_following();
                 if first {
                     return Command::batch([self.check_path_at_start(), self.ask_next(), following]);
@@ -589,16 +589,14 @@ impl App for Quvyta {
                 }
             }
             Msg::Closed { index, outcome } => {
-                let Some(member) = APPS.get(index) else { return Command::none() };
+                let Some(app) = APPS.get(index) else { return Command::none() };
                 // An install keeps quvyta here: stopping it unasked would lose the build.
-                if self.leaves_with_member()
-                    && matches!(outcome, HandoffOutcome::Finished { .. })
-                    && !self.installs.busy()
+                if self.leaves_with_app() && matches!(outcome, HandoffOutcome::Finished { .. }) && !self.installs.busy()
                 {
                     return Command::quit();
                 }
-                // The member may have changed what is installed, even itself.
-                return Command::batch([open::report(member, &outcome), self.read_inventory()]);
+                // The app may have changed what is installed, even itself.
+                return Command::batch([open::report(app, &outcome), self.read_inventory()]);
             }
             Msg::Install(msg) => {
                 // Answering one dialog the command line asked for opens the next.
@@ -609,8 +607,8 @@ impl App for Quvyta {
                 }
                 return done;
             }
-            // What a member that does not run here is told, whether the keyboard or the command
-            // line asked for it. The list keeps the member, and offers nothing.
+            // What an app that does not run here is told, whether the keyboard or the command
+            // line asked for it. The list keeps the app, and offers nothing.
             Msg::NotInstallable(index) => {
                 if let Some(refusal) = self.refusal(index) {
                     return Command::toast(Toast::warning(refusal));
@@ -621,7 +619,7 @@ impl App for Quvyta {
             // The header's keys and a click leave the keys on the tabs, where they were.
             Msg::Tab(tab) => {
                 self.tab = tab;
-                // A member opened since the last look may have written its file.
+                // An app opened since the last look may have written its file.
                 if tab == Tab::Settings {
                     return self.read_following();
                 }
@@ -706,12 +704,12 @@ impl Quvyta {
     fn list_items(&self, compact: bool) -> Vec<ListItem> {
         APPS.iter()
             .enumerate()
-            .map(|(index, member)| {
+            .map(|(index, app)| {
                 // A failure keeps its mark in the list until it is dismissed; the word says it too.
                 let item = if self.install_failed(index) {
-                    ListItem::new(member.command).icon("error", Some("danger"))
+                    ListItem::new(app.command).icon("error", Some("danger"))
                 } else {
-                    ListItem::new(member.command).icon(member.icon, None)
+                    ListItem::new(app.command).icon(app.icon, None)
                 };
                 match self.row_text(index, compact) {
                     Some(text) => item.detail(text),
@@ -731,7 +729,7 @@ impl Quvyta {
         (0..APPS.len()).map(row).max().unwrap_or(0)
     }
 
-    /// What the row of the member at `index` says: an install under way, or how it is installed
+    /// What the row of the app at `index` says: an install under way, or how it is installed
     /// and the newer version when there is one.
     fn row_text(&self, index: usize, compact: bool) -> Option<String> {
         self.install_row(index).or_else(|| {
@@ -767,9 +765,9 @@ impl Quvyta {
     }
 
     fn detail(&self, ui: &mut View<'_, Msg>) {
-        let member = &APPS[self.selected];
+        let app = &APPS[self.selected];
         let narrow = !self.wide();
-        // Keyed by member so copy confirmations do not carry over to the next one.
+        // Keyed by app so copy confirmations do not carry over to the next one.
         ui.add_with(ScrollView::new(), |ui| {
             ui.column(|ui| {
                 if narrow {
@@ -779,18 +777,18 @@ impl Quvyta {
                 let main = |ui: &mut View<'_, Msg>| self.main_action(self.selected, ui);
                 let latest = self.update_to(self.selected);
                 let room = self.detail_width().saturating_sub(4);
-                detail::show(member, self.state(self.selected), latest.as_deref(), main, &self.machine, room, ui);
+                detail::show(app, self.state(self.selected), latest.as_deref(), main, &self.machine, room, ui);
             })
             .gap(1)
             .padding(Padding { top: 0, right: 2, bottom: 1, left: 2 })
             .fill_width()
-            .id(member.key);
+            .id(app.key);
         })
         .fill();
     }
 
     /// What changed in the running version: the title, the entry as the changelog that ships
-    /// writes it, and the way back. Drawn as `detail` draws the details of a member, over a
+    /// writes it, and the way back. Drawn as `detail` draws the details of an app, over a
     /// surface that answers the pointer like the key does, since a click is `esc` here too.
     fn whats_new_page(&self, entry: &str, ui: &mut View<'_, Msg>) {
         ui.add_with(ScrollView::new(), |ui| {
@@ -865,8 +863,8 @@ fn tabs_width(env: &qframe::env::Env, labels: &[String]) -> u16 {
     qframe::widget::natural_size(&Tabs::<Msg>::new(labels.to_vec()), env, Size::MAX).width
 }
 
-/// What a list row says about how its member is installed: in words, never in colour alone.
-/// Says which of the members at `indexes` were asked for but are installed already.
+/// What a list row says about how its app is installed: in words, never in colour alone.
+/// Says which of the apps at `indexes` were asked for but are installed already.
 fn already_installed(indexes: &[usize]) -> Command<Msg> {
     if indexes.is_empty() {
         return Command::none();
@@ -876,14 +874,14 @@ fn already_installed(indexes: &[usize]) -> Command<Msg> {
 }
 
 /// `compact` leaves out quvyta's own version, which its details show anyway.
-fn row_state(member: &Member, state: &State, compact: bool, not_here: Option<NotHere>) -> String {
+fn row_state(app: &QuvytaApp, state: &State, compact: bool, not_here: Option<NotHere>) -> String {
     match state {
         // Not there for a reason of its own, so never "not installed": that invites the install.
-        // A member that is not out yet keeps its own line, and one that does not run here says
+        // An app that is not out yet keeps its own line, and one that does not run here says
         // which platform it is for.
         State::Missing => match not_here {
             Some(reason) => quiet(reason),
-            None if member.status() == Status::Soon => t!("row.soon"),
+            None if app.status() == Status::Soon => t!("row.soon"),
             None => t!("row.missing"),
         },
         State::Cargo { version, .. } => version.clone(),
@@ -893,7 +891,7 @@ fn row_state(member: &Member, state: &State, compact: bool, not_here: Option<Not
     }
 }
 
-/// Why a member cannot be installed from here, in the few words a list row has room for. The
+/// Why an app cannot be installed from here, in the few words a list row has room for. The
 /// first run says the same claim in a whole sentence; the page and the row both say this.
 pub(in crate::app) fn quiet(reason: NotHere) -> String {
     match reason {

@@ -19,9 +19,9 @@ mod machine;
 mod shell_path;
 pub mod updates;
 
-pub use app::{Change, Following, InstallMsg, MemberFollowing, Msg, PathMsg, Quvyta, SettingMsg, Tab, UpdateMsg};
+pub use app::{AppFollowing, Change, Following, InstallMsg, Msg, PathMsg, Quvyta, SettingMsg, Tab, UpdateMsg};
 pub use cargo::Installed;
-pub use ecosystem::{APPS, Member, Status};
+pub use ecosystem::{APPS, QuvytaApp, Status};
 pub use install::Outcome;
 pub use inventory::Inventory;
 pub use launcher::AfterClose;

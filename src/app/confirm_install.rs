@@ -45,15 +45,15 @@ impl Quvyta {
     }
 
     fn remove_dialog(&self, index: usize, ui: &mut View<'_, Msg>) {
-        let member = &APPS[index];
-        let keep = Msg::Install(InstallMsg::KeepMember);
+        let app = &APPS[index];
+        let keep = Msg::Install(InstallMsg::KeepApp);
         let remove = Msg::Install(InstallMsg::ConfirmRemove);
-        let removal = Removal::new(&self.machine, member);
+        let removal = Removal::new(&self.machine, app);
         let command = removal.as_ref().map(Removal::command_line);
         let width = width_for(command.as_deref());
         let room = shown_width(ui, width);
         let modal = Modal::new()
-            .title(t!("remove.title", command = member.command))
+            .title(t!("remove.title", command = app.command))
             .variant("danger")
             .width(width)
             .on_close(keep.clone())
@@ -61,7 +61,7 @@ impl Quvyta {
             .action(Button::new(t!("remove.confirm")).variant("danger").on_press(remove));
         ui.add_with(modal, |ui| {
             ui.column(|ui| {
-                let program = self.machine.show(&self.machine.cargo_bin().join(member.command));
+                let program = self.machine.show(&self.machine.cargo_bin().join(app.command));
                 ui.add(Text::new(t!("remove.message", program = program))).fill_width();
                 // The settings are the user's: named, so it is plain they stay.
                 let kept = match &self.machine.settings_dir {
@@ -83,17 +83,17 @@ impl Quvyta {
             self.update_all_dialog(dialog, ui);
             return;
         }
-        let member = &APPS[dialog.index];
-        let job = Job::new(&self.machine, member, dialog.version.clone());
+        let app = &APPS[dialog.index];
+        let job = Job::new(&self.machine, app, dialog.version.clone());
         let found = dialog.problems.as_deref();
         let ready = found.is_some_and(<[Problem]>::is_empty);
         let close = Msg::Install(InstallMsg::Close);
         let (title, go) = match (&dialog.from, &dialog.version) {
             (Some(from), Some(to)) => (
-                t!("confirm.update-title", command = member.command, from = from.as_str(), to = to.as_str()),
+                t!("confirm.update-title", command = app.command, from = from.as_str(), to = to.as_str()),
                 t!("confirm.update"),
             ),
-            _ => (t!("confirm.title", command = member.command), t!("confirm.install")),
+            _ => (t!("confirm.title", command = app.command), t!("confirm.install")),
         };
         let problem_commands = found.unwrap_or_default().iter().flat_map(problem_commands);
         let width = match found {
@@ -119,9 +119,9 @@ impl Quvyta {
                     Some(version) => version.clone(),
                     None => t!("confirm.latest"),
                 };
-                let target = self.machine.show(&self.machine.cargo_bin().join(member.command));
+                let target = self.machine.show(&self.machine.cargo_bin().join(app.command));
                 let fields = [
-                    (t!("confirm.source"), t!("confirm.crates-io", package = member.package)),
+                    (t!("confirm.source"), t!("confirm.crates-io", package = app.package)),
                     (t!("confirm.version"), version),
                     (t!("confirm.target"), target),
                 ];
@@ -157,14 +157,14 @@ impl Quvyta {
         });
     }
 
-    /// The question before Install updates: every member it updates, from which version to which,
-    /// each with the exact command that runs, and what the checks find, as one member's update
+    /// The question before Install updates: every app it updates, from which version to which,
+    /// each with the exact command that runs, and what the checks find, as one app's update
     /// dialog shows it.
     fn update_all_dialog(&self, dialog: &Dialog, ui: &mut View<'_, Msg>) {
         let first =
             dialog.from.clone().zip(dialog.version.clone()).map(|(from, to)| Also { index: dialog.index, from, to });
-        let members: Vec<&Also> = first.iter().chain(dialog.more.iter()).collect();
-        let jobs: Vec<(&Also, Option<Job>)> = members
+        let apps: Vec<&Also> = first.iter().chain(dialog.more.iter()).collect();
+        let jobs: Vec<(&Also, Option<Job>)> = apps
             .iter()
             .map(|also| (*also, Job::new(&self.machine, &APPS[also.index], Some(also.to.clone()))))
             .collect();
@@ -181,7 +181,7 @@ impl Quvyta {
         };
         let room = shown_width(ui, width);
         let mut modal = Modal::new()
-            .title(t!("confirm.update-all-title", n = members.len()))
+            .title(t!("confirm.update-all-title", n = apps.len()))
             .width(width)
             .on_close(close.clone())
             .action(Button::new(t!("confirm.cancel")).on_press(close));
@@ -209,16 +209,16 @@ impl Quvyta {
                     Some(found) if !found.is_empty() => problems(found, true, room, ui),
                     _ => {
                         for (also, job) in &jobs {
-                            let member = &APPS[also.index];
+                            let app = &APPS[also.index];
                             let label = t!(
                                 "confirm.update-line",
-                                command = member.command,
+                                command = app.command,
                                 from = also.from.as_str(),
                                 to = also.to.as_str()
                             );
                             match job {
                                 Some(job) => {
-                                    copyable(ui, label, job.command_line(), &format!("command-{}", member.key), room);
+                                    copyable(ui, label, job.command_line(), &format!("command-{}", app.key), room);
                                 }
                                 None => {
                                     ui.add(Text::new(label).role("faint")).fill_width();
@@ -365,7 +365,7 @@ pub(super) fn field(ui: &mut View<'_, Msg>, label: &str, width: u16, value: &str
 fn copyable(ui: &mut View<'_, Msg>, label: String, value: String, id: &str, room: u16) {
     let fits = qframe::text::width(&value).saturating_add(AROUND_VALUE) <= room;
     ui.column(|ui| {
-        // A label that does not fit wraps rather than losing its end: the member and its
+        // A label that does not fit wraps rather than losing its end: the app and its
         // versions are part of what is agreed to.
         ui.add(Text::new(label).role("faint")).fill_width();
         if !fits {

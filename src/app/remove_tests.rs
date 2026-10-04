@@ -1,5 +1,5 @@
-//! Removing a member: the question naming what goes and what stays, `cargo uninstall` through
-//! the stand-in cargo, the queue it shares with installs, failures, and the members that have
+//! Removing an app: the question naming what goes and what stays, `cargo uninstall` through
+//! the stand-in cargo, the queue it shares with installs, failures, and the apps that have
 //! no Remove.
 
 use std::path::Path;
@@ -132,7 +132,7 @@ fn a_failed_removal_shows_cargo_s_lines_and_can_be_tried_again() {
 }
 
 #[test]
-fn only_members_cargo_installed_can_be_removed_and_never_quvyta() {
+fn only_apps_cargo_installed_can_be_removed_and_never_quvyta() {
     let (root, mut h) = removing();
     for key in ["focus", "tools", "quvyta"] {
         h.send(Msg::Select(index(key)));
@@ -271,7 +271,7 @@ fn visual_review_removal() {
             let size = format!("{locale} {width}x{height}");
             let (root, mut h) = harness(width, height);
             h.set_locale(locale).send(Msg::ShowDetail(index("code")));
-            shot(&h, format!("a member cargo installed {size}"));
+            shot(&h, format!("an app cargo installed {size}"));
             ask_remove(&mut h, index("code"));
             shot(&h, format!("remove {size}"));
             std::fs::write(root.path().join("bin/uninstall.err"), "error: failed to remove file `qcode`\n")

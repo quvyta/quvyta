@@ -1,4 +1,4 @@
-//! A member that is out only as a pre-release: cargo installs it only when its version is named,
+//! An app that is out only as a pre-release: cargo installs it only when its version is named,
 //! so the question before installing names the version, and the command it shows is the very
 //! command that runs, whether or not crates.io was asked for updates before.
 //!

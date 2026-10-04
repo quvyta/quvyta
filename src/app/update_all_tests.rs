@@ -1,5 +1,5 @@
-//! Updating many members at once, and the members quvyta must leave alone while it does: the
-//! question before Install updates starts anything, and a member cargo built from a folder or a
+//! Updating many apps at once, and the apps quvyta must leave alone while it does: the
+//! question before Install updates starts anything, and an app cargo built from a folder or a
 //! git repository, which crates.io's version would overwrite.
 //!
 //! Every test stands in a temporary root with the stand-in cargo; nothing is installed and no
@@ -55,7 +55,7 @@ fn with_local_qcode() -> (TempDir, Harness<Quvyta>) {
 }
 
 #[test]
-fn a_member_cargo_built_from_a_folder_is_left_to_that_folder() {
+fn an_app_cargo_built_from_a_folder_is_left_to_that_folder() {
     let (root, mut h) = with_local_qcode();
     let screen = h.screen();
     println!("{screen}");

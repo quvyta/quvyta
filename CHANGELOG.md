@@ -2,6 +2,11 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.4.0 (2026-10-04)
+
+- Both install scripts call the Quvyta apps apps where they still said members, as in "Name the apps instead". The library names an app `QuvytaApp`, where it was `Member`; code that used the old name has to say the new one, which is why this release is 0.4.
+- Requires quvyta-framework 0.1.33.
+
 ## 0.3.2 (2026-10-04)
 
 - Three more Quvyta apps are on the list and in both install scripts: **qexp**, the file explorer, **qbrow**, the web browser that runs an unmodified Chromium out of sight, and **qcli**, the small coding agent. qcli is an alpha with only pre-releases so far, which cargo installs only when the version is named, so quvyta and `install.sh` ask crates.io for the newest one first; its page carries an "Alpha" badge. The three are built for Linux and macOS: `install.ps1` lists them and leaves them out on Windows, and the setup wizard does not offer them there.

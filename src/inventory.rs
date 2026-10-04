@@ -1,17 +1,17 @@
-//! Which members are installed on this machine, from cargo's own record.
+//! Which apps are installed on this machine, from cargo's own record.
 //!
 //! cargo keeps the list of what it installed; quvyta keeps no record of its own, so the two can
-//! never disagree. A member's command found somewhere cargo does not know about still counts as
+//! never disagree. An app's command found somewhere cargo does not know about still counts as
 //! installed, with an unknown version. Finding a command only looks at the file: running a
-//! member to ask its version could open it.
+//! app to ask its version could open it.
 
 use std::path::PathBuf;
 
 use crate::cargo::{Installed, parse_install_list};
-use crate::ecosystem::{APPS, Member};
+use crate::ecosystem::{APPS, QuvytaApp};
 use crate::machine::Machine;
 
-/// How one member is installed.
+/// How one app is installed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum State {
     /// Its command is nowhere to be found.
@@ -28,7 +28,7 @@ pub enum State {
         /// Where the command was found.
         path: PathBuf,
     },
-    /// The member is quvyta, which is running.
+    /// The app is quvyta, which is running.
     This {
         /// The running version.
         version: &'static str,
@@ -39,7 +39,7 @@ pub enum State {
 }
 
 impl State {
-    /// The version cargo installed, for a member cargo can update.
+    /// The version cargo installed, for an app cargo can update.
     pub fn cargo_version(&self) -> Option<&str> {
         match self {
             Self::Cargo { version, .. } | Self::This { cargo: Some(version), .. } => Some(version),
@@ -47,7 +47,7 @@ impl State {
         }
     }
 
-    /// The command that opens the member, for a member quvyta can open: an installed one that
+    /// The command that opens the app, for an app quvyta can open: an installed one that
     /// is not quvyta itself.
     pub fn program(&self) -> Option<&PathBuf> {
         match self {
@@ -57,7 +57,7 @@ impl State {
     }
 }
 
-/// The state of every member, in the order of [`APPS`].
+/// The state of every app, in the order of [`APPS`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inventory {
     states: Vec<State>,
@@ -78,36 +78,36 @@ impl Inventory {
 
     /// The states given cargo's list of installed packages.
     pub fn from_list(machine: &Machine, listed: &[Installed]) -> Self {
-        Self { states: APPS.iter().map(|member| state(machine, listed, member)).collect() }
+        Self { states: APPS.iter().map(|app| state(machine, listed, app)).collect() }
     }
 
-    /// The state of the member at `index` of [`APPS`].
+    /// The state of the app at `index` of [`APPS`].
     pub(crate) fn state(&self, index: usize) -> &State {
         self.states.get(index).unwrap_or(&State::Missing)
     }
 }
 
-fn state(machine: &Machine, listed: &[Installed], member: &Member) -> State {
-    let path = machine.cargo_bin().join(member.command);
-    let by_cargo = listed.iter().find(|installed| {
-        installed.package == member.package && installed.commands.iter().any(|c| c == member.command)
-    });
+fn state(machine: &Machine, listed: &[Installed], app: &QuvytaApp) -> State {
+    let path = machine.cargo_bin().join(app.command);
+    let by_cargo = listed
+        .iter()
+        .find(|installed| installed.package == app.package && installed.commands.iter().any(|c| c == app.command));
     // cargo's record alone is not enough: a command deleted by hand cannot be opened. And a
-    // member cargo built from a folder or a git repository is someone's own build: crates.io's
+    // app cargo built from a folder or a git repository is someone's own build: crates.io's
     // version would overwrite it, so it counts as installed elsewhere, left to where it came from.
     let by_cargo = by_cargo
         .filter(|installed| installed.from_crates_io)
-        .filter(|_| machine.find_program(member.command).as_ref() == Some(&path));
-    if member.is_self() {
+        .filter(|_| machine.find_program(app.command).as_ref() == Some(&path));
+    if app.is_self() {
         let cargo = by_cargo.map(|installed| installed.version.clone());
         return State::This { version: env!("CARGO_PKG_VERSION"), cargo };
     }
-    // cargo can only have installed a member still to come from a local build; quvyta did not
+    // cargo can only have installed an app still to come from a local build; quvyta did not
     // put it there and crates.io has nothing to update it to, so it counts as installed elsewhere.
-    if let Some(installed) = by_cargo.filter(|_| member.published()) {
+    if let Some(installed) = by_cargo.filter(|_| app.published()) {
         return State::Cargo { version: installed.version.clone(), path };
     }
-    match machine.find_program(member.command) {
+    match machine.find_program(app.command) {
         Some(path) => State::Elsewhere { path },
         None => State::Missing,
     }
@@ -169,7 +169,7 @@ pub(crate) mod tests {
     }
 
     fn index(key: &str) -> usize {
-        APPS.iter().position(|member| member.key == key).expect("a member")
+        APPS.iter().position(|app| app.key == key).expect("an app")
     }
 
     const LIST: &str = "\
@@ -271,7 +271,7 @@ quvyta-framework-showcase v0.1.4:
     }
 
     #[test]
-    fn installed_members_open_with_their_full_path_and_quvyta_does_not_open_itself() {
+    fn installed_apps_open_with_their_full_path_and_quvyta_does_not_open_itself() {
         let path = PathBuf::from("/x/qcode");
         assert_eq!(State::Cargo { version: "0.1.1".to_owned(), path: path.clone() }.program(), Some(&path));
         assert_eq!(State::Elsewhere { path: path.clone() }.program(), Some(&path));

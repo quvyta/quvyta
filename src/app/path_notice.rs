@@ -20,7 +20,7 @@ use crate::shell_path::{self, PathAction};
 pub enum PathMsg {
     /// What the check of `PATH` after an install, or at start, decided in the background.
     Checked {
-        /// The member just installed, an index of [`APPS`]; `None` at start.
+        /// The app just installed, an index of [`APPS`]; `None` at start.
         installed: Option<usize>,
         /// What it takes.
         action: PathAction,
@@ -52,7 +52,7 @@ pub(super) enum PathReach {
 /// The notice shown in the detail area, or under the settings.
 #[derive(Debug, Clone)]
 pub(super) struct PathNotice {
-    /// The member the text names; `None` for the general wording.
+    /// The app the text names; `None` for the general wording.
     command: Option<&'static str>,
     action: PathAction,
     stage: Stage,
@@ -72,11 +72,11 @@ enum Stage {
 }
 
 impl Quvyta {
-    /// Checks whether members can be started by name and shows the notice when they cannot.
+    /// Checks whether apps can be started by name and shows the notice when they cannot.
     ///
-    /// This is the entry point for installing: after a successful install of the member at
+    /// This is the entry point for installing: after a successful install of the app at
     /// `index`, `update` returns `self.check_path(Some(index))`, and the notice names that
-    /// member. At start it runs with `None`, and the wording is general.
+    /// app. At start it runs with `None`, and the wording is general.
     pub(super) fn check_path(&self, installed: Option<usize>) -> Command<Msg> {
         self.decide_path(installed, false)
     }
@@ -113,11 +113,11 @@ impl Quvyta {
     /// since only then is there a program the user may want to type by name.
     pub(super) fn check_path_at_start(&self) -> Command<Msg> {
         let cargo_bin = self.machine.cargo_bin();
-        let by_cargo = APPS.iter().enumerate().any(|(index, member)| match self.state(index) {
+        let by_cargo = APPS.iter().enumerate().any(|(index, app)| match self.state(index) {
             Some(State::Cargo { .. }) => true,
             // quvyta's own row says it is running, not where from; its file in cargo's folder
             // says cargo put it there.
-            Some(State::This { .. }) => cargo_bin.join(member.command).is_file(),
+            Some(State::This { .. }) => cargo_bin.join(app.command).is_file(),
             _ => false,
         });
         if by_cargo { self.check_path(None) } else { Command::none() }
@@ -139,7 +139,7 @@ impl Quvyta {
                     // an offer, so it still shows.
                     _ if asks && !asked && self.launcher.path_prompt == PathPrompt::Dismissed => None,
                     action => Some(PathNotice {
-                        command: installed.and_then(|index| APPS.get(index)).map(|member| member.command),
+                        command: installed.and_then(|index| APPS.get(index)).map(|app| app.command),
                         action,
                         stage: Stage::Offered,
                     }),

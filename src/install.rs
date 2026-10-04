@@ -1,10 +1,10 @@
-//! Installing a member with `cargo install`, one at a time, in a shared build folder, and
+//! Installing an app with `cargo install`, one at a time, in a shared build folder, and
 //! removing one with `cargo uninstall`.
 //!
 //! cargo builds everything in a folder of its own and puts the program in place only once the
 //! build has succeeded, so an install that is stopped or fails leaves nothing half-installed.
-//! quvyta's part is the build folder, which it shares across a queue so the members' common
-//! crates are built once and deletes when the queue ends, and the log of each member's last
+//! quvyta's part is the build folder, which it shares across a queue so the apps' common
+//! crates are built once and deletes when the queue ends, and the log of each app's last
 //! install.
 //!
 //! Two quvyta windows must not share the folder: the one installing holds an [`AppLock`] beside
@@ -20,7 +20,7 @@ use qframe::runtime::{Keep, Line, Process, ProcessOutcome};
 use qframe::storage::{AppLock, atomic_write};
 
 use crate::cargo::{self, Failure};
-use crate::ecosystem::{Member, Status};
+use crate::ecosystem::{QuvytaApp, Status};
 use crate::machine::Machine;
 
 /// The folder under the data folder that builds go to.
@@ -47,7 +47,7 @@ pub struct Job {
     pub package: &'static str,
     /// The version to install; `None` for the latest one.
     pub version: Option<String>,
-    /// Whether the member has only pre-releases so far. cargo takes a pre-release only when its
+    /// Whether the app has only pre-releases so far. cargo takes a pre-release only when its
     /// version is named, so without a version the newest one is asked of crates.io first.
     pub named_only: bool,
     /// The cargo program.
@@ -64,22 +64,22 @@ pub struct Job {
 }
 
 impl Job {
-    /// The install of `member` at `version` on `machine`; `None` without cargo.
-    pub fn new(machine: &Machine, member: &Member, version: Option<String>) -> Option<Self> {
+    /// The install of `app` at `version` on `machine`; `None` without cargo.
+    pub fn new(machine: &Machine, app: &QuvytaApp, version: Option<String>) -> Option<Self> {
         let cargo = machine.cargo.clone().or_else(|| machine.find_program("cargo"))?;
         Some(Self {
-            package: member.package,
+            package: app.package,
             version,
-            named_only: member.status() == Status::Alpha,
+            named_only: app.status() == Status::Alpha,
             cargo,
             cargo_home: machine.cargo_home.clone(),
             dir: machine.home.clone(),
             build: build_dir(machine),
-            log: log_path(machine, member),
+            log: log_path(machine, app),
         })
     }
 
-    /// cargo's arguments: always `--locked`, so the versions the member was released and tested
+    /// cargo's arguments: always `--locked`, so the versions the app was released and tested
     /// with are the ones built.
     pub fn args(&self) -> Vec<String> {
         let mut args = vec!["install".to_owned(), "--locked".to_owned(), self.package.to_owned()];
@@ -179,7 +179,7 @@ impl Job {
 
 /// One `cargo uninstall`. It only deletes the program and cargo's record of it: nothing is
 /// built, so it needs no build folder, and it keeps no log, which would replace the one of the
-/// member's last install.
+/// app's last install.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Removal {
     /// The package cargo installed.
@@ -193,10 +193,10 @@ pub struct Removal {
 }
 
 impl Removal {
-    /// The removal of `member` on `machine`; `None` without cargo.
-    pub fn new(machine: &Machine, member: &Member) -> Option<Self> {
+    /// The removal of `app` on `machine`; `None` without cargo.
+    pub fn new(machine: &Machine, app: &QuvytaApp) -> Option<Self> {
         let cargo = machine.cargo.clone().or_else(|| machine.find_program("cargo"))?;
-        Some(Self { package: member.package, cargo, cargo_home: machine.cargo_home.clone(), dir: machine.home.clone() })
+        Some(Self { package: app.package, cargo, cargo_home: machine.cargo_home.clone(), dir: machine.home.clone() })
     }
 
     /// cargo's arguments.
@@ -255,9 +255,9 @@ pub fn build_dir(machine: &Machine) -> Option<PathBuf> {
     machine.data_dir.as_ref().map(|data| data.join(BUILD))
 }
 
-/// Where the log of `member`'s last install goes: `logs/<command>.log` in the data folder.
-pub fn log_path(machine: &Machine, member: &Member) -> Option<PathBuf> {
-    machine.data_dir.as_ref().map(|data| data.join(LOGS).join(format!("{}.log", member.command)))
+/// Where the log of `app`'s last install goes: `logs/<command>.log` in the data folder.
+pub fn log_path(machine: &Machine, app: &QuvytaApp) -> Option<PathBuf> {
+    machine.data_dir.as_ref().map(|data| data.join(LOGS).join(format!("{}.log", app.command)))
 }
 
 fn write_log(path: &Path, lines: &[String]) -> io::Result<()> {
@@ -341,8 +341,8 @@ pub(crate) mod tests {
     use crate::ecosystem::APPS;
     use crate::inventory::tests::machine_with_cargo;
 
-    pub(crate) fn member(key: &str) -> &'static Member {
-        APPS.iter().find(|member| member.key == key).expect("a member")
+    pub(crate) fn app(key: &str) -> &'static QuvytaApp {
+        APPS.iter().find(|app| app.key == key).expect("an app")
     }
 
     /// Makes the stand-in cargo in `root` answer `install` with `out` and `code`.
@@ -353,8 +353,7 @@ pub(crate) mod tests {
 
     /// Tells the stand-in cargo which command each package installs, and at which version.
     pub(crate) fn packages(root: &Path) {
-        let lines: String =
-            APPS.iter().map(|member| format!("{} {} 0.1.2\n", member.package, member.command)).collect();
+        let lines: String = APPS.iter().map(|app| format!("{} {} 0.1.2\n", app.package, app.command)).collect();
         std::fs::write(root.join("bin/packages"), lines).expect("scenario");
     }
 
@@ -402,13 +401,13 @@ pub(crate) mod tests {
     fn the_command_is_locked_and_pins_a_known_version() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
-        let job = Job::new(&machine, member("tools"), None).expect("cargo is there");
+        let job = Job::new(&machine, app("tools"), None).expect("cargo is there");
         assert_eq!(job.args(), ["install", "--locked", "quvyta-tools"]);
         assert_eq!(
             job.command_line(),
             format!("{} install --locked quvyta-tools", root.path().join("bin/cargo").display())
         );
-        let pinned = Job::new(&machine, member("tools"), Some("0.1.2".to_owned())).expect("cargo is there");
+        let pinned = Job::new(&machine, app("tools"), Some("0.1.2".to_owned())).expect("cargo is there");
         assert_eq!(pinned.args(), ["install", "--locked", "quvyta-tools", "--version", "0.1.2"]);
         assert_eq!(pinned.build, Some(root.path().join("data/build")));
         assert_eq!(pinned.log, Some(root.path().join("data/logs/qtools.log")));
@@ -426,7 +425,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_member_with_only_pre_releases_is_installed_at_the_newest_one_crates_io_names() {
+    fn an_app_with_only_pre_releases_is_installed_at_the_newest_one_crates_io_names() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
         packages(root.path());
@@ -435,7 +434,7 @@ pub(crate) mod tests {
         // pre-releases included.
         let answer = "quvyta-cli = \"0.1.0-alpha.2\"    # A small coding agent in the terminal (alpha)\n";
         std::fs::write(root.path().join("bin/search.out"), answer).expect("scenario");
-        let cli = member("cli");
+        let cli = app("cli");
         assert_eq!(cli.status(), Status::Alpha);
 
         let (outcome, _) = run(&Job::new(&machine, cli, None).expect("cargo"));
@@ -450,21 +449,21 @@ pub(crate) mod tests {
         let calls = std::fs::read_to_string(root.path().join("bin/calls.log")).expect("calls");
         assert!(!calls.contains("\tsearch "), "{calls}");
 
-        // A released member is never looked up: cargo already takes its newest version.
+        // A released app is never looked up: cargo already takes its newest version.
         std::fs::remove_file(root.path().join("bin/calls.log")).expect("reset");
-        run(&Job::new(&machine, member("explorer"), None).expect("cargo"));
+        run(&Job::new(&machine, app("explorer"), None).expect("cargo"));
         assert_eq!(installs_called(root.path()), ["install --locked quvyta-explorer"]);
     }
 
     #[test]
-    fn a_pre_release_member_crates_io_cannot_be_asked_about_still_goes_to_cargo_and_its_answer() {
+    fn a_pre_release_app_crates_io_cannot_be_asked_about_still_goes_to_cargo_and_its_answer() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
         std::fs::write(root.path().join("bin/search.code"), "101").expect("scenario");
         let refusal = "error: could not find `quvyta-cli` in registry `crates-io` with version `*`\n";
         std::fs::write(root.path().join("bin/install.err"), refusal).expect("scenario");
         std::fs::write(root.path().join("bin/install.code"), "101").expect("scenario");
-        let (outcome, lines) = run(&Job::new(&machine, member("cli"), None).expect("cargo"));
+        let (outcome, lines) = run(&Job::new(&machine, app("cli"), None).expect("cargo"));
         assert_eq!(installs_called(root.path()), ["install --locked quvyta-cli"]);
         assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
         assert!(lines.iter().any(|line| line.contains("could not find `quvyta-cli`")), "{lines:?}");
@@ -473,8 +472,8 @@ pub(crate) mod tests {
     #[test]
     fn without_cargo_there_is_nothing_to_run() {
         let root = tempfile::tempdir().expect("temp");
-        assert_eq!(Job::new(&Machine::in_root(root.path()), member("tools"), None), None);
-        assert_eq!(Removal::new(&Machine::in_root(root.path()), member("tools")), None);
+        assert_eq!(Job::new(&Machine::in_root(root.path()), app("tools"), None), None);
+        assert_eq!(Removal::new(&Machine::in_root(root.path()), app("tools")), None);
     }
 
     #[test]
@@ -483,7 +482,7 @@ pub(crate) mod tests {
         let machine = machine_with_cargo(root.path(), "quvyta-tools v0.1.2:\n    qtools\n", 0);
         packages(root.path());
         crate::inventory::tests::installed_command(&machine, "qtools");
-        let removal = Removal::new(&machine, member("tools")).expect("cargo");
+        let removal = Removal::new(&machine, app("tools")).expect("cargo");
         assert_eq!(
             removal.command_line(),
             format!("{} uninstall quvyta-tools", root.path().join("bin/cargo").display())
@@ -509,8 +508,7 @@ pub(crate) mod tests {
             .expect("scenario");
         std::fs::write(root.path().join("bin/uninstall.code"), "101").expect("scenario");
         let mut lines = Vec::new();
-        let outcome =
-            Removal::new(&machine, member("tools")).expect("cargo").run(&|| false, &mut |line| lines.push(line));
+        let outcome = Removal::new(&machine, app("tools")).expect("cargo").run(&|| false, &mut |line| lines.push(line));
         assert_eq!(outcome, Outcome::NotRemoved);
         assert_eq!(lines, ["error: Permission denied (os error 13)"]);
         assert!(machine.cargo_bin().join("qtools").exists());
@@ -522,7 +520,7 @@ pub(crate) mod tests {
         let machine = machine_with_cargo(root.path(), "", 0);
         scenario(root.path(), INSTALL, 0);
         packages(root.path());
-        let job = Job::new(&machine, member("tools"), None).expect("cargo");
+        let job = Job::new(&machine, app("tools"), None).expect("cargo");
         let (outcome, lines) = run(&job);
         assert_eq!(outcome, Outcome::Installed { version: Some("0.1.2".to_owned()) });
         assert!(machine.cargo_bin().join("qtools").is_file(), "the stand-in put the command in place");
@@ -553,7 +551,7 @@ pub(crate) mod tests {
         let recording = include_str!("../tests/cargo-output/install-pty.txt");
         scenario(root.path(), recording, 0);
         packages(root.path());
-        let (outcome, lines, frames) = run_with_frames(&Job::new(&machine, member("tools"), None).expect("cargo"));
+        let (outcome, lines, frames) = run_with_frames(&Job::new(&machine, app("tools"), None).expect("cargo"));
         assert!(matches!(outcome, Outcome::Installed { .. }), "{outcome:?}");
         let steps: Vec<cargo::Step> = lines.iter().filter_map(|line| cargo::step(line)).collect();
         let compiling = steps.iter().filter(|step| matches!(step, cargo::Step::Compiling { .. })).count();
@@ -586,7 +584,7 @@ pub(crate) mod tests {
         let machine = machine_with_cargo(root.path(), "", 0);
         scenario(root.path(), "   Compiling proc-macro2 v1.0.95\nerror: linker `cc` not found\n", 101);
         packages(root.path());
-        let (outcome, _) = run(&Job::new(&machine, member("tools"), None).expect("cargo"));
+        let (outcome, _) = run(&Job::new(&machine, app("tools"), None).expect("cargo"));
         assert_eq!(outcome, Outcome::Failed(Failure::NoLinker));
         assert!(!machine.cargo_bin().join("qtools").exists());
         let log = std::fs::read_to_string(root.path().join("data/logs/qtools.log")).expect("log written");
@@ -594,10 +592,10 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn only_the_last_install_of_a_member_is_logged() {
+    fn only_the_last_install_of_an_app_is_logged() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
-        let job = Job::new(&machine, member("tools"), None).expect("cargo");
+        let job = Job::new(&machine, app("tools"), None).expect("cargo");
         scenario(root.path(), "first attempt\n", 101);
         run(&job);
         scenario(root.path(), "second attempt\n", 101);
@@ -613,7 +611,7 @@ pub(crate) mod tests {
         scenario(root.path(), "   Compiling serde v1.0.219\n", 0);
         packages(root.path());
         std::fs::write(root.path().join("bin/install.sleep"), "30").expect("scenario");
-        let job = Job::new(&machine, member("tools"), None).expect("cargo");
+        let job = Job::new(&machine, app("tools"), None).expect("cargo");
         let stop = Arc::new(AtomicBool::new(false));
         let started = std::time::Instant::now();
         let flag = Arc::clone(&stop);
@@ -633,7 +631,7 @@ pub(crate) mod tests {
         // A network that hangs: the search answers only after half a minute.
         std::fs::write(root.path().join("bin/search.out"), "quvyta-cli = \"0.1.0-alpha.2\"\n").expect("scenario");
         std::fs::write(root.path().join("bin/search.sleep"), "30").expect("scenario");
-        let job = Job::new(&machine, member("cli"), None).expect("cargo");
+        let job = Job::new(&machine, app("cli"), None).expect("cargo");
         let started = std::time::Instant::now();
         // Stop is pressed a moment after the install began, while the search is still waiting.
         let stop = move || started.elapsed() > std::time::Duration::from_millis(300);
@@ -651,7 +649,7 @@ pub(crate) mod tests {
     fn a_cargo_that_cannot_start_is_told() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine_with_cargo(root.path(), "", 0);
-        let mut job = Job::new(&machine, member("tools"), None).expect("cargo");
+        let mut job = Job::new(&machine, app("tools"), None).expect("cargo");
         job.cargo = root.path().join("bin/missing-cargo");
         let (outcome, _) = run(&job);
         assert!(matches!(outcome, Outcome::NotStarted(_)), "{outcome:?}");
@@ -690,7 +688,7 @@ pub(crate) mod tests {
         let mut machine = machine_with_cargo(root.path(), "", 0);
         machine.data_dir = None;
         assert!(matches!(claim(&machine), Claim::Unshared));
-        let job = Job::new(&machine, member("tools"), None).expect("cargo");
+        let job = Job::new(&machine, app("tools"), None).expect("cargo");
         assert_eq!((job.build, job.log), (None, None));
     }
 
@@ -702,7 +700,7 @@ pub(crate) mod tests {
     #[ignore = "installs from crates.io; run in a disposable container"]
     fn a_real_install_from_crates_io() {
         let package = std::env::var("QUVYTA_E2E_PACKAGE").unwrap_or_else(|_| "quvyta-tools".to_owned());
-        let member = APPS.iter().find(|member| member.package == package).expect("a member");
+        let app = APPS.iter().find(|app| app.package == package).expect("an app");
         let root = tempfile::tempdir().expect("temp");
         let home = root.path().join("home");
         std::fs::create_dir_all(&home).expect("home");
@@ -710,14 +708,14 @@ pub(crate) mod tests {
             .and_then(|path| std::env::split_paths(&path).map(|dir| dir.join("cargo")).find(|cargo| cargo.is_file()))
             .expect("cargo on PATH");
         let job = Job {
-            package: member.package,
+            package: app.package,
             version: None,
             named_only: false,
             cargo,
             cargo_home: home.join(".cargo"),
             dir: home.clone(),
             build: Some(root.path().join("data/build")),
-            log: Some(root.path().join("data/logs").join(format!("{}.log", member.command))),
+            log: Some(root.path().join("data/logs").join(format!("{}.log", app.command))),
         };
         let (mut steps, mut frames) = (Vec::new(), Vec::new());
         let outcome = job.run(
@@ -736,7 +734,7 @@ pub(crate) mod tests {
         let log = std::fs::read_to_string(job.log.as_ref().expect("log")).expect("log written");
         let Outcome::Installed { version: Some(version) } = &outcome else { panic!("{outcome:?}\n{log}") };
         println!("installed {package} {version}");
-        assert!(home.join(".cargo/bin").join(member.command).is_file(), "{log}");
+        assert!(home.join(".cargo/bin").join(app.command).is_file(), "{log}");
         assert!(steps.first().is_some_and(|step| *step == cargo::Step::Downloading), "{steps:?}");
         assert!(steps.iter().any(|step| matches!(step, cargo::Step::Compiling { .. })), "{steps:?}");
         assert_eq!(steps.last(), Some(&cargo::Step::Placing), "{steps:?}");

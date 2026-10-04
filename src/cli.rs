@@ -1,9 +1,9 @@
 //! The command line: what quvyta was asked to do before its screen opens.
 //!
 //! Without arguments quvyta opens the list of Quvyta apps. `install` opens it straight into the install
-//! dialog of the members named, one after another, so nothing is installed without the same
-//! consent the screen asks for. `show` opens it on one member's page, so another program can
-//! send its user to that member. `--help` and `--version` answer on standard output; anything
+//! dialog of the apps named, one after another, so nothing is installed without the same
+//! consent the screen asks for. `show` opens it on one app's page, so another program can
+//! send its user to that app. `--help` and `--version` answer on standard output; anything
 //! else is a mistake, told on standard error with exit code 2 and without opening the screen.
 //!
 //! The words come from the language files, in the language the screen would use.
@@ -35,9 +35,9 @@ pub enum Parsed {
 pub enum Start {
     /// On the list of Quvyta apps.
     List,
-    /// Asking to install these members, indexes of [`APPS`] in the order named.
+    /// Asking to install these apps, indexes of [`APPS`] in the order named.
     Install(Vec<usize>),
-    /// On the page of this member, an index of [`APPS`].
+    /// On the page of this app, an index of [`APPS`].
     Show(usize),
 }
 
@@ -46,13 +46,13 @@ pub enum Start {
 pub enum Mistake {
     /// An option quvyta does not have.
     Option(String),
-    /// A name no member goes by.
+    /// A name no app goes by.
     Name(String),
     /// A first word that is not something quvyta does.
     Command(String),
     /// `install` without a name.
     NoNames,
-    /// `install` naming a member that is not released yet, an index of [`APPS`].
+    /// `install` naming an app that is not released yet, an index of [`APPS`].
     Unreleased(usize),
     /// `show` without a name.
     NoShowName,
@@ -64,7 +64,7 @@ pub enum Mistake {
 ///
 /// `--help` anywhere wins, then `--version`, so either answers whatever else was typed.
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Parsed {
-    // A name that is not UTF-8 matches no member; shown as well as it can be, it says which.
+    // A name that is not UTF-8 matches no app; shown as well as it can be, it says which.
     let args: Vec<String> = args.into_iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
     if args.iter().any(|arg| matches!(arg.as_str(), "-h" | "--help")) {
         return Parsed::Help;
@@ -88,27 +88,27 @@ fn install(names: &[String]) -> Parsed {
     if names.is_empty() {
         return Parsed::Wrong(Mistake::NoNames);
     }
-    let mut members = Vec::new();
+    let mut apps = Vec::new();
     for name in names {
-        let Some(index) = member(name) else { return Parsed::Wrong(Mistake::Name(name.clone())) };
+        let Some(index) = app(name) else { return Parsed::Wrong(Mistake::Name(name.clone())) };
         // The whole line is refused, as for a wrong name: the ones that can be installed are
         // better asked for again than half of what was typed started.
         if !APPS[index].published() {
             return Parsed::Wrong(Mistake::Unreleased(index));
         }
-        // Naming a member twice asks once.
-        if !members.contains(&index) {
-            members.push(index);
+        // Naming an app twice asks once.
+        if !apps.contains(&index) {
+            apps.push(index);
         }
     }
-    Parsed::Open(Start::Install(members))
+    Parsed::Open(Start::Install(apps))
 }
 
-/// `show` with `names`. Every member has a page, the ones not released yet and quvyta too.
+/// `show` with `names`. Every app has a page, the ones not released yet and quvyta too.
 fn show(names: &[String]) -> Parsed {
     match names {
         [] => Parsed::Wrong(Mistake::NoShowName),
-        [name] => match member(name) {
+        [name] => match app(name) {
             Some(index) => Parsed::Open(Start::Show(index)),
             None => Parsed::Wrong(Mistake::Name(name.clone())),
         },
@@ -116,11 +116,9 @@ fn show(names: &[String]) -> Parsed {
     }
 }
 
-/// The member that goes by `name`: its short name, its command or its package, in any case.
-pub(crate) fn member(name: &str) -> Option<usize> {
-    APPS.iter().position(|member| {
-        [member.key, member.command, member.package].iter().any(|known| known.eq_ignore_ascii_case(name))
-    })
+/// The app that goes by `name`: its short name, its command or its package, in any case.
+pub(crate) fn app(name: &str) -> Option<usize> {
+    APPS.iter().position(|app| [app.key, app.command, app.package].iter().any(|known| known.eq_ignore_ascii_case(name)))
 }
 
 /// The language files over the framework's, in the language of the environment `lookup` reads,
@@ -162,10 +160,10 @@ impl Answer {
                     Mistake::NoNames => t!("cli.no-names"),
                     Mistake::NoShowName => t!("cli.show-no-name"),
                     Mistake::ShowMany => t!("cli.show-many"),
-                    // The help has nothing to add: the name was right, the member is only not
+                    // The help has nothing to add: the name was right, the app is only not
                     // out yet.
                     Mistake::Unreleased(index) => {
-                        let command = APPS.get(index).map_or("", |member| member.command);
+                        let command = APPS.get(index).map_or("", |app| app.command);
                         return Self::Refuse(format!("quvyta: {}\n", t!("cli.unreleased", command = command)));
                     }
                 };
@@ -224,7 +222,7 @@ mod tests {
     use super::*;
 
     fn index(key: &str) -> usize {
-        APPS.iter().position(|member| member.key == key).expect("a member")
+        APPS.iter().position(|app| app.key == key).expect("an app")
     }
 
     fn parsed(args: &[&str]) -> Parsed {
@@ -370,7 +368,7 @@ A name is an app's short name (code), its command (qcode) or its package (quvyta
     }
 
     #[test]
-    fn show_opens_on_one_member_by_any_of_its_names() {
+    fn show_opens_on_one_app_by_any_of_its_names() {
         let show = |key: &str| Parsed::Open(Start::Show(index(key)));
         let cases: [(&[&str], Parsed); 10] = [
             (&["show", "qfocus"], show("focus")),
@@ -406,11 +404,11 @@ A name is an app's short name (code), its command (qcode) or its package (quvyta
         let Answer::Refuse(text) = answer("tr", &["show"]) else { panic!("refused") };
         assert!(text.starts_with("quvyta: show bir ad bekliyor, örneğin qfocus\n"), "{text}");
         let _soon = crate::ecosystem::tests::unreleased("desk");
-        assert_eq!(answer("en", &["show", "qdesk"]).code(), None, "a member still to come has a page too");
+        assert_eq!(answer("en", &["show", "qdesk"]).code(), None, "an app still to come has a page too");
     }
 
     #[test]
-    fn a_member_not_released_yet_is_refused_in_one_line() {
+    fn an_app_not_released_yet_is_refused_in_one_line() {
         let desk = index("desk");
         assert_eq!(parsed(&["install", "qdesk"]), Parsed::Open(Start::Install(vec![desk])), "qdesk is out");
         let _soon = crate::ecosystem::tests::unreleased("desk");

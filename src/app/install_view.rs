@@ -17,8 +17,8 @@ const LOG_ROWS: u16 = 12;
 const LAST_LINES: usize = 5;
 
 impl Quvyta {
-    /// What a list row says about an install of the member at `index`, when one runs, waits or
-    /// failed; `None` leaves the row to say how the member is installed.
+    /// What a list row says about an install of the app at `index`, when one runs, waits or
+    /// failed; `None` leaves the row to say how the app is installed.
     pub(super) fn install_row(&self, index: usize) -> Option<String> {
         if let Some(running) = self.installs.running(index) {
             if running.action == Action::Remove {
@@ -39,12 +39,12 @@ impl Quvyta {
         }
     }
 
-    /// Whether the member at `index` shows its failure mark.
+    /// Whether the app at `index` shows its failure mark.
     pub(super) fn install_failed(&self, index: usize) -> bool {
         matches!(self.installs.ended.get(&index), Some(Ended::Failed { .. })) && !self.installs.has(index)
     }
 
-    /// The main part of the details of the member at `index`: Open, Install, or the install
+    /// The main part of the details of the app at `index`: Open, Install, or the install
     /// running, waiting or failed.
     pub(super) fn main_action(&self, index: usize, ui: &mut View<'_, Msg>) {
         if let Some(running) = self.installs.running(index) {
@@ -101,7 +101,7 @@ impl Quvyta {
         } else if let Some(reason) = self.not_here(index) {
             // Where the Install button would be, the reason: a word where a button would be and
             // nothing to press. Reached only when no other main action is on the page, so an
-            // install under way, a member already here and its update all keep their own.
+            // install under way, an app already here and its update all keep their own.
             ui.add(Text::new(quiet(reason)).role("secondary")).fill_width();
         }
     }
@@ -165,16 +165,16 @@ impl Quvyta {
         lines: &[&str],
         ui: &mut View<'_, Msg>,
     ) {
-        let member = &APPS[index];
+        let app = &APPS[index];
         let removing = *action == Action::Remove;
         let title = if removing {
-            t!("remove.failed", command = member.command)
+            t!("remove.failed", command = app.command)
         } else {
-            t!("install.failed", command = member.command)
+            t!("install.failed", command = app.command)
         };
         ui.add(Text::new(title).role("title").color("danger")).fill_width();
         let reason = match outcome {
-            Outcome::Failed(failure) => failure_text(*failure, member.package),
+            Outcome::Failed(failure) => failure_text(*failure, app.package),
             Outcome::NotRemoved => t!("remove.failed-reason"),
             Outcome::NotStarted(reason) => t!("install.not-started", reason = reason.as_str()),
             Outcome::Installed { .. } | Outcome::Removed | Outcome::Cancelled => String::new(),
@@ -199,7 +199,7 @@ impl Quvyta {
             .selectable(true)
             .fill_width();
         }
-        if let Some(path) = install::log_path(&self.machine, member).filter(|_| !removing) {
+        if let Some(path) = install::log_path(&self.machine, app).filter(|_| !removing) {
             ui.add(Text::new(t!("install.log-file", path = self.machine.show(&path)))).selectable(true).fill_width();
         }
         actions(ui, |ui| {
@@ -258,7 +258,7 @@ fn row_width(buttons: &[u16], spacer: bool) -> u16 {
 }
 
 /// The columns the row under a running install asks for: the details button, the spacer that
-/// holds Stop apart, and Stop. Nothing about it depends on which member is installing, so the
+/// holds Stop apart, and Stop. Nothing about it depends on which app is installing, so the
 /// split can keep room for it without moving the moment an install starts.
 pub(super) fn running_row_width() -> u16 {
     row_width(&[details_button_width(), button_width(&t!("install.stop"))], true)

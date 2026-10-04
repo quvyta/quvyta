@@ -3,7 +3,7 @@
 //!
 //! The harness runs a background task until it ends, so an install through the stand-in cargo
 //! finishes within one frame. Screens of an install still running are built instead by queueing
-//! members on the application before the harness starts: the task is made but never run, and
+//! apps on the application before the harness starts: the task is made but never run, and
 //! the test sends the lines and endings the task would.
 
 use std::path::Path;
@@ -104,10 +104,10 @@ pub(super) fn confirm(h: &mut Harness<Quvyta>) {
     click_beside(h, &cancel, &install);
 }
 
-/// Asks to install or update the member at `index` the way a person does, with the key that runs
-/// the member's main button. The selection is set as the list itself sends it; the ask is the part
+/// Asks to install or update the app at `index` the way a person does, with the key that runs
+/// the app's main button. The selection is set as the list itself sends it; the ask is the part
 /// a person does, so it is a key and not a message. A screen too narrow for the split asks for the
-/// member's page first, which the same key reaches and the key after it answers.
+/// app's page first, which the same key reaches and the key after it answers.
 pub(super) fn ask(h: &mut Harness<Quvyta>, index: usize) {
     h.send(Msg::Select(index)).press("enter");
     if h.app().installs.dialog.is_none() {
@@ -116,7 +116,7 @@ pub(super) fn ask(h: &mut Harness<Quvyta>, index: usize) {
     h.advance(DIALOG_IN);
 }
 
-/// Asks to remove the member at `index` the way a person does, with the Remove button in its
+/// Asks to remove the app at `index` the way a person does, with the Remove button in its
 /// details. The label is read from the language files, so the button is found in every language,
 /// and a screen too narrow for the split shows the page the button stands on first.
 pub(super) fn ask_remove(h: &mut Harness<Quvyta>, index: usize) {
@@ -478,7 +478,7 @@ fn an_install_into_a_folder_off_path_offers_to_put_it_there() {
     let screen = h.screen();
     assert!(line_with(&screen, "qtools ").contains("0.1.2"), "{screen}");
     assert!(screen.contains("~/.cargo/bin is not on PATH"), "{screen}");
-    assert!(screen.contains("For qtools to open when you type its name"), "the notice names the member:\n{screen}");
+    assert!(screen.contains("For qtools to open when you type its name"), "the notice names the app:\n{screen}");
 }
 
 #[test]
@@ -699,7 +699,7 @@ fn stopping_the_queued_ones_too_empties_the_queue() {
 }
 
 #[test]
-fn a_queued_member_can_be_taken_out() {
+fn a_queued_app_can_be_taken_out() {
     let (_root, mut h) = installing();
     h.send(Msg::Select(index("packages")));
     let screen = h.screen();
@@ -1041,7 +1041,7 @@ fn reads_fully(h: &Harness<Quvyta>, scene: &str, locale: &str, width: u16, label
         }
     }
     // A handful of the list's last cells allowed in, so a word of the details starting on the
-    // edge is never lost: far too few to reach a member's name, which is what the list would
+    // edge is never lost: far too few to reach an app's name, which is what the list would
     // otherwise lend to a title looked for here.
     let flat = squeezed(&detail_rows(h, &screen, 8).concat());
     for label in labels {
@@ -1051,7 +1051,7 @@ fn reads_fully(h: &Harness<Quvyta>, scene: &str, locale: &str, width: u16, label
 
 /// The narrowest screen on which the details sit beside the list in `locale`: the split is at
 /// its tightest there, so that is where a row of buttons is likeliest to lose its end. The
-/// screen answers it, since a member's page shows the rest of the list only beside it.
+/// screen answers it, since an app's page shows the rest of the list only beside it.
 fn splits_at(locale: &str) -> u16 {
     let (_root, mut h) = harness(40, 30);
     h.set_locale(locale).send(Msg::ShowDetail(index("tools")));

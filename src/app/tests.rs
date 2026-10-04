@@ -76,7 +76,7 @@ pub(super) fn harness(width: u16, height: u16) -> (TempDir, Harness<Quvyta>) {
 /// Makes `root` a machine quvyta has been set up on: an empty `launcher.conf` is enough, since
 /// the first-run wizard opens only while quvyta has no file of its own. The running version is
 /// kept as seen, so the page of what changed stays closed. The distribution is named
-/// too, as Arch Linux, where every member runs and none of them is held back; a root that names
+/// too, as Arch Linux, where every app runs and none of them is held back; a root that names
 /// its own distribution before the machine is built keeps it, which is how
 /// [`super::platform_tests`] stands on another system. Without this every test of the app list
 /// would see the wizard, which is [`super::wizard::tests`]' own subject.
@@ -126,7 +126,7 @@ pub(super) fn harness_with_settings_at(settings: &str, width: u16, height: u16) 
 }
 
 pub(super) fn index(key: &str) -> usize {
-    APPS.iter().position(|member| member.key == key).expect("a member")
+    APPS.iter().position(|app| app.key == key).expect("an app")
 }
 
 /// Long enough for a toast to have slid in.
@@ -208,13 +208,13 @@ fn the_selected_row_carries_the_pillar() {
 }
 
 #[test]
-fn an_installed_member_says_which_version_and_where() {
+fn an_installed_app_says_which_version_and_where() {
     let (_root, h) = harness(100, 24);
     let screen = h.screen();
     for text in ["Quvyta Code", "Beta", "quvyta-code", "Installed  0.1.1, ~/.cargo/bin/qcode", "Source", "A beta"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    assert!(!screen.contains("cargo install quvyta-code"), "an installed member needs no install line:\n{screen}");
+    assert!(!screen.contains("cargo install quvyta-code"), "an installed app needs no install line:\n{screen}");
 }
 
 #[test]
@@ -263,14 +263,14 @@ fn quvyta_itself_shows_the_running_version() {
 
 #[test]
 fn every_program_installs_under_its_package_name() {
-    for member in APPS {
-        assert!(member.repository.starts_with("https://github.com/quvyta/"), "{}", member.repository);
-        let expected = match member.key {
+    for app in APPS {
+        assert!(app.repository.starts_with("https://github.com/quvyta/"), "{}", app.repository);
+        let expected = match app.key {
             "framework" => Status::Released,
             "cli" => Status::Alpha,
             _ => Status::Beta,
         };
-        assert_eq!(member.status(), expected, "{}", member.package);
+        assert_eq!(app.status(), expected, "{}", app.package);
     }
 }
 
@@ -330,7 +330,7 @@ fn widening_the_screen_puts_the_details_beside_the_list() {
 }
 
 #[test]
-fn every_member_reads_fully_in_every_language() {
+fn every_app_reads_fully_in_every_language() {
     for locale in LANGUAGES {
         let (_root, mut h) = harness(100, 30);
         h.set_locale(locale);
@@ -412,9 +412,9 @@ fn narrow_ascii_screens_keep_the_rules() {
     }
 }
 
-/// With `QUVYTA_REVIEW=1`, writes every member in both languages, wide, narrow and short, to
+/// With `QUVYTA_REVIEW=1`, writes every app in both languages, wide, narrow and short, to
 /// `target/quvyta-review.html` in colour for a visual review; a narrow screen shows its list and
-/// then every member's page. The notices after a member closes, for a broken settings file and
+/// then every app's page. The notices after an app closes, for a broken settings file and
 /// about PATH follow, then the Settings tab.
 ///
 /// It is ignored rather than left to return early: a review only ever writes a file for a person
@@ -434,10 +434,10 @@ fn visual_review() {
                 fragments.push(h.html(&format!("list {locale} {width}x{height}")));
                 println!("list {locale} {width}x{height}\n{}", h.screen());
             }
-            for (index, member) in APPS.iter().enumerate() {
+            for (index, app) in APPS.iter().enumerate() {
                 h.send(if width < WIDE { Msg::ShowDetail(index) } else { Msg::Select(index) });
-                fragments.push(h.html(&format!("{} {locale} {width}x{height}", member.key)));
-                println!("{} {locale} {width}x{height}\n{}", member.key, h.screen());
+                fragments.push(h.html(&format!("{} {locale} {width}x{height}", app.key)));
+                println!("{} {locale} {width}x{height}\n{}", app.key, h.screen());
             }
         }
     }
@@ -480,7 +480,7 @@ fn a_short_terminal_scrolls_to_the_focused_value() {
 }
 
 #[test]
-fn enter_opens_the_selected_member_by_its_full_path_in_the_home_folder() {
+fn enter_opens_the_selected_app_by_its_full_path_in_the_home_folder() {
     let (root, mut h) = harness(100, 24);
     h.press("enter");
     let program = root.path().join("home/.cargo/bin/qcode");
@@ -493,7 +493,7 @@ fn enter_opens_the_selected_member_by_its_full_path_in_the_home_folder() {
 }
 
 #[test]
-fn the_open_button_opens_a_member_installed_elsewhere_from_where_it_was_found() {
+fn the_open_button_opens_an_app_installed_elsewhere_from_where_it_was_found() {
     let (root, mut h) = harness(100, 24);
     h.press("down");
     assert!(h.screen().contains("Open"), "{}", h.screen());
@@ -503,7 +503,7 @@ fn the_open_button_opens_a_member_installed_elsewhere_from_where_it_was_found() 
 }
 
 #[test]
-fn quvyta_itself_and_missing_members_have_nothing_to_open() {
+fn quvyta_itself_and_missing_apps_have_nothing_to_open() {
     let (_root, mut h) = harness(100, 24);
     h.send(Msg::Select(index("quvyta")));
     assert!(!h.screen().contains("Open") && !h.screen().contains("Install"), "{}", h.screen());
@@ -519,7 +519,7 @@ fn quvyta_itself_and_missing_members_have_nothing_to_open() {
 }
 
 #[test]
-fn a_member_that_fails_says_so_quietly_and_a_good_close_says_nothing() {
+fn an_app_that_fails_says_so_quietly_and_a_good_close_says_nothing() {
     for (outcome, toast) in [
         (HandoffOutcome::Finished { code: Some(1) }, Some("qcode closed with code 1")),
         (HandoffOutcome::Finished { code: None }, Some("qcode was stopped by a signal")),
@@ -541,14 +541,14 @@ fn a_member_that_fails_says_so_quietly_and_a_good_close_says_nothing() {
 }
 
 #[test]
-fn with_after_close_shell_quvyta_quits_when_the_member_closes() {
+fn with_after_close_shell_quvyta_quits_when_the_app_closes() {
     let (_root, mut h) = harness_with_settings("after_close = \"shell\"\n");
     h.set_handoff_outcome(HandoffOutcome::Finished { code: Some(0) }).press("enter");
     assert!(h.quit_requested());
 
     let (_root, mut h) = harness_with_settings("after_close = \"shell\"\n");
     h.set_handoff_outcome(HandoffOutcome::Failed("Permission denied".to_owned())).press("enter");
-    assert!(!h.quit_requested(), "a member that never opened leaves quvyta to say why");
+    assert!(!h.quit_requested(), "an app that never opened leaves quvyta to say why");
 
     let (_root, mut h) = harness_with_settings("after_close = \"return\"\n");
     h.press("enter");
@@ -565,7 +565,7 @@ fn a_broken_setting_falls_back_and_says_where() {
 }
 
 #[test]
-fn what_is_installed_is_read_again_after_a_member_closes_keeping_the_selection() {
+fn what_is_installed_is_read_again_after_an_app_closes_keeping_the_selection() {
     let (root, mut h) = harness(100, 24);
     h.send(Msg::Select(index("framework")));
     // While qframe was open, the user installed qtools with cargo.
@@ -590,16 +590,16 @@ fn on_a_narrow_screen_enter_shows_the_details_then_opens() {
     assert_eq!(request.program, root.path().join("home/.cargo/bin/qcode").as_os_str());
 }
 
-/// The labels the details show for the member at `index`, in the harness' language: its title,
+/// The labels the details show for the app at `index`, in the harness' language: its title,
 /// its badge, and the buttons its state puts on the screen. These come from the language files,
 /// so they are the ones a narrow screen cuts.
 fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
     let say = |key: &str| h.env().i18n().translate(key, &[]);
-    let member = &APPS[index];
+    let entry = &APPS[index];
     let app = h.app();
     let mut labels = vec![
-        say(&format!("apps.{}.title", member.key)),
-        say(match member.status() {
+        say(&format!("apps.{}.title", entry.key)),
+        say(match entry.status() {
             Status::Released => "status.released",
             Status::Beta => "status.beta",
             Status::Alpha => "status.alpha",
@@ -622,10 +622,10 @@ fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
     labels
 }
 
-/// Whether `line` is the one a `CopyValue` of `member` draws: it begins with the head of the
+/// Whether `line` is the one a `CopyValue` of `app` draws: it begins with the head of the
 /// value it carries, which the widget keeps when it shortens the middle.
-fn carries_a_copyable(line: &str, member: &Member) -> bool {
-    let mut values = member.library.into_iter().chain(std::iter::once(member.repository));
+fn carries_a_copyable(line: &str, app: &QuvytaApp) -> bool {
+    let mut values = app.library.into_iter().chain(std::iter::once(app.repository));
     values.any(|value| {
         let head: String = value.chars().take(8).collect();
         line.trim_start().starts_with(&head)
@@ -641,17 +641,17 @@ fn no_label_is_cut_on_a_narrow_screen_in_any_language() {
         for locale in LANGUAGES {
             let (_root, mut h) = harness(width, 44);
             h.set_locale(locale);
-            for (index, member) in APPS.iter().enumerate() {
+            for (index, app) in APPS.iter().enumerate() {
                 for page in [false, true] {
                     h.send(Msg::Select(index));
                     if page {
                         h.send(Msg::ShowDetail(index));
                     }
                     let screen = h.screen();
-                    let place = format!("`{}` in {locale} at {width} columns", member.key);
+                    let place = format!("`{}` in {locale} at {width} columns", app.key);
                     for line in screen.lines() {
                         assert!(
-                            !line.contains('…') || carries_a_copyable(line, member),
+                            !line.contains('…') || carries_a_copyable(line, app),
                             "a line is cut short, {place}: `{}`\n{screen}",
                             line.trim_end()
                         );

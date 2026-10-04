@@ -1,6 +1,6 @@
 //! Starting from the command line: `quvyta install <name>...` opens on the install dialogs of
-//! the members named, one after another, and never installs without them; `quvyta show <name>`
-//! opens on one member's page.
+//! the apps named, one after another, and never installs without them; `quvyta show <name>`
+//! opens on one app's page.
 
 use std::path::Path;
 
@@ -19,8 +19,8 @@ pub(super) fn started(root: &Path, args: &[&str], width: u16) -> Harness<Quvyta>
     };
     let app = Quvyta::new(machine(root));
     let app = match start {
-        Start::Install(members) => app.asking(members),
-        Start::Show(member) => app.showing(member),
+        Start::Install(apps) => app.asking(apps),
+        Start::Show(entry) => app.showing(entry),
         Start::List => app,
     };
     let mut h = Harness::with_env(app, env(), width, 30);
@@ -67,7 +67,7 @@ fn several_names_ask_one_after_another_and_queue_what_is_agreed_to() {
 }
 
 #[test]
-fn a_member_that_is_there_is_shown_with_a_note_instead_of_installed_again() {
+fn an_app_that_is_there_is_shown_with_a_note_instead_of_installed_again() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = started(root.path(), &["install", "qcode"], 100);
     h.advance(TOAST_IN);
@@ -110,7 +110,7 @@ fn a_dialog_the_command_line_asked_for_opens_over_the_list_even_from_the_setting
 }
 
 #[test]
-fn show_opens_on_the_member_s_details_beside_the_list() {
+fn show_opens_on_the_app_s_details_beside_the_list() {
     let root = tempfile::tempdir().expect("temp");
     let h = started(root.path(), &["show", "qfocus"], 100);
     let screen = h.screen();
@@ -123,7 +123,7 @@ fn show_opens_on_the_member_s_details_beside_the_list() {
 }
 
 #[test]
-fn show_on_a_narrow_screen_opens_the_member_s_page_and_esc_goes_back_to_the_list() {
+fn show_on_a_narrow_screen_opens_the_app_s_page_and_esc_goes_back_to_the_list() {
     let root = tempfile::tempdir().expect("temp");
     let mut h = started(root.path(), &["show", "qfocus"], 48);
     let screen = h.screen();
@@ -132,11 +132,11 @@ fn show_on_a_narrow_screen_opens_the_member_s_page_and_esc_goes_back_to_the_list
     h.press("esc");
     let screen = h.screen();
     assert!(!h.app().detail_page && screen.contains("qtools"), "{screen}");
-    assert!(super::tests::line_with(&screen, "qfocus").contains('▌'), "the member stays selected:\n{screen}");
+    assert!(super::tests::line_with(&screen, "qfocus").contains('▌'), "the app stays selected:\n{screen}");
 }
 
 #[test]
-fn show_opens_any_member_even_one_still_to_come_and_quvyta_itself() {
+fn show_opens_any_app_even_one_still_to_come_and_quvyta_itself() {
     let root = tempfile::tempdir().expect("temp");
     for (name, title) in [("qdesk", "Quvyta Desktop"), ("quvyta", "Running"), ("QTOOLS", "Quvyta Tools")] {
         for width in [100, 48] {

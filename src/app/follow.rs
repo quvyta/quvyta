@@ -1,9 +1,9 @@
-//! Whether each installed member follows the shared language, theme, icons and reduced motion, as
+//! Whether each installed app follows the shared language, theme, icons and reduced motion, as
 //! the Settings tab shows it.
 //!
-//! Each member keeps its own settings file in the shared folder. A shared key it does not name,
-//! or names as the shared id, follows the shared value; any other value is the member's own. quvyta
-//! only reads these files here: it never writes to a member's file it could not read, since
+//! Each app keeps its own settings file in the shared folder. A shared key it does not name,
+//! or names as the shared id, follows the shared value; any other value is the app's own. quvyta
+//! only reads these files here: it never writes to an app's file it could not read, since
 //! rewriting a broken file could lose what someone wrote in it by hand.
 
 use std::path::Path;
@@ -17,15 +17,15 @@ use qframe::theme::ThemeRegistry;
 use crate::ecosystem::APPS;
 use crate::machine::Machine;
 
-/// How one member's settings file stands with the shared settings.
+/// How one app's settings file stands with the shared settings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Following {
-    /// The member has no settings file yet: it has never been opened, and when it is, it starts
+    /// The app has no settings file yet: it has never been opened, and when it is, it starts
     /// on the shared values.
     NotOpened,
     /// The file cannot be read as settings; the reasons, each at its file, line and column.
     Unreadable(Vec<String>),
-    /// The member's own value of each shared setting the follow table shows, in its order; `None` where
+    /// The app's own value of each shared setting the follow table shows, in its order; `None` where
     /// it follows the shared value.
     Keys(Vec<(Shared, Option<String>)>),
 }
@@ -48,30 +48,29 @@ pub(crate) const SHOWN: [(Shared, Option<&str>, &str); 4] = [
 
 /// A Quvyta app, an index of [`APPS`], and how it follows the shared values.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MemberFollowing {
-    /// The member, an index of [`APPS`].
+pub struct AppFollowing {
+    /// The app, an index of [`APPS`].
     pub index: usize,
     /// How its file stands.
     pub following: Following,
 }
 
-/// Reads the settings file of each member at `members`, indexes of [`APPS`], in that order.
-pub(crate) fn read(machine: &Machine, members: &[usize]) -> Vec<MemberFollowing> {
-    members
-        .iter()
+/// Reads the settings file of each app at `apps`, indexes of [`APPS`], in that order.
+pub(crate) fn read(machine: &Machine, apps: &[usize]) -> Vec<AppFollowing> {
+    apps.iter()
         .filter_map(|index| {
-            let member = APPS.get(*index)?;
-            let following = match machine.member_conf(member.settings_id()) {
+            let app = APPS.get(*index)?;
+            let following = match machine.app_conf(app.settings_id()) {
                 Some(path) => read_file(&path),
-                // Without a settings folder no member could have written a file either.
+                // Without a settings folder no app could have written a file either.
                 None => Following::NotOpened,
             };
-            Some(MemberFollowing { index: *index, following })
+            Some(AppFollowing { index: *index, following })
         })
         .collect()
 }
 
-/// Puts the member at `index` of [`APPS`] back on the shared value of `key`: only that key
+/// Puts the app at `index` of [`APPS`] back on the shared value of `key`: only that key
 /// of its own file changes, to the shared id, and the shared file is neither read nor
 /// written. The framework refuses a file it cannot read and leaves it exactly as it was.
 ///
@@ -79,10 +78,10 @@ pub(crate) fn read(machine: &Machine, members: &[usize]) -> Vec<MemberFollowing>
 ///
 /// The framework's: a broken file, no settings folder, or a file that cannot be written.
 pub(crate) fn follow(machine: &Machine, index: usize, key: Shared) -> std::io::Result<()> {
-    let member = APPS.get(index).ok_or_else(|| std::io::Error::other("no such member"))?;
-    match &machine.member_settings {
-        Some(folder) => Family::QUVYTA.follow_in(folder, member.settings_id(), key),
-        None => Family::QUVYTA.follow(member.settings_id(), key),
+    let app = APPS.get(index).ok_or_else(|| std::io::Error::other("no such app"))?;
+    match &machine.app_settings {
+        Some(folder) => Family::QUVYTA.follow_in(folder, app.settings_id(), key),
+        None => Family::QUVYTA.follow(app.settings_id(), key),
     }
 }
 
@@ -105,8 +104,8 @@ fn read_file(path: &Path) -> Following {
     Following::Keys(SHOWN.iter().map(|(key, ..)| (*key, own_value(&settings, *key))).collect())
 }
 
-/// The member's own value of `key`, or `None` when it follows the shared value. A value the framework
-/// would not use is shown the way the framework resolves it, so the table says what the member
+/// The app's own value of `key`, or `None` when it follows the shared value. A value the framework
+/// would not use is shown the way the framework resolves it, so the table says what the app
 /// will really draw with: an icon set it does not know follows the shared one, and a theme it
 /// cannot build is drawn with the built-in default.
 fn own_value(settings: &Settings, key: Shared) -> Option<String> {
@@ -151,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn a_key_named_or_left_out_follows_the_shared_value_and_any_other_value_is_the_member_s_own() {
+    fn a_key_named_or_left_out_follows_the_shared_value_and_any_other_value_is_the_app_s_own() {
         let (_folder, path) = file("language = \"quvyta\"\ntheme = \"amber\"\nreduced_motion = true\n");
         let expected = vec![
             (Shared::Language, None),

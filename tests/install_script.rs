@@ -40,7 +40,7 @@ fn sh_body<'a>(script: &'a str, function: &str) -> &'a str {
     &body[..body.find("\n}").expect("the function is closed")]
 }
 
-/// The text `install.sh` prints for a member from one of its `case` functions, such as
+/// The text `install.sh` prints for an app from one of its `case` functions, such as
 /// `code) echo qcode ;;` or `code) echo "coding ..." ;;`.
 fn sh_case(script: &str, function: &str, name: &str) -> Option<String> {
     sh_body(script, function).lines().find_map(|line| {
@@ -60,20 +60,20 @@ fn both_installers_know_the_same_apps() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let sh = std::fs::read_to_string(root.join("install.sh")).expect("install.sh is readable");
     let ps1 = std::fs::read_to_string(root.join("install.ps1")).expect("install.ps1 is readable");
-    let members: Vec<&str> = ps1.lines().filter(|line| line.contains("[pscustomobject]@{ Name = ")).collect();
-    let names: Vec<String> = members.iter().map(|line| ps1_field(line, "Name")).collect();
+    let apps: Vec<&str> = ps1.lines().filter(|line| line.contains("[pscustomobject]@{ Name = ")).collect();
+    let names: Vec<String> = apps.iter().map(|line| ps1_field(line, "Name")).collect();
     let sh_names = sh.lines().find_map(|line| line.strip_prefix("names=\"")).expect("install.sh lists names");
-    assert_eq!(names.join(" "), sh_names.trim_end_matches('"'), "the same members in the same order");
+    assert_eq!(names.join(" "), sh_names.trim_end_matches('"'), "the same apps in the same order");
 
     let arch_only = sh_body(&sh, "arch_only")
         .lines()
         .map(str::trim)
         .find(|line| line.ends_with(") return 0 ;;"))
-        .expect("install.sh marks Arch-only members");
+        .expect("install.sh marks Arch-only apps");
     let soon = sh
         .lines()
         .find_map(|line| line.strip_prefix("soon=\""))
-        .expect("install.sh lists the members that are not released yet")
+        .expect("install.sh lists the apps that are not released yet")
         .trim_end_matches('"');
     for name in soon.split_whitespace() {
         assert!(names.iter().any(|known| known == name), "{name} is not a Quvyta app");
@@ -81,9 +81,9 @@ fn both_installers_know_the_same_apps() {
     let alpha = sh
         .lines()
         .find_map(|line| line.strip_prefix("alpha=\""))
-        .expect("install.sh lists the members that have only pre-releases")
+        .expect("install.sh lists the apps that have only pre-releases")
         .trim_end_matches('"');
-    for line in members {
+    for line in apps {
         let name = ps1_field(line, "Name");
         for (field, function) in [("Crate", "crate_of"), ("Command", "command_of"), ("About", "about")] {
             assert_eq!(Some(ps1_field(line, field)), sh_case(&sh, function, &name), "{field} of {name}");
@@ -92,21 +92,17 @@ fn both_installers_know_the_same_apps() {
         assert_eq!(ps1_field(line, "ArchOnly") == "true", sh_arch, "whether {name} is Arch-only");
         let sh_soon = soon.split_whitespace().any(|word| word == name);
         assert_eq!(ps1_field(line, "Soon") == "true", sh_soon, "whether {name} is not released yet");
-        // The screen knows the same members the two installers do: the setup wizard offers a
-        // member that runs on Arch Linux only nowhere else, as they install it nowhere else.
-        let member = APPS.iter().find(|member| member.key == name).expect("the screen knows {name}");
-        assert_eq!(member.arch_only, sh_arch, "whether {name} runs on Arch Linux only");
-        assert_eq!(member.status == Status::Soon, sh_soon, "whether {name} is out");
+        // The screen knows the same apps the two installers do: the setup wizard offers a
+        // app that runs on Arch Linux only nowhere else, as they install it nowhere else.
+        let app = APPS.iter().find(|app| app.key == name).expect("the screen knows {name}");
+        assert_eq!(app.arch_only, sh_arch, "whether {name} runs on Arch Linux only");
+        assert_eq!(app.status == Status::Soon, sh_soon, "whether {name} is out");
         // cargo installs a pre-release only when its version is named, so the script has to know
-        // which members have nothing else yet, as the screen does.
+        // which apps have nothing else yet, as the screen does.
         let sh_alpha = alpha.split_whitespace().any(|word| word == name);
-        assert_eq!(member.status == Status::Alpha, sh_alpha, "whether {name} has only pre-releases");
-        // install.ps1 never offers a member that does not build on Windows.
-        assert_eq!(
-            ps1_field(line, "UnixOnly") == "true",
-            member.unix_only,
-            "whether {name} is for Linux and macOS only"
-        );
+        assert_eq!(app.status == Status::Alpha, sh_alpha, "whether {name} has only pre-releases");
+        // install.ps1 never offers an app that does not build on Windows.
+        assert_eq!(ps1_field(line, "UnixOnly") == "true", app.unix_only, "whether {name} is for Linux and macOS only");
     }
 }
 
