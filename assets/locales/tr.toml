@@ -308,6 +308,25 @@ unix-only = "Windows için değil"
 arch-only-toast = "{command} yalnızca Arch Linux'ta çalışır"
 unix-only-toast = "{command} Windows'ta çalışmaz"
 
+# quvyta'nın kendi tuşlarının tuş listesindeki adı; liste framework'ün okuduğu yerden okur.
+# Ekranın ipucu çubuğu bir tuşun orada ne yaptığını söyler; bunlar tuşun ne olduğunu söyler.
+[keys]
+primary = "asıl düğme"
+back = "geri dön"
+refresh = "güncellemeleri denetle"
+update = "gösterilen uygulamayı güncelle"
+
+# Palet quvyta'nın kendi listesi: sunduğu her komut burada yapılabilen bir iştir ve adı, ne
+# yapacağını ve kime yapacağını söyler.
+[palette]
+open = "{command} uygulamasını aç"
+install = "{command} uygulamasını kur"
+update = "{command} uygulamasını güncelle"
+remove = "{command} uygulamasını kaldır"
+show = "{command} uygulamasını göster"
+check = "Güncellemeleri denetle"
+missing = "Eksik uygulamaları kur"
+
 # Çalıştığın sürümde ne değişti. Girdinin kendisi günlüğün kendi kelimeleri, İngilizce; yalnız
 # başlık, geri dönüş yolu ve yanındaki not burada söylenir.
 [whats-new]
@@ -319,3 +338,18 @@ forgotten = "quvyta bunu okuduğunuzu hatırlayamıyor, bir sonraki açılışta
 checked = "İndirilen dosya, bir şey kopyalanmadan önce quvyta'nın içinde yazan sağlama toplamıyla karşılaştırılır."
 registered = "Yeni yazı tipi yalnızca senin hesabına bildirilir, sistemin geri kalanına dokunulmaz."
 undo = "Geri almak için o klasörü silmen yeter."
+
+# Liste altındaki satır: bu makinede kurulu olmayan Quvyta uygulamalarını sayar ve her birini
+# ayrı ayrı sorarak kurmayı önerir.
+[missing]
+count = { one = "{n} uygulama kurulu değil", other = "{n} uygulama kurulu değil" }
+install = "Hepsini kur"
+hint = "eksik"
+
+# Makineden bir şeye ihtiyacı olan bir uygulama açılmadan önceki soru ve kurma sorusunun bu konudaki satırı.
+[needs]
+no-browser = "Sayfaları çizmek için Chromium gerekiyor, ama hiçbiri bulunamadı: chromium, chromium-browser, google-chrome-stable ya da google-chrome."
+title = "{command} açılsın mı?"
+checking = "{command} neye ihtiyaç duyuyor, denetleniyor…"
+not-now = "Şimdi değil"
+then-open = "Tarayıcı kurulur kurulmaz {command} açılır."

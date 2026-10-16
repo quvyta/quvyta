@@ -307,6 +307,26 @@ unix-only = "Windows では使えません"
 arch-only-toast = "{command} は Arch Linux でのみ動きます"
 unix-only-toast = "{command} は Windows では動きません"
 
+# `?` で開くキーの一覧で、framework が quvyta 自身のキーをどう呼んでいるか。ここから読みます。
+# 画面の下部のヒントバーはそのキーがそこで何をするかを言い、これらのキーはそのキーが何であるかを
+# 言います。
+[keys]
+primary = "主な操作"
+back = "戻る"
+refresh = "更新を確認"
+update = "表示中のアプリを更新"
+
+# パレットは quvyta 自身の一覧です。挙げるコマンドはすべて quvyta が今できることで、名前はそれが
+# 指したアプリに何をするかを言います。
+[palette]
+open = "{command} を開く"
+install = "{command} をインストール"
+update = "{command} を更新"
+remove = "{command} を削除"
+show = "{command} を表示"
+check = "更新を確認"
+missing = "未インストールのアプリを入れる"
+
 [whats-new]
 title = "{version} の変更点"
 forgotten = "quvyta はこれを読んだことを記録できないため、次回の起動時にもう一度表示します。"
@@ -315,3 +335,17 @@ forgotten = "quvyta はこれを読んだことを記録できないため、次
 checked = "何かをコピーする前に、ダウンロードしたファイルを quvyta に書き込まれたチェックサムと照合します。"
 registered = "新しいフォントを知らせるのはあなたのアカウントだけで、それ以外には何も伝えません。"
 undo = "元に戻すには、そのフォルダーを削除してください。"
+
+# リストの下にあるこの行は、この端末に入っていない Quvyta アプリを数え、一つずつ尋ねて入れるように促します。
+[missing]
+count = { other = "{n} 個のアプリが未インストール" }
+install = "すべて入れる"
+hint = "未インストール"
+
+# マシンに何かが必要なアプリを開く前の質問と、インストールの質問がそれについて加える行。
+[needs]
+no-browser = "ページを描くには Chromium が必要ですが、見つかりませんでした: chromium、chromium-browser、google-chrome-stable、google-chrome。"
+title = "{command} を開きますか？"
+checking = "{command} に必要なものを確認しています…"
+not-now = "今はしない"
+then-open = "ブラウザーが入りしだい {command} が開きます。"

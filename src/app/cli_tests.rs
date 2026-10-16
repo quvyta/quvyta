@@ -31,6 +31,8 @@ pub(super) fn started(root: &Path, args: &[&str], width: u16) -> Harness<Quvyta>
     h
 }
 
+/// How many installs cargo was actually run for, which is how a test shows that nothing was
+/// installed without being asked first.
 pub(super) fn installs_ran(root: &Path) -> usize {
     calls(root).iter().filter(|call| call.starts_with("install --locked")).count()
 }

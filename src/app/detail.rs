@@ -1,7 +1,7 @@
 //! The details of one app: what it is, how it is installed and where it comes from.
 
 use qframe::prelude::*;
-use qframe::widgets::{Badge, CopyValue};
+use qframe::widgets::{Badge, CopyValue, Field};
 
 use super::Msg;
 use crate::ecosystem::{QuvytaApp, Status};
@@ -91,15 +91,14 @@ pub(super) fn show(
     }
 }
 
-/// A quiet label and its value on one line, with the newer version in the accent colour when
-/// there is one; the words say it too, not the colour alone. A `Field` value is one plain text,
-/// so it could not colour the version.
+/// A quiet label and its value beside it, under it on a narrow screen, with the newer version in the accent colour when there is one;
+/// the words say it too, not the colour alone.
 fn labelled(ui: &mut View<'_, Msg>, label: &str, value: &str, latest: Option<&str>) {
-    let mut spans = vec![Span::new(format!("{label}  ")).role("faint"), Span::new(value)];
+    let mut spans = vec![Span::new(value)];
     if let Some(latest) = latest {
         spans.push(Span::new(format!("  {}", t!("detail.new", version = latest))).color("accent"));
     }
-    ui.add(Text::rich(spans)).fill_width();
+    ui.add(Field::new(label).label_width(qframe::text::width(label)).value_spans(spans)).fill_width();
 }
 
 fn copyable(ui: &mut View<'_, Msg>, label: String, value: &str, id: &str) {

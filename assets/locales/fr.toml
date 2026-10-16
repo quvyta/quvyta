@@ -307,6 +307,25 @@ unix-only = "Pas pour Windows"
 arch-only-toast = "{command} ne fonctionne que sous Arch Linux"
 unix-only-toast = "{command} ne fonctionne pas sous Windows"
 
+# Comment le framework nomme les touches de quvyta dans la liste que `?` ouvre et qu'il lit ici.
+# La barre d'indices d'un écran dit ce qu'une touche y fait ; celles-ci disent ce qu'elle est.
+[keys]
+primary = "l'action principale"
+back = "retour"
+refresh = "chercher les mises à jour"
+update = "mettre à jour l'appli affichée"
+
+# La palette est la liste de quvyta : chaque commande qu'elle propose est une chose que quvyta
+# peut faire ici, nommée d'après ce qu'elle fera de l'appli qu'elle nomme.
+[palette]
+open = "Ouvrir {command}"
+install = "Installer {command}"
+update = "Mettre à jour {command}"
+remove = "Supprimer {command}"
+show = "Afficher {command}"
+check = "Chercher les mises à jour"
+missing = "Installer les applications manquantes"
+
 [whats-new]
 title = "Ce qui a changé dans {version}"
 forgotten = "quvyta ne peut pas retenir que vous l'avez lu : il s'affichera de nouveau la prochaine fois."
@@ -315,3 +334,18 @@ forgotten = "quvyta ne peut pas retenir que vous l'avez lu : il s'affichera de n
 checked = "Avant toute copie, le téléchargement est comparé à la somme de contrôle inscrite dans quvyta."
 registered = "Rien en dehors de votre propre compte n’est informé de la nouvelle police."
 undo = "Pour l’annuler, supprimez ce dossier."
+
+# La ligne sous la liste compte les applications Quvyta qui manquent sur cette machine et propose
+# de les installer, en demandant l’une après l’autre.
+[missing]
+count = { one = "{n} application n’est pas installée", other = "{n} applications ne sont pas installées" }
+install = "Tout installer"
+hint = "manquantes"
+
+# La question avant d’ouvrir une app qui a besoin de quelque chose de la machine, et la ligne que la question d’installation ajoute à ce sujet.
+[needs]
+no-browser = "Chromium est nécessaire pour dessiner les pages, et aucun n’a été trouvé : chromium, chromium-browser, google-chrome-stable ou google-chrome."
+title = "Ouvrir {command} ?"
+checking = "Vérification de ce dont {command} a besoin…"
+not-now = "Pas maintenant"
+then-open = "{command} s’ouvrira dès qu’un navigateur sera là."

@@ -307,6 +307,25 @@ unix-only = "不适用于 Windows"
 arch-only-toast = "{command} 仅在 Arch Linux 上运行"
 unix-only-toast = "{command} 无法在 Windows 上运行"
 
+# `?` 打开的按键列表里，framework 如何称呼 quvyta 自己的按键，它就是从这里读的。屏幕底部的提示条
+# 说某个键在这里做什么；这些说的是这个键本身。
+[keys]
+primary = "主要操作"
+back = "返回"
+refresh = "检查更新"
+update = "更新显示中的应用"
+
+# 调色板是 quvyta 自己的清单：它提供的每条命令都是 quvyta 现在能做的事，名字说的是它要对所指的
+# 应用做什么。
+[palette]
+open = "打开 {command}"
+install = "安装 {command}"
+update = "更新 {command}"
+remove = "卸载 {command}"
+show = "显示 {command}"
+check = "检查更新"
+missing = "安装未安装的应用"
+
 [whats-new]
 title = "{version} 版本的变化"
 forgotten = "quvyta 无法记住你已读过此页，下次启动时会再次显示。"
@@ -315,3 +334,17 @@ forgotten = "quvyta 无法记住你已读过此页，下次启动时会再次显
 checked = "复制任何东西之前，下载的文件会先与写在 quvyta 里的校验和核对。"
 registered = "新字体只告知你自己的账户，不涉及账户之外的任何地方。"
 undo = "要撤销，删除那个文件夹即可。"
+
+# 列表下面这一行数出这台机器上没有的 Quvyta 应用，并提出逐个询问是否安装。
+[missing]
+count = { other = "有 {n} 个应用未安装" }
+install = "全部安装"
+hint = "未安装"
+
+# 打开需要机器上某样东西的应用之前的提问，以及安装提问就此加上的一行。
+[needs]
+no-browser = "绘制页面需要 Chromium，但一个也没找到：chromium、chromium-browser、google-chrome-stable 或 google-chrome。"
+title = "打开 {command}？"
+checking = "正在检查 {command} 需要什么…"
+not-now = "暂不"
+then-open = "一有浏览器，{command} 就会打开。"

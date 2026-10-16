@@ -343,24 +343,34 @@ impl Quvyta {
             InstallMsg::Ask(_) => {}
             InstallMsg::Checked { index, problems, other_window, named } => {
                 if let Some(dialog) = self.installs.dialog.as_mut().filter(|dialog| dialog.index == index) {
-                    dialog.problems = Some(problems);
+                    dialog.problems = Some(problems.clone());
                     if dialog.version.is_none() {
                         dialog.version = named;
                     }
                     // This window's own lock reads as taken too; only a lock it does not hold counts.
                     self.installs.other_window = other_window && self.installs.lock.is_none();
                 }
+                // The question before an app opens waits for the same answer, so the checks are
+                // asked once and every question that asked hears it.
+                return self.needs_checked(index, problems);
             }
             InstallMsg::Recheck => {
                 if let Some(dialog) = self.installs.dialog.as_mut() {
                     dialog.problems = None;
                     return self.check();
                 }
+                // The question before an app opens is looked at again by the same message.
+                if let Some(index) = self.needs.as_mut().map(|needs| {
+                    needs.problems = None;
+                    needs.index
+                }) {
+                    return self.checked(index);
+                }
             }
             InstallMsg::Close => self.installs.dialog = None,
             InstallMsg::Confirm => {
                 if let Some(dialog) = self.installs.dialog.take()
-                    && dialog.problems.as_ref().is_some_and(Vec::is_empty)
+                    && dialog.problems.as_ref().is_some_and(|found| !found.iter().any(Problem::blocks))
                 {
                     // Each app as the dialog showed it, and only while that still holds: one
                     // that was updated or queued meanwhile is not updated twice.
@@ -560,10 +570,27 @@ impl Quvyta {
             .then(|| APPS.get(index).and_then(|app| Job::new(&self.machine, app, None)))
             .flatten()
             .filter(|job| job.named_only);
+        // An app's own requirement is about running it, so an update of one already installed
+        // is not asked about it: its question before opening is.
+        let fresh = dialog.from.is_none() && dialog.more.is_empty();
+        self.run_checks(index, fresh, unnamed)
+    }
+
+    /// The checks of the app at `index` in the background, for the question that stands before
+    /// it opens. The install dialog and that question ask the same questions and hear the same
+    /// answer, so the app goes with them: one that needs something of its own from the machine is
+    /// only told about it when it is the one being installed or opened.
+    pub(super) fn checked(&self, index: usize) -> Command<Msg> {
+        self.run_checks(index, true, None)
+    }
+
+    /// The checks of the app at `index`, with its own requirement when `own` says so, and the
+    /// newest version of `unnamed` when there is an install that can only name its version.
+    fn run_checks(&self, index: usize, own: bool, unnamed: Option<Job>) -> Command<Msg> {
         let machine = self.machine.clone();
         let mine = self.installs.lock.is_some();
         Command::perform(move || {
-            let problems = checks::run(&machine);
+            let problems = checks::run(&machine, APPS.get(index).filter(|_| own));
             let other_window = !mine && install::held_elsewhere(&machine);
             let named = unnamed.and_then(|job| job.newest(&|| false));
             Msg::Install(InstallMsg::Checked { index, problems, other_window, named })
@@ -690,8 +717,10 @@ impl Quvyta {
                 )
             };
             let problems = match outcome {
+                // The machine is asked on its own here: a failed build is about the toolchain,
+                // and an app's own requirement is no part of what is being explained.
                 Outcome::Failed(cargo::Failure::NoLinker | cargo::Failure::OldRust) => {
-                    checks::run(&machine).into_iter().filter(explains).collect()
+                    checks::run(&machine, None).into_iter().filter(explains).collect()
                 }
                 _ => Vec::new(),
             };

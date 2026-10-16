@@ -2,6 +2,14 @@
 
 What changed in each release of quvyta. Versions follow [Semantic Versioning](https://semver.org/); while the version starts with 0, a minor release may change how things look or where they are kept.
 
+## 0.5.0 (2026-10-16)
+
+- **`?` lists every key of the screen you are on, and `ctrl p` opens a palette of everything quvyta can do right now.** The list of keys is over the screen, in the same words the bar at its foot uses, and the keymap's own actions under their own headings; `esc`, the `×` or a click on the dimmed screen closes it and the keys go back where they were, and the palette closes the same ways. The palette holds each app's **Install**, **Open**, **Update** and **Remove** exactly while its own buttons do, plus **Show** for its page, **Check for updates**, **Install updates**, the missing apps, the PATH notice's **Add**, both tabs and the way out; choosing one does what the button does, so an install still asks first.
+- Under the list, a quiet line says how many Quvyta apps this machine does not have, and offers to install them: **Install them**, or `i`, asks for each one in turn, in the same question every single install gets, so nothing is installed without being asked about. An app you have from somewhere else, one that is not out yet, quvyta itself and one that does not run on this machine are left out of the count. When every app is installed there is nothing to say, and the list keeps its room.
+- qbrow draws its pages with Chromium, and quvyta now says so when the machine has none. Installing qbrow warns about it and still installs; opening it first asks, with the command that installs Chromium on this system to copy and an **Install here** button that runs that command in this terminal, where sudo asks for its password. Nothing is run until you press it, and qbrow opens by itself once a browser is there. On a system quvyta does not know, the commands for the ones it knows are shown and none is run.
+- The library's `QuvytaApp` has a new field, `need`, naming what an app needs from the machine besides itself: `Need::Browser` for qbrow. Code that builds a `QuvytaApp` of its own has to fill it in, which is why this release is 0.5.
+- Requires quvyta-framework 0.1.34.
+
 ## 0.4.0 (2026-10-04)
 
 - Both install scripts call the Quvyta apps apps where they still said members, as in "Name the apps instead". The library names an app `QuvytaApp`, where it was `Member`; code that used the old name has to say the new one, which is why this release is 0.4.

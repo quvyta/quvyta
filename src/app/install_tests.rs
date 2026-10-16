@@ -246,7 +246,9 @@ fn quvyta_never_offers_to_install_itself() {
     let (_root, mut h) = harness(100, 30);
     ask(&mut h, index("quvyta"));
     assert!(h.app().installs.dialog.is_none());
-    assert!(!has(&h, "Install"), "{}", h.screen());
+    // The line under the list offers to install the apps that are missing, and quvyta is not one
+    // of them: nothing asks to install quvyta itself.
+    assert!(!has(&h, "Install quvyta?"), "{}", h.screen());
 }
 
 /// The dialog for qtools on a machine with a C linker and no cargo at all.

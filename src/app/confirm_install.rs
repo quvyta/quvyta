@@ -13,21 +13,15 @@ use crate::install::{Job, Removal};
 
 /// The dialogs' width, padding included, when what they copy is short; a longer command widens
 /// them, and narrow screens shrink them.
-const WIDTH: u16 = 72;
+pub(super) const WIDTH: u16 = 72;
 
 /// The columns a dialog's line spends around a copyable value: the dialog's padding, the value's
 /// own padding and pillar, the gap before its marker and the widest marker, `✓ kopyalandı`.
 const AROUND_VALUE: u16 = 24;
 
 /// The width of a dialog that copies `values`: wide enough to show each on one line.
-fn width_for<'a>(values: impl IntoIterator<Item = &'a str>) -> u16 {
+pub(super) fn width_for<'a>(values: impl IntoIterator<Item = &'a str>) -> u16 {
     values.into_iter().map(|value| qframe::text::width(value).saturating_add(AROUND_VALUE)).fold(WIDTH, u16::max)
-}
-
-/// The columns a dialog of `width` gets on the screen of `ui`: a modal leaves a column free on
-/// each side.
-fn shown_width(ui: &View<'_, Msg>, width: u16) -> u16 {
-    width.min(ui.size().width.saturating_sub(2))
 }
 
 impl Quvyta {
@@ -51,7 +45,6 @@ impl Quvyta {
         let removal = Removal::new(&self.machine, app);
         let command = removal.as_ref().map(Removal::command_line);
         let width = width_for(command.as_deref());
-        let room = shown_width(ui, width);
         let modal = Modal::new()
             .title(t!("remove.title", command = app.command))
             .variant("danger")
@@ -70,7 +63,7 @@ impl Quvyta {
                 };
                 ui.add(Text::new(kept).role("secondary")).fill_width();
                 if let Some(removal) = &removal {
-                    copyable(ui, t!("confirm.command"), removal.command_line(), "remove-command", room);
+                    copyable(ui, t!("confirm.command"), removal.command_line(), "remove-command");
                 }
             })
             .gap(1)
@@ -85,7 +78,10 @@ impl Quvyta {
         }
         let app = &APPS[dialog.index];
         let job = Job::new(&self.machine, app, dialog.version.clone());
-        let found = dialog.problems.as_deref();
+        // What keeps the build from working stands in the way; what the app only needs to run is
+        // said under the install, which goes ahead.
+        let (blocking, warnings) = split(dialog.problems.as_deref());
+        let found = blocking.as_deref();
         let ready = found.is_some_and(<[Problem]>::is_empty);
         let close = Msg::Install(InstallMsg::Close);
         let (title, go) = match (&dialog.from, &dialog.version) {
@@ -95,12 +91,12 @@ impl Quvyta {
             ),
             _ => (t!("confirm.title", command = app.command), t!("confirm.install")),
         };
-        let problem_commands = found.unwrap_or_default().iter().flat_map(problem_commands);
+        let found_commands = found.unwrap_or_default().iter().flat_map(problem_commands);
         let width = match found {
-            Some(found) if !found.is_empty() => width_for(problem_commands),
-            _ => width_for(job.as_ref().map(Job::command_line).as_deref()),
+            Some(found) if !found.is_empty() => width_for(found_commands),
+            _ => width_for(job.as_ref().map(Job::command_line).as_deref())
+                .max(width_for(warnings.iter().flat_map(problem_commands))),
         };
-        let room = shown_width(ui, width);
         let mut modal = Modal::new()
             .title(title)
             .width(width)
@@ -135,10 +131,10 @@ impl Quvyta {
                 .fill_width();
                 match found {
                     // What is in the way takes the room of what the install would do.
-                    Some(found) if !found.is_empty() => problems(found, true, room, ui),
+                    Some(found) if !found.is_empty() => problems(found, true, ui),
                     _ => {
                         if let Some(job) = &job {
-                            copyable(ui, t!("confirm.command"), job.command_line(), "command", room);
+                            copyable(ui, t!("confirm.command"), job.command_line(), "command");
                         }
                         ui.column(|ui| {
                             ui.add(Text::new(t!("confirm.built-here")).role("secondary")).fill_width();
@@ -146,6 +142,9 @@ impl Quvyta {
                             ui.add(Text::new(t!("confirm.no-sudo", folder = home)).role("secondary")).fill_width();
                         })
                         .fill_width();
+                        if !warnings.is_empty() {
+                            problems(&warnings, true, ui);
+                        }
                     }
                 }
                 if ready && self.installs.other_window {
@@ -179,7 +178,6 @@ impl Quvyta {
                 width_for(lines.iter().map(String::as_str))
             }
         };
-        let room = shown_width(ui, width);
         let mut modal = Modal::new()
             .title(t!("confirm.update-all-title", n = apps.len()))
             .width(width)
@@ -206,7 +204,7 @@ impl Quvyta {
                 })
                 .fill_width();
                 match found {
-                    Some(found) if !found.is_empty() => problems(found, true, room, ui),
+                    Some(found) if !found.is_empty() => problems(found, true, ui),
                     _ => {
                         for (also, job) in &jobs {
                             let app = &APPS[also.index];
@@ -218,7 +216,7 @@ impl Quvyta {
                             );
                             match job {
                                 Some(job) => {
-                                    copyable(ui, label, job.command_line(), &format!("command-{}", app.key), room);
+                                    copyable(ui, label, job.command_line(), &format!("command-{}", app.key));
                                 }
                                 None => {
                                     ui.add(Text::new(label).role("faint")).fill_width();
@@ -268,20 +266,28 @@ impl Quvyta {
 }
 
 /// The commands the fixes of `problem` offer to copy.
-fn problem_commands(problem: &Problem) -> Vec<&'static str> {
+pub(super) fn problem_commands(problem: &Problem) -> Vec<&'static str> {
     match problem {
         Problem::NoCargo => problem.fix().into_iter().chain([checks::RUSTUP_SITE]).collect(),
         Problem::OldRust { .. } => Vec::new(),
-        Problem::NoLinker(Distro::Other) => Distro::KNOWN.iter().filter_map(|distro| distro.linker_command()).collect(),
-        Problem::NoLinker(known) => known.linker_command().into_iter().collect(),
+        Problem::NoLinker(distro) => known_commands(*distro, Distro::linker_command),
+        Problem::NoBrowser(distro) => known_commands(*distro, Distro::browser_command),
+    }
+}
+
+/// The command of the distribution itself, or of every distribution quvyta knows when it does not
+/// know the one it is on.
+fn known_commands(distro: Distro, command: fn(Distro) -> Option<&'static str>) -> Vec<&'static str> {
+    match distro {
+        Distro::Other => Distro::KNOWN.iter().filter_map(|known| command(*known)).collect(),
+        known => command(known).into_iter().collect(),
     }
 }
 
 /// What is in the way of an install, each with its fix: the command, to copy or to run here with
 /// the button beside it, or only to copy when quvyta cannot be sure the line is right. Without `headline` only the fixes are drawn, for a
-/// failure that has already said what is wrong. `room` is the width of the surface they are
-/// drawn on, which says whether a command fits on one line.
-pub(super) fn problems(found: &[Problem], headline: bool, room: u16, ui: &mut View<'_, Msg>) {
+/// failure that has already said what is wrong.
+pub(super) fn problems(found: &[Problem], headline: bool, ui: &mut View<'_, Msg>) {
     for problem in found {
         ui.column(|ui| match problem {
             Problem::NoCargo => {
@@ -289,10 +295,10 @@ pub(super) fn problems(found: &[Problem], headline: bool, room: u16, ui: &mut Vi
                     ui.add(Text::new(t!("checks.no-cargo")).color("warning")).fill_width();
                 }
                 if let Some(line) = problem.fix() {
-                    copyable(ui, t!("checks.rustup"), line.to_owned(), "rustup-install", room);
+                    copyable(ui, t!("checks.rustup"), line.to_owned(), "rustup-install");
                     run_here(ui, problem, t!("checks.rustup-here"));
                 }
-                copyable(ui, t!("checks.rustup-site"), checks::RUSTUP_SITE.to_owned(), "rustup-site", room);
+                copyable(ui, t!("checks.rustup-site"), checks::RUSTUP_SITE.to_owned(), "rustup-site");
             }
             Problem::OldRust { version, rustup } => {
                 let (major, minor) = checks::MIN_RUST;
@@ -318,37 +324,75 @@ pub(super) fn problems(found: &[Problem], headline: bool, room: u16, ui: &mut Vi
                 if headline {
                     ui.add(Text::new(t!("checks.no-linker")).color("warning")).fill_width();
                 }
-                let shown: Vec<Distro> = match distro {
-                    Distro::Other => Distro::KNOWN.to_vec(),
-                    known => vec![*known],
-                };
-                for (at, distro) in shown.into_iter().enumerate() {
-                    if let Some(command) = distro.linker_command() {
-                        let label = t!("checks.linker-on", distro = distro.name());
-                        copyable(ui, label, command.to_owned(), &format!("linker-{at}"), room);
-                    }
+                commands(ui, problem, *distro, Distro::linker_command, "linker");
+            }
+            Problem::NoBrowser(distro) => {
+                if headline {
+                    ui.add(Text::new(t!("needs.no-browser")).color("warning")).fill_width();
                 }
-                if problem.fix().is_some() {
-                    run_here(ui, problem, t!("checks.sudo-here"));
-                } else {
-                    // Which of them is right is not known here, so none is run.
-                    ui.add(Text::new(t!("checks.run-yourself")).role("secondary")).fill_width();
-                }
+                commands(ui, problem, *distro, Distro::browser_command, "browser");
             }
         })
         .fill_width();
     }
 }
 
+/// The command that puts `problem` right on each distribution shown, to copy, and the button that
+/// runs the one for this machine when there is a single machine to know. `table` is the command
+/// that distribution gives, and `prefix` keeps the copyable values of the two apart.
+fn commands(
+    ui: &mut View<'_, Msg>,
+    problem: &Problem,
+    distro: Distro,
+    table: fn(Distro) -> Option<&'static str>,
+    prefix: &str,
+) {
+    let shown: Vec<Distro> = match distro {
+        Distro::Other => Distro::KNOWN.to_vec(),
+        known => vec![known],
+    };
+    for (at, distro) in shown.into_iter().enumerate() {
+        if let Some(command) = table(distro) {
+            let label = t!("checks.linker-on", distro = distro.name());
+            copyable(ui, label, command.to_owned(), &format!("{prefix}-{at}"));
+        }
+    }
+    if problem.fix().is_some() {
+        run_here(ui, problem, t!("checks.sudo-here"));
+    } else {
+        // Which of them is right is not known here, so none is run.
+        ui.add(Text::new(t!("checks.run-yourself")).role("secondary")).fill_width();
+    }
+}
+
 /// The button that runs the fix of `problem` here, with `note` saying what running it involves.
 fn run_here(ui: &mut View<'_, Msg>, problem: &Problem, note: String) {
+    let Some(id) = fix_button_id(problem) else { return };
     ui.row(|ui| {
         let run = Msg::Install(InstallMsg::RunFix(problem.clone()));
-        // Both fixes can be on screen at once, so each button has its own id.
-        let id = if matches!(problem, Problem::NoCargo) { "install-rust" } else { "install-linker" };
         ui.add(Button::new(t!("checks.install-here")).on_press(run)).id(id);
     });
     ui.add(Text::new(note).role("secondary")).fill_width();
+}
+
+/// `found` parted into what keeps the build from working, `None` while the checks run, and what
+/// the app only needs to run.
+fn split(found: Option<&[Problem]>) -> (Option<Vec<Problem>>, Vec<Problem>) {
+    let Some(found) = found else { return (None, Vec::new()) };
+    let (blocking, warnings) = found.iter().cloned().partition(Problem::blocks);
+    (Some(blocking), warnings)
+}
+
+/// The id of the button that runs `problem` here, `None` for a problem that has no such button: a
+/// Rust that is too old is put right by the button of its own above it. Two fixes can be on
+/// screen at once, so each button has an id of its own to keep apart.
+fn fix_button_id(problem: &Problem) -> Option<&'static str> {
+    match problem {
+        Problem::NoCargo => Some("install-rust"),
+        Problem::NoLinker(_) => Some("install-linker"),
+        Problem::NoBrowser(_) => Some("install-browser"),
+        Problem::OldRust { .. } => None,
+    }
 }
 
 /// A quiet label in a column `width` cells wide and its value beside it, or under it when the
@@ -357,21 +401,9 @@ pub(super) fn field(ui: &mut View<'_, Msg>, label: &str, width: u16, value: &str
     ui.add(Field::new(label).label_width(width).value(value)).fill_width();
 }
 
-/// A label with a copyable value under it, on a surface `room` columns wide. A value too long
-/// for one line there is shown whole above it as well, wrapped, since the copyable value keeps
-/// to one line and cuts what does not fit; a command is agreed to by reading all of it.
-/// `CopyValue::labelled` does the same but keeps its label to one line, and the label here can
-/// name an app and two versions, all part of what is agreed to.
-fn copyable(ui: &mut View<'_, Msg>, label: String, value: String, id: &str, room: u16) {
-    let fits = qframe::text::width(&value).saturating_add(AROUND_VALUE) <= room;
-    ui.column(|ui| {
-        // A label that does not fit wraps rather than losing its end: the app and its
-        // versions are part of what is agreed to.
-        ui.add(Text::new(label).role("faint")).fill_width();
-        if !fits {
-            ui.add(Text::new(value.clone())).fill_width().selectable(true);
-        }
-        ui.add(CopyValue::new(value)).id(id);
-    })
-    .fill_width();
+/// A label with a copyable value under it. A command is agreed to by reading all of it, so a
+/// value too long for its line is shown whole above it as well, and a label that names an app
+/// and two versions wraps rather than losing its end.
+fn copyable(ui: &mut View<'_, Msg>, label: String, value: String, id: &str) {
+    ui.add(CopyValue::new(value).labelled(label)).id(id).fill_width();
 }

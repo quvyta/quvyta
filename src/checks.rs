@@ -1,12 +1,14 @@
-//! What an install needs before it starts: cargo, a Rust new enough and a C linker. The checks
-//! run when the install dialog opens, so a problem is told with its fix before anything starts
-//! rather than as a failed build minutes later.
+//! What an install needs before it starts: cargo, a Rust new enough, a C linker, and whatever the
+//! app itself needs from the machine. The checks run when the install dialog opens, so a
+//! problem is told with its fix before anything starts rather than as a failed build minutes
+//! later; the same checks run before an app that needs something of its own is opened.
 
 use std::path::PathBuf;
 use std::time::Duration;
 
 use qframe::runtime::{Keep, Process};
 
+use crate::ecosystem::QuvytaApp;
 use crate::machine::Machine;
 
 /// The oldest Rust the Quvyta apps build with, as in `install.sh`.
@@ -22,6 +24,13 @@ pub const RUSTUP_SITE: &str = "https://rustup.rs";
 /// What rustup runs to bring Rust up to date.
 pub const RUSTUP_UPDATE: [&str; 2] = ["update", "stable"];
 
+/// The programs a terminal browser is drawn by, in the order `qbrow` itself looks for them. This
+/// is qbrow's list rather than a list of quvyta's own: quvyta must not tell a person a browser is
+/// missing while the program it is about to start would have drawn the page with it, nor the
+/// other way round. qbrow also reads a program path it is given outright, which quvyta has no way
+/// of passing on.
+pub const BROWSERS: [&str; 4] = ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome"];
+
 /// Something that keeps an install from working.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem {
@@ -36,6 +45,8 @@ pub enum Problem {
     },
     /// There is no C linker to finish a build with.
     NoLinker(Distro),
+    /// There is no browser for an app that draws its pages with one.
+    NoBrowser(Distro),
 }
 
 /// The Linux distributions whose linker package `install.sh` names.
@@ -97,9 +108,28 @@ impl Distro {
             Self::Other => None,
         }
     }
+
+    /// The command that installs a browser there, the same package `qbrow` offers on its own first
+    /// start, so the two say the same line for the same system. It needs sudo, so quvyta runs it
+    /// only when the person presses the button beside it.
+    pub fn browser_command(self) -> Option<&'static str> {
+        match self {
+            Self::Arch => Some("sudo pacman -S --needed chromium"),
+            Self::Debian => Some("sudo apt install chromium"),
+            Self::Fedora => Some("sudo dnf install chromium"),
+            Self::Other => None,
+        }
+    }
 }
 
 impl Problem {
+    /// Whether this keeps the build from working. A missing browser does not: the app builds and
+    /// installs without one, and only needs it to draw pages, so an install is warned about it
+    /// and goes ahead.
+    pub fn blocks(&self) -> bool {
+        !matches!(self, Self::NoBrowser(_))
+    }
+
     /// The one line quvyta can run to put this right, shown to the person before they choose to
     /// run it; `None` when there is no single line it can be sure of. rustup's line is a shell
     /// pipe, which only a Unix shell runs.
@@ -108,13 +138,16 @@ impl Problem {
             Self::NoCargo => cfg!(unix).then_some(RUSTUP_INSTALL),
             Self::OldRust { .. } => None,
             Self::NoLinker(distro) => distro.linker_command(),
+            Self::NoBrowser(distro) => distro.browser_command(),
         }
     }
 }
 
-/// Everything in the way of an install on `machine`, most basic first; empty when it can go
-/// ahead. Runs `rustc --version`, so it belongs in the background.
-pub fn run(machine: &Machine) -> Vec<Problem> {
+/// Everything in the way of an install of `app` on `machine`, most basic first; empty when it
+/// can go ahead. `app` is `None` where the machine is asked on its own, as after a build has
+/// already failed, so an app's own requirement is only ever asked about for an app it is
+/// about. Runs `rustc --version`, so it belongs in the background.
+pub fn run(machine: &Machine, app: Option<&QuvytaApp>) -> Vec<Problem> {
     let mut problems = Vec::new();
     // cargo may have been installed since quvyta started, so its file is looked for again.
     if machine.cargo.is_none() && machine.find_program("cargo").is_none() {
@@ -127,7 +160,18 @@ pub fn run(machine: &Machine) -> Vec<Problem> {
     if machine.linker().is_none() {
         problems.push(Problem::NoLinker(distro(machine)));
     }
+    // An app's own requirement comes after the toolchain: whatever the app is, it is built
+    // the same way first, so a missing linker is the more basic thing to say.
+    if app.is_some_and(QuvytaApp::needs_browser) && browser(machine).is_none() {
+        problems.push(Problem::NoBrowser(distro(machine)));
+    }
     problems
+}
+
+/// A browser on `machine`, or `None` when there is none of the names [`BROWSERS`] holds. Only the
+/// files are looked at, so a browser installed while quvyta runs is found the next time.
+fn browser(machine: &Machine) -> Option<PathBuf> {
+    BROWSERS.iter().find_map(|name| machine.find_program(name))
 }
 
 /// The distribution this machine runs, from the file that names it. The one place the question is
@@ -179,6 +223,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
+    use crate::ecosystem::APPS;
     use crate::inventory::tests::{wait_until_runnable, write_program};
 
     /// A machine in `root` with cargo, a `rustc` answering `rustc_answer` and, when `linker`, a
@@ -197,32 +242,32 @@ mod tests {
     #[test]
     fn a_ready_machine_has_no_problems() {
         let root = tempfile::tempdir().expect("temp");
-        assert_eq!(run(&machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", true)), []);
+        assert_eq!(run(&machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", true), None), []);
         let root = tempfile::tempdir().expect("temp");
-        assert_eq!(run(&machine(root.path(), "rustc 1.97.0-nightly (a1b2c3d4e 2026-09-01)", true)), []);
+        assert_eq!(run(&machine(root.path(), "rustc 1.97.0-nightly (a1b2c3d4e 2026-09-01)", true), None), []);
     }
 
     #[test]
     fn without_cargo_nothing_else_about_rust_is_asked() {
         let root = tempfile::tempdir().expect("temp");
         write_program(&root.path().join("bin/cc"), "#!/bin/sh\nexit 0\n");
-        assert_eq!(run(&Machine::in_root(root.path())), [Problem::NoCargo]);
+        assert_eq!(run(&Machine::in_root(root.path()), None), [Problem::NoCargo]);
     }
 
     #[test]
     fn an_old_rust_is_found_with_rustup_or_without() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine(root.path(), "rustc 1.80.1 (3f5fd8dd4 2024-08-06)", true);
-        assert_eq!(run(&machine), [Problem::OldRust { version: "1.80.1".to_owned(), rustup: None }]);
+        assert_eq!(run(&machine, None), [Problem::OldRust { version: "1.80.1".to_owned(), rustup: None }]);
         let rustup = machine.cargo_bin().join("rustup");
         write_program(&rustup, "#!/bin/sh\nexit 0\n");
-        assert_eq!(run(&machine), [Problem::OldRust { version: "1.80.1".to_owned(), rustup: Some(rustup) }]);
+        assert_eq!(run(&machine, None), [Problem::OldRust { version: "1.80.1".to_owned(), rustup: Some(rustup) }]);
     }
 
     #[test]
     fn a_rustc_that_says_nothing_useful_is_not_blamed() {
         let root = tempfile::tempdir().expect("temp");
-        assert_eq!(run(&machine(root.path(), "error: no default toolchain", true)), []);
+        assert_eq!(run(&machine(root.path(), "error: no default toolchain", true), None), []);
     }
 
     #[test]
@@ -241,7 +286,7 @@ mod tests {
             let machine = machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", false);
             std::fs::create_dir_all(root.path().join("etc")).expect("folder");
             std::fs::write(root.path().join("etc/os-release"), os_release).expect("os-release");
-            assert_eq!(run(&machine), [Problem::NoLinker(distro)], "{os_release}");
+            assert_eq!(run(&machine, None), [Problem::NoLinker(distro)], "{os_release}");
         }
     }
 
@@ -249,7 +294,7 @@ mod tests {
     fn a_machine_without_os_release_shows_every_command() {
         let root = tempfile::tempdir().expect("temp");
         let machine = machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", false);
-        assert_eq!(run(&machine), [Problem::NoLinker(Distro::Other)]);
+        assert_eq!(run(&machine, None), [Problem::NoLinker(Distro::Other)]);
         assert_eq!(Distro::Other.linker_command(), None);
         assert!(Distro::KNOWN.iter().all(|distro| distro.linker_command().is_some_and(|c| c.starts_with("sudo "))));
     }
@@ -260,6 +305,63 @@ mod tests {
         assert_eq!(Problem::NoLinker(Distro::Other).fix(), None);
         assert_eq!(Problem::OldRust { version: "1.80.1".to_owned(), rustup: None }.fix(), None);
         assert_eq!(Problem::NoCargo.fix(), cfg!(unix).then_some(RUSTUP_INSTALL));
+    }
+
+    /// The exact line for each distribution quvyta knows, and none at all for one it does not:
+    /// which of several lines is right cannot be known here, so none of them is run.
+    #[test]
+    fn the_command_is_the_one_for_the_distribution() {
+        assert_eq!(Distro::Arch.browser_command(), Some("sudo pacman -S --needed chromium"));
+        assert_eq!(Distro::Debian.browser_command(), Some("sudo apt install chromium"));
+        assert_eq!(Distro::Fedora.browser_command(), Some("sudo dnf install chromium"));
+        assert_eq!(Distro::Other.browser_command(), None);
+        assert!(Distro::KNOWN.iter().all(|distro| distro.browser_command().is_some_and(|c| c.starts_with("sudo "))));
+        // The problem runs the very line its distribution names, and nothing else.
+        assert_eq!(Problem::NoBrowser(Distro::Debian).fix(), Some("sudo apt install chromium"));
+        assert_eq!(Problem::NoBrowser(Distro::Other).fix(), None);
+    }
+
+    /// The names are qbrow's own, in its own order: a person with any one of them has no problem,
+    /// and quvyta must not disagree with the program it is about to start.
+    #[test]
+    fn any_of_the_names_qbrow_accepts_leaves_no_problem() {
+        assert_eq!(BROWSERS, ["chromium", "chromium-browser", "google-chrome-stable", "google-chrome"]);
+        for name in BROWSERS {
+            let root = tempfile::tempdir().expect("temp");
+            let machine = machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", true);
+            write_program(&root.path().join(format!("bin/{name}")), "#!/bin/sh\nexit 0\n");
+            assert_eq!(run(&machine, Some(browser())), [], "{name} is what qbrow looks for");
+        }
+        // A file that cannot run is not a browser, as the shell sees it too.
+        let root = tempfile::tempdir().expect("temp");
+        let machine = machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", true);
+        std::fs::write(root.path().join("bin/chromium"), "").expect("a file");
+        assert_eq!(run(&machine, Some(browser())), [Problem::NoBrowser(Distro::Other)]);
+    }
+
+    /// Only the app with the requirement is held up by it, and it comes after the toolchain
+    /// every app is built with.
+    #[test]
+    fn an_apps_own_requirement_is_a_problem_only_of_that_app() {
+        let root = tempfile::tempdir().expect("temp");
+        let machine = machine(root.path(), "rustc 1.95.0 (29483883e 2026-08-07)", true);
+        assert_eq!(run(&machine, None), [], "nothing is asked of the machine on its own");
+        assert_eq!(run(&machine, Some(tools())), [], "an app that needs nothing is not held up");
+        assert_eq!(run(&machine, Some(browser())), [Problem::NoBrowser(Distro::Other)]);
+        // A machine with neither cargo nor a linker says so first, and the requirement last.
+        let root = tempfile::tempdir().expect("temp");
+        let bare = Machine::in_root(root.path());
+        let found = run(&bare, Some(browser()));
+        assert_eq!(found, [Problem::NoCargo, Problem::NoLinker(Distro::Other), Problem::NoBrowser(Distro::Other)]);
+    }
+
+    /// The requirement belongs to the browser alone, and these are the two sides of that.
+    fn browser() -> &'static QuvytaApp {
+        APPS.iter().find(|app| app.key == "browser").expect("qbrow is listed")
+    }
+
+    fn tools() -> &'static QuvytaApp {
+        APPS.iter().find(|app| app.key == "tools").expect("qtools is listed")
     }
 
     #[test]

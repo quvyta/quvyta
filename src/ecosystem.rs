@@ -30,6 +30,14 @@ pub enum NotHere {
     UnixOnly,
 }
 
+/// Something an app needs from the machine before it can do its work, besides the toolchain
+/// every Quvyta app is built with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Need {
+    /// A Chromium or a Google Chrome, which draws the pages of a browser in the terminal.
+    Browser,
+}
+
 /// A Quvyta app. Names and descriptions live in the language files under `apps.<key>`.
 #[derive(Debug)]
 pub struct QuvytaApp {
@@ -51,6 +59,10 @@ pub struct QuvytaApp {
     /// Whether it is built for Linux and macOS only, as `install.ps1` also knows it: on Windows
     /// it is listed, and told apart, but not offered for installing.
     pub unix_only: bool,
+    /// What it needs from the machine before it can run, which no Quvyta tool provides. The
+    /// checks before an install and the question before opening ask it through one method, so
+    /// nothing else needs to know what the values are.
+    pub need: Option<Need>,
     /// How settled it is. quvyta reads it through `QuvytaApp::status()`, which a test can answer
     /// otherwise.
     pub status: Status,
@@ -112,6 +124,13 @@ impl QuvytaApp {
     pub(crate) fn offered(&self, arch: bool) -> bool {
         self.published() && !self.is_self() && self.not_here(arch).is_none()
     }
+
+    /// Whether a browser has to be on the machine before this app can run: qbrow draws its
+    /// pages with a Chromium or a Chrome, and quits with an error about it when there is none.
+    /// An app that needs nothing from the machine but the toolchain is not held up by this.
+    pub(crate) fn needs_browser(&self) -> bool {
+        self.need == Some(Need::Browser)
+    }
 }
 
 /// Every app, in the order they are listed: the applications, the ones still to come after
@@ -128,6 +147,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: false,
+        need: None,
         status: Status::Beta,
     },
     QuvytaApp {
@@ -139,6 +159,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: false,
+        need: None,
         status: Status::Beta,
     },
     QuvytaApp {
@@ -150,6 +171,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: true,
         unix_only: false,
+        need: None,
         status: Status::Beta,
     },
     QuvytaApp {
@@ -161,6 +183,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: true,
         unix_only: false,
+        need: None,
         status: Status::Beta,
     },
     QuvytaApp {
@@ -172,6 +195,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: true,
+        need: None,
         status: Status::Beta,
     },
     QuvytaApp {
@@ -183,6 +207,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: true,
+        need: Some(Need::Browser),
         status: Status::Beta,
     },
     QuvytaApp {
@@ -194,6 +219,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: true,
+        need: None,
         status: Status::Alpha,
     },
     QuvytaApp {
@@ -207,6 +233,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: false,
+        need: None,
         status: Status::Beta,
     },
     QuvytaApp {
@@ -218,6 +245,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: Some("cargo add quvyta-framework"),
         arch_only: false,
         unix_only: false,
+        need: None,
         status: Status::Released,
     },
     QuvytaApp {
@@ -229,6 +257,7 @@ pub const APPS: [QuvytaApp; 10] = [
         library: None,
         arch_only: false,
         unix_only: false,
+        need: None,
         status: Status::Beta,
     },
 ];

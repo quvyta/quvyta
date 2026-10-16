@@ -58,6 +58,14 @@ pub(super) struct PathNotice {
     stage: Stage,
 }
 
+impl PathNotice {
+    /// Whether the notice's own Add is on the screen, waiting to be pressed: a command that runs
+    /// it is worth offering exactly then, and at no other time.
+    pub(super) fn offers_add(&self) -> bool {
+        matches!(self.action, PathAction::Add { .. }) && self.stage == Stage::Offered
+    }
+}
+
 /// How far the offer got.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Stage {

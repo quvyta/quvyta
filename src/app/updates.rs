@@ -153,5 +153,5 @@ impl Quvyta {
     }
 }
 
-/// The columns between the count and the button beside it.
-const GAP: u16 = 2;
+/// The columns between the count and the button beside it, on both the lines under the list.
+pub(super) const GAP: u16 = 2;

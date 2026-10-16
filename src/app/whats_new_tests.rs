@@ -411,7 +411,7 @@ fn a_long_entry_scrolls_on_a_short_terminal() {
         let column = bar(&h);
         assert!(thumb(&column) > column.len() / 2, "and the thumb is at the foot of the bar:\n{}", h.screen());
         h.press("esc");
-        assert!(h.screen().contains("qcode"), "the list is whole again at {width}x{height}");
+        assert!(h.screen().contains("qcode"), "the list is whole again at {width}x{height}:\n{}", h.screen());
     }
 }
 

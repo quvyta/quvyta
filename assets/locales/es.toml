@@ -307,6 +307,25 @@ unix-only = "No para Windows"
 arch-only-toast = "{command} solo funciona en Arch Linux"
 unix-only-toast = "{command} no funciona en Windows"
 
+# Cómo se llaman las teclas de quvyta en la lista de teclas que abre `?`, que el framework lee de
+# aquí. La barra de pistas de una pantalla dice qué hace una tecla allí; estas dicen qué es.
+[keys]
+primary = "la acción principal"
+back = "volver"
+refresh = "buscar actualizaciones"
+update = "actualizar la app mostrada"
+
+# La paleta es la lista propia de quvyta: cada comando que ofrece es uno que quvyta puede hacer
+# aquí, con el nombre de lo que hará con la app que nombra.
+[palette]
+open = "Abrir {command}"
+install = "Instalar {command}"
+update = "Actualizar {command}"
+remove = "Eliminar {command}"
+show = "Mostrar {command}"
+check = "Buscar actualizaciones"
+missing = "Instalar las aplicaciones que faltan"
+
 [whats-new]
 title = "Qué cambió en {version}"
 forgotten = "quvyta no puede recordar que ya lo leíste, así que lo volverá a mostrar la próxima vez."
@@ -315,3 +334,18 @@ forgotten = "quvyta no puede recordar que ya lo leíste, así que lo volverá a 
 checked = "Antes de copiar nada, la descarga se compara con la suma de comprobación escrita en quvyta."
 registered = "Fuera de tu propia cuenta, nada se entera de la nueva fuente."
 undo = "Para deshacerlo, borra esa carpeta."
+
+# La línea bajo la lista cuenta las aplicaciones de Quvyta que faltan en esta máquina y ofrece
+# instalarlas, preguntando una por una.
+[missing]
+count = { one = "{n} aplicación no está instalada", other = "{n} aplicaciones no están instaladas" }
+install = "Instalar todas"
+hint = "faltan"
+
+# La pregunta antes de abrir una app que necesita algo del equipo, y la línea que la pregunta de instalación añade sobre ello.
+[needs]
+no-browser = "Se necesita Chromium para dibujar las páginas y no se encontró ninguno: chromium, chromium-browser, google-chrome-stable o google-chrome."
+title = "¿Abrir {command}?"
+checking = "Comprobando lo que necesita {command}…"
+not-now = "Ahora no"
+then-open = "{command} se abrirá en cuanto haya un navegador."

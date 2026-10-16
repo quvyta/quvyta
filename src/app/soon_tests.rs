@@ -77,7 +77,9 @@ fn its_details_say_what_it_will_be_and_that_it_is_not_out() {
     ] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    for text in ["Install", "cargo install", "A beta", "enter"] {
+    // The line under the list offers to install the apps that are missing, and an app not out
+    // yet is not one of them: nothing here offers to install qdesk.
+    for text in ["Install qdesk", "cargo install", "A beta", "enter"] {
         assert!(!screen.contains(text), "`{text}` is offered:\n{screen}");
     }
     h.set_locale("tr");
@@ -85,7 +87,7 @@ fn its_details_say_what_it_will_be_and_that_it_is_not_out() {
     for text in ["Yakında", "Henüz yayımlanmadı", "SSH üzerinden"] {
         assert!(screen.contains(text), "`{text}` is missing:\n{screen}");
     }
-    assert!(!screen.contains("Kur "), "{screen}");
+    assert!(!screen.contains("qdesk kurulsun mu?"), "{screen}");
 }
 
 #[test]

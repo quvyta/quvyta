@@ -42,4 +42,5 @@ pub const LOCALES: [(&str, &str); 9] = [
 ];
 
 /// The application's own keys, layered over the framework's as the keymap source `keymap.toml`.
-pub const KEYS: &str = "[app]\nprimary = \"enter\"\nback = \"esc\"\nrefresh = \"r\"\nupdate = \"u\"\n";
+pub const KEYS: &str =
+    "[app]\nprimary = \"enter\"\nback = \"esc\"\nrefresh = \"r\"\nupdate = \"u\"\ninstall-missing = \"i\"\n";

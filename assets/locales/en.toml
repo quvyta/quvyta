@@ -309,6 +309,25 @@ unix-only = "Not for Windows"
 arch-only-toast = "{command} runs only on Arch Linux"
 unix-only-toast = "{command} does not run on Windows"
 
+# What quvyta's own keys are called in the list of keys `?` opens, which the framework reads from
+# here. The hint bar of a screen says what a key does there and then; these say what the key is.
+[keys]
+primary = "the main action"
+back = "go back"
+refresh = "check for updates"
+update = "update the app shown"
+
+# The palette is quvyta's own list: every command it offers is one quvyta can do here, named by
+# what it will do to the app it names.
+[palette]
+open = "Open {command}"
+install = "Install {command}"
+update = "Update {command}"
+remove = "Remove {command}"
+show = "Show {command}"
+check = "Check for updates"
+missing = "Install the missing apps"
+
 # What changed in the version you now run. The entry itself is the changelog's own words, in
 # English; only the title, the way back and the note around them are said here.
 [whats-new]
@@ -320,3 +339,19 @@ forgotten = "quvyta cannot remember that you have read this, so it will show aga
 checked = "The download is checked against the checksum written into quvyta before anything is copied."
 registered = "Nothing outside your own account is told about the new font."
 undo = "To undo it, delete that folder."
+
+# The line under the list that counts the Quvyta apps this machine does not have and offers to
+# install them, one question after another.
+[missing]
+count = { one = "{n} app is not installed", other = "{n} apps are not installed" }
+install = "Install them"
+hint = "missing"
+
+# The question before an app that needs something from the machine opens, and the line the
+# install question adds about it.
+[needs]
+no-browser = "Chromium is needed to draw the pages, and none was found: chromium, chromium-browser, google-chrome-stable or google-chrome."
+title = "Open {command}?"
+checking = "Checking what {command} needs…"
+not-now = "Not now"
+then-open = "{command} opens as soon as a browser is there."

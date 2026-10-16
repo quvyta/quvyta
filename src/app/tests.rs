@@ -506,8 +506,13 @@ fn the_open_button_opens_an_app_installed_elsewhere_from_where_it_was_found() {
 fn quvyta_itself_and_missing_apps_have_nothing_to_open() {
     let (_root, mut h) = harness(100, 24);
     h.send(Msg::Select(index("quvyta")));
-    assert!(!h.screen().contains("Open") && !h.screen().contains("Install"), "{}", h.screen());
-    assert!(!h.screen().contains("enter"), "the footer offers nothing for enter:\n{}", h.screen());
+    // The line under the list offers to install the apps that are missing, and quvyta is not one
+    // of them: that line is the only place on the screen offering an install at all.
+    let screen = h.screen();
+    let offered: Vec<&str> = screen.lines().filter(|line| line.contains("Install")).collect();
+    assert_eq!(offered.len(), 1, "only the line under the list offers an install:\n{screen}");
+    assert!(offered[0].contains("Install them") && !screen.contains("Open"), "{screen}");
+    assert!(!screen.contains("enter"), "the footer offers nothing for enter:\n{screen}");
     // Neither of the two has an Open button to click, so these two messages stand in for the
     // clicks nobody can make: the key that runs them is offered to nobody, and neither opens.
     h.press("enter").send(Msg::Open(index("quvyta")));
@@ -622,14 +627,21 @@ fn labels_on_show(h: &Harness<Quvyta>, index: usize) -> Vec<String> {
     labels
 }
 
-/// Whether `line` is the one a `CopyValue` of `app` draws: it begins with the head of the
-/// value it carries, which the widget keeps when it shortens the middle.
+/// Whether every part of `line` that is cut short is a `CopyValue` of `app`: such a part begins
+/// with the head of the value it carries, which the widget keeps when it shortens the middle. A
+/// line can hold more than the page, such as the quiet line under the list beside it, so each
+/// part between wide gaps is asked on its own.
 fn carries_a_copyable(line: &str, app: &QuvytaApp) -> bool {
-    let mut values = app.library.into_iter().chain(std::iter::once(app.repository));
-    values.any(|value| {
-        let head: String = value.chars().take(8).collect();
-        line.trim_start().starts_with(&head)
-    })
+    let heads: Vec<String> = app
+        .library
+        .into_iter()
+        .chain(std::iter::once(app.repository))
+        .map(|value| value.chars().take(8).collect())
+        .collect();
+    line.split("  ")
+        .map(str::trim)
+        .filter(|part| part.contains('…'))
+        .all(|part| heads.iter().any(|head| part.starts_with(head.as_str())))
 }
 
 /// Nothing the language files say may be cut, in any language, at any width the split or the

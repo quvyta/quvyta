@@ -4,8 +4,11 @@
 mod confirm_install;
 mod detail;
 mod follow;
+mod help;
 mod install_view;
 mod installs;
+mod missing;
+mod needs;
 mod open;
 mod path_notice;
 mod settings;
@@ -28,6 +31,8 @@ use crate::machine::{LAUNCHER, Machine};
 pub use follow::{AppFollowing, Following};
 pub use installs::InstallMsg;
 use installs::Installs;
+use needs::Needs;
+pub use needs::NeedsMsg;
 use open::Opening;
 pub use path_notice::PathMsg;
 use path_notice::PathNotice;
@@ -80,6 +85,8 @@ pub struct Quvyta {
     appearance: Appearance,
     /// Installs running, waiting and ended.
     installs: Installs,
+    /// The question that stands between Open and an app the machine cannot run yet.
+    needs: Option<Needs>,
     /// What the detail area says about starting apps by name; `None` when there is nothing
     /// to say.
     path_notice: Option<PathNotice>,
@@ -102,6 +109,10 @@ pub struct Quvyta {
     setup: Option<Setup<Msg>>,
     /// Which apps are checked on the wizard's own step, by index of [`APPS`].
     picked: [bool; APPS.len()],
+    /// Whether the list of every key of the screen that is open is over it.
+    help: bool,
+    /// Whether the palette, where any command quvyta offers is run by typing, is open.
+    palette: bool,
     /// Whether this is Arch Linux, which is where the apps marked `arch_only` run. Read once
     /// at start, since the app list offers apps on every screen and not only on the wizard's.
     arch: bool,
@@ -139,10 +150,23 @@ pub enum Msg {
     /// The app at this index does not run on this machine, and the screen says so instead of
     /// offering to install it.
     NotInstallable(usize),
+    /// Shows or hides the list of every key of the screen that is open, which `?` opens over the
+    /// screen; the keys go back where they were when it closes.
+    Help(bool),
+    /// Shows or hides the palette, where a command of quvyta's is run by typing a few letters of
+    /// its name.
+    Palette(bool),
+    /// Leaves quvyta, as `ctrl q` does: the question while an install runs, the leaving while it
+    /// does not. A command of the palette has no key of its own to press, so it sends this.
+    Quit,
+    /// Something about the question that stands before an app is opened.
+    Needs(NeedsMsg),
     /// The PATH notice.
     Path(PathMsg),
     /// Something about updates.
     Updates(UpdateMsg),
+    /// Asks to install every app this machine does not have, one question after another.
+    InstallMissing,
     /// Shows this tab.
     Tab(Tab),
     /// Something on the Settings tab.
@@ -237,6 +261,7 @@ impl Quvyta {
             settings,
             appearance,
             installs: Installs::default(),
+            needs: None,
             path_notice: None,
             updates: Updates::default(),
             asked: VecDeque::new(),
@@ -244,6 +269,8 @@ impl Quvyta {
             following: None,
             following_selected: None,
             unreadable_told: Vec::new(),
+            help: false,
+            palette: false,
         }
     }
 
@@ -513,6 +540,13 @@ impl App for Quvyta {
         if self.setting_up() {
             return None;
         }
+        // The list of keys and the palette are the two ways in the framework binds for every Quvyta
+        // app: they are the screen's own, so they open over whatever screen is there.
+        match name {
+            "help" => return Some(Msg::Help(true)),
+            "palette" => return Some(Msg::Palette(true)),
+            _ => {}
+        }
         // The page of what changed has one way out, the Back button; the list it is over is not
         // there to act on.
         if self.whats_new {
@@ -528,6 +562,7 @@ impl App for Quvyta {
             "primary" => Some(Msg::Primary),
             "refresh" => Some(Msg::Updates(UpdateMsg::Check)),
             "update" => self.ask_update(self.selected),
+            "install-missing" => self.ask_missing(),
             _ => None,
         }
     }
@@ -584,6 +619,12 @@ impl App for Quvyta {
             }
             Msg::Primary => return self.update(Msg::Open(self.selected)),
             Msg::Open(index) => {
+                // An app that needs something of its own from the machine is asked about it
+                // before the terminal goes to a program that is about to fail; the question opens
+                // the app by itself as soon as the requirement is met.
+                if APPS.get(index).is_some_and(QuvytaApp::needs_browser) {
+                    return self.ask_need(index);
+                }
                 if let Some(opening) = self.opening(index) {
                     return opening.handoff(index, &APPS[index]);
                 }
@@ -614,8 +655,31 @@ impl App for Quvyta {
                     return Command::toast(Toast::warning(refusal));
                 }
             }
+            // A layer takes the keys while it is there and hands the focus back to the widget
+            // that had it when it closes, so the screen under it is left as it was found.
+            Msg::Help(open) => self.help = open,
+            Msg::Palette(open) => self.palette = open,
+            // What `ctrl q` does: the question while an install runs, the leaving while it does
+            // not.
+            Msg::Quit => {
+                if let Some(ask) = self.ask_before_quit() {
+                    return self.update(ask);
+                }
+                return Command::quit();
+            }
+            Msg::Needs(msg) => return self.update_needs(msg),
             Msg::Path(msg) => return self.update_path(msg),
             Msg::Updates(msg) => return self.update_update(msg),
+            // The line under the list asks for the apps that are missing, in the order of the
+            // list: each one its own question, so agreeing to one agrees to that one alone. A
+            // question of its own is open, so there is nothing to fill: that one is the person's
+            // business until it is answered or closed.
+            Msg::InstallMissing if self.installs.dialog.is_none() => {
+                let missing: Vec<usize> = self.missing().collect();
+                self.asked.extend(missing);
+                return self.ask_next();
+            }
+            Msg::InstallMissing => {}
             // The header's keys and a click leave the keys on the tabs, where they were.
             Msg::Tab(tab) => {
                 self.tab = tab;
@@ -655,10 +719,26 @@ impl App for Quvyta {
             .footer(|ui| self.footer(ui))
             .show(ui);
         self.install_dialogs(ui);
+        self.needs_dialog(ui);
+        self.layers(ui);
     }
 }
 
 impl Quvyta {
+    /// The list of every key of the screen, and the palette, each over the screen while it is
+    /// open. Both are the framework's own layer; neither draws anything of its own, so they add
+    /// nothing to what is behind them.
+    fn layers(&self, ui: &mut View<'_, Msg>) {
+        if self.help {
+            let layer = self.help_layer(ui.env());
+            ui.add(layer);
+        }
+        if self.palette {
+            let palette = self.palette(ui.env());
+            ui.add(palette);
+        }
+    }
+
     fn body(&self, ui: &mut View<'_, Msg>) {
         // The page of what changed is over the list, which is still there, whole, behind it. A
         // version whose entry the changelog that ships does not have is not shown at all.
@@ -683,10 +763,11 @@ impl Quvyta {
         }
     }
 
-    /// The list, and under it what there is to say about updates.
+    /// The list, and under it what there is to say about what is missing and about updates.
     fn list_area(&self, ui: &mut View<'_, Msg>) {
         ui.column(|ui| {
             self.list(ui);
+            self.missing_bar(ui);
             self.update_bar(ui);
         })
         .gap(1)
@@ -826,18 +907,19 @@ impl Quvyta {
                 .action(Scope::Global, "focus-next")
         } else if self.wide() || self.detail_page {
             let hints = KeyHints::new();
-            let hints = if self.installable(self.selected) {
-                hints.action_labelled_first(Scope::App, "primary", t!("hints.install"))
-            } else if self.opening(self.selected).is_some() {
-                hints.action_labelled_first(Scope::App, "primary", t!("hints.open"))
-            } else if self.updatable(self.selected) {
-                hints.action_labelled_first(Scope::App, "primary", t!("hints.update"))
-            } else {
-                hints
+            let hints = match self.main_hint() {
+                Some(label) => hints.action_labelled_first(Scope::App, "primary", label),
+                None => hints,
             };
             // Where enter updates already, `u` would say it twice.
             let hints = if self.updatable(self.selected) && self.opening(self.selected).is_some() {
                 hints.action_labelled_first(Scope::App, "update", t!("hints.update"))
+            } else {
+                hints
+            };
+            // The key of the line that counts what is missing, while it has something to say.
+            let hints = if self.anything_missing() {
+                hints.action_labelled(Scope::App, "install-missing", t!("missing.hint"))
             } else {
                 hints
             };
@@ -932,7 +1014,13 @@ mod cli_tests;
 #[cfg(test)]
 mod framework_tests;
 #[cfg(test)]
+mod help_tests;
+#[cfg(test)]
 mod install_tests;
+#[cfg(test)]
+mod missing_tests;
+#[cfg(test)]
+mod needs_tests;
 #[cfg(test)]
 mod platform_tests;
 #[cfg(test)]
